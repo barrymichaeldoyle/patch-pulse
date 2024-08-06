@@ -11,7 +11,8 @@
     "db:studio": "drizzle-kit studio",
     "dev": "next dev",
     "lint": "next lint",
-    "start": "next start"
+    "start": "next start",
+    "patch-pulse": "pnpm dlx patch-pulse@latest"
   },
   "dependencies": {
     "@t3-oss/env-nextjs": "^0.10.1",
