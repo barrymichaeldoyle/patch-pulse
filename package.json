@@ -1,0 +1,30 @@
+{
+  "name": "@patch-pulse/root",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.30.3",
+  "devDependencies": {
+    "knip": "6.3.1",
+    "oxfmt": "0.44.0",
+    "oxlint": "1.59.0"
+  },
+  "scripts": {
+    "build:shared": "node -e \"console.log('@patch-pulse/shared does not require a build step')\"",
+    "build:notifier": "pnpm --filter @patch-pulse/notifier-bot build",
+    "build:cli": "pnpm --filter patch-pulse build",
+    "build:vscode-extension": "pnpm --filter patch-pulse-vscode-extension compile",
+    "build": "pnpm run build:shared && pnpm run build:notifier && pnpm run build:cli && pnpm run build:vscode-extension",
+    "dev:notifier": "pnpm --filter @patch-pulse/notifier-bot start:dev",
+    "dev:cli": "pnpm --filter patch-pulse dev",
+    "dev:vscode-extension": "pnpm --filter patch-pulse-vscode-extension watch",
+    "format": "pnpm exec oxfmt --write .",
+    "format:check": "pnpm exec oxfmt --check .",
+    "knip": "pnpm exec knip",
+    "lint": "pnpm exec oxlint .",
+    "lint:fix": "pnpm exec oxlint --fix .",
+    "start:notifier": "pnpm --filter @patch-pulse/notifier-bot start",
+    "test:cli": "pnpm --filter patch-pulse test",
+    "test:vscode-extension": "pnpm --filter patch-pulse-vscode-extension test",
+    "test": "pnpm run test:cli"
+  }
+}

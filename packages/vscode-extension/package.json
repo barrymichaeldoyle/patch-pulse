@@ -1,0 +1,83 @@
+{
+  "name": "patch-pulse-vscode-extension",
+  "displayName": "Patch Pulse",
+  "description": "Keep a pulse on npm package updates! Shows inline version information for packages in package.json files.",
+  "version": "0.0.1",
+  "publisher": "patch-pulse",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.96.2"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:json",
+    "workspaceContains:**/package.json"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "patch-pulse.checkVersions",
+        "title": "Patch Pulse: Check Package Versions",
+        "category": "Patch Pulse"
+      },
+      {
+        "command": "patch-pulse.refreshVersions",
+        "title": "Patch Pulse: Refresh Package Versions",
+        "category": "Patch Pulse"
+      }
+    ],
+    "configuration": {
+      "title": "Patch Pulse",
+      "properties": {
+        "patchPulse.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable/disable Patch Pulse functionality"
+        },
+        "patchPulse.checkOnOpen": {
+          "type": "boolean",
+          "default": true,
+          "description": "Check versions when package.json files are opened"
+        },
+        "patchPulse.updateInterval": {
+          "type": "number",
+          "default": 3600,
+          "description": "Update interval in seconds (default: 1 hour)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "pnpm run package",
+    "compile": "pnpm run check-types && pnpm run lint && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "pnpm run check-types && pnpm run lint && node esbuild.js --production",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "pnpm run compile-tests && pnpm run compile && pnpm run lint",
+    "check-types": "tsc --noEmit",
+    "format": "pnpm exec oxfmt --write .",
+    "format:check": "pnpm exec oxfmt --check .",
+    "lint": "pnpm exec oxlint .",
+    "lint:fix": "pnpm exec oxlint --fix .",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "10.0.10",
+    "@types/node": "20.x",
+    "@types/vscode": "1.102.0",
+    "@vscode/test-cli": "0.0.11",
+    "@vscode/test-electron": "2.5.2",
+    "esbuild": "0.25.6",
+    "npm-run-all": "4.1.5",
+    "typescript": "5.8.3"
+  },
+  "dependencies": {
+    "@patch-pulse/shared": "workspace:*"
+  }
+}

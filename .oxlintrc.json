@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "node"],
+  "env": {
+    "builtin": true,
+    "node": true
+  },
+  "ignorePatterns": [
+    "**/coverage/**",
+    "**/dist/**",
+    "**/lib/**",
+    "**/node_modules/**",
+    "**/out/**",
+    "**/*.d.ts"
+  ],
+  "rules": {
+    "eqeqeq": "error"
+  }
+}

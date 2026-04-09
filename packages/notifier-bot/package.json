@@ -1,0 +1,43 @@
+{
+  "name": "@patch-pulse/notifier-bot",
+  "version": "0.0.1",
+  "description": "Patch Pulse notifier service",
+  "author": "",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "nest build",
+    "format": "pnpm exec oxfmt --write .",
+    "format:check": "pnpm exec oxfmt --check .",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch --env-file .env",
+    "start:docker": "docker run -p 3000:3000 --env-file .env patch-pulse:latest",
+    "start:tunnel": "ngrok http --domain=welcome-newt-polished.ngrok-free.app 3000 --region=eu",
+    "start:prod": "node dist/main",
+    "lint": "pnpm exec oxlint .",
+    "lint:fix": "pnpm exec oxlint --fix .",
+    "gen-types": "pnpm dlx supabase gen types typescript --project-id 'tbdgovoaqpqsdncdaadp' --schema public > src/services/supabase/gen/types.ts && pnpm exec oxfmt --write src/services/supabase/gen/types.ts"
+  },
+  "dependencies": {
+    "@patch-pulse/shared": "workspace:*",
+    "@nestjs/common": "^10.0.0",
+    "@nestjs/config": "^3.1.1",
+    "@nestjs/core": "^10.0.0",
+    "@nestjs/platform-express": "^10.0.0",
+    "@nestjs/schedule": "^3.0.4",
+    "@slack/web-api": "^6.9.0",
+    "@supabase/supabase-js": "^2.38.0",
+    "axios": "^1.5.1",
+    "discord.js": "^14.13.0",
+    "reflect-metadata": "^0.1.13",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^10.0.0",
+    "@nestjs/schematics": "^10.0.0",
+    "@types/node": "^20.3.1",
+    "ts-loader": "^9.4.3",
+    "typescript": "^5.1.3"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "skip": [
+    // Exact package names
+    "lodash",
+    "chalk",
+
+    // Glob patterns (use * for wildcards)
+    "@types/*",
+    "test-*",
+    "*-dev",
+
+    // Regex patterns (use regex syntax)
+    ".*-dev",
+    "^@angular/.*",
+    "zone\\.js"
+  ]
+}

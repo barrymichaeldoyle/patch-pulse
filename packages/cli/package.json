@@ -1,0 +1,67 @@
+{
+  "name": "patch-pulse",
+  "version": "2.9.0",
+  "description": "Check for outdated npm dependencies",
+  "type": "module",
+  "bin": {
+    "patch-pulse": "lib/index.js"
+  },
+  "exports": {
+    "./utils": "./lib/utils/index.js"
+  },
+  "files": [
+    "lib/**/*",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "cli",
+    "npm",
+    "dependencies",
+    "package.json",
+    "updates",
+    "version-check",
+    "patch-pulse"
+  ],
+  "license": "MIT",
+  "author": {
+    "name": "Barry Michael Doyle",
+    "email": "barry@barrymichaeldoyle.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PatchPulse/cli.git"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "node scripts/generate-version.cjs && tsc && node scripts/fix-imports.cjs",
+    "dev": "tsx src/index.ts",
+    "test:build": "npm run build && node lib/index.js",
+    "test:version": "npm run build && node lib/index.js --version",
+    "test:help": "npm run build && node lib/index.js --help",
+    "format": "pnpm exec oxfmt --write .",
+    "format:check": "pnpm exec oxfmt --check .",
+    "lint": "pnpm exec oxlint .",
+    "lint:fix": "pnpm exec oxlint --fix .",
+    "lint:format": "npm run lint && npm run format",
+    "lint:format:fix": "npm run lint:fix && npm run format",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui",
+    "ci-check": "node scripts/ci-check.cjs",
+    "deploy": "npm run build && npm publish --tag beta",
+    "deploy:latest": "npm run build && npm publish"
+  },
+  "dependencies": {
+    "@patch-pulse/shared": "workspace:*",
+    "chalk": "5.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.0.13",
+    "@vitest/coverage-v8": "3.2.4",
+    "tsx": "4.20.3",
+    "typescript": "5.8.3",
+    "vitest": "3.2.4"
+  }
+}
