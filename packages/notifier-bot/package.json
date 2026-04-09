@@ -8,7 +8,6 @@
   "scripts": {
     "dev": "convex dev",
     "deploy": "convex deploy",
-    "migrate": "tsx scripts/migrate-from-supabase.ts",
     "format": "pnpm exec oxfmt --write .",
     "format:check": "pnpm exec oxfmt --check .",
     "lint": "pnpm exec oxlint .",

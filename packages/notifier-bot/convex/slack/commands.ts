@@ -35,9 +35,7 @@ export const npmTrack = httpAction(async (ctx, request) => {
   });
 
   return new Response(
-    JSON.stringify({
-      text: `⏳ processing your request to track *${packageName}* on _npm_ 📦`,
-    }),
+    JSON.stringify({ text: `⏳ Tracking *${packageName}*…` }),
     { headers: { "Content-Type": "application/json" } },
   );
 });
@@ -55,9 +53,7 @@ export const npmUntrack = httpAction(async (ctx, request) => {
   });
 
   return new Response(
-    JSON.stringify({
-      text: `⏳ processing your request to stop tracking *${packageName}* on _npm_ 📦`,
-    }),
+    JSON.stringify({ text: `⏳ Untracking *${packageName}*…` }),
     { headers: { "Content-Type": "application/json" } },
   );
 });
@@ -73,9 +69,7 @@ export const listPackages = httpAction(async (ctx, request) => {
   });
 
   return new Response(
-    JSON.stringify({
-      text: `⏳ processing your request to list all tracked packages 📦`,
-    }),
+    JSON.stringify({ text: `⏳ Fetching your tracked packages…` }),
     { headers: { "Content-Type": "application/json" } },
   );
 });
@@ -91,7 +85,7 @@ export const processNpmTrack = internalAction({
   handler: async (ctx, { packageName, teamId, responseUrl }) => {
     const subscriber = await ctx.runQuery(internal.subscribers.getByTeamId, { teamId });
     if (!subscriber) {
-      await sendToSlack(responseUrl, `❌ workspace not found. Please reinstall PatchPulse.`);
+      await sendToSlack(responseUrl, `❌ Workspace not found. Please reinstall PatchPulse.`);
       return;
     }
 
@@ -100,10 +94,7 @@ export const processNpmTrack = internalAction({
     }).catch(() => null);
 
     if (!version) {
-      await sendToSlack(
-        responseUrl,
-        `❌ failed to fetch _npm_ data for *${packageName}* 📦`,
-      );
+      await sendToSlack(responseUrl, `❌ Could not find *${packageName}* on npm.`);
       return;
     }
 
@@ -121,7 +112,7 @@ export const processNpmTrack = internalAction({
     if (existing) {
       await sendToSlack(
         responseUrl,
-        `⚠️ workspace is already tracking *${packageName}* on _npm_ 📦 *${packageName}@latest* version is *${existing.lastNotifiedVersion}*`,
+        `Already tracking *${packageName}* — currently at *${existing.lastNotifiedVersion}*`,
       );
       return;
     }
@@ -139,11 +130,9 @@ export const processNpmTrack = internalAction({
     if (details) {
       await sendToSlack(
         details.webhookUrl,
-        `🚀 started tracking *${packageName}* on _npm_ 📦 *${packageName}@latest* version is *${version}* 📢 stay tuned for updates!`,
+        `Now tracking *${packageName}* — current version *${version}*`,
       );
     }
-
-    await sendToSlack(responseUrl, `✅ process complete`);
   },
 });
 
@@ -156,16 +145,13 @@ export const processNpmUntrack = internalAction({
   handler: async (ctx, { packageName, teamId, responseUrl }) => {
     const pkg = await ctx.runQuery(internal.packages.getByName, { name: packageName });
     if (!pkg) {
-      await sendToSlack(
-        responseUrl,
-        `⚠️ workspace was never tracking *${packageName}* on _npm_ 📦`,
-      );
+      await sendToSlack(responseUrl, `*${packageName}* is not in your tracked packages.`);
       return;
     }
 
     const subscriber = await ctx.runQuery(internal.subscribers.getByTeamId, { teamId });
     if (!subscriber) {
-      await sendToSlack(responseUrl, `❌ workspace not found. Please reinstall PatchPulse.`);
+      await sendToSlack(responseUrl, `❌ Workspace not found. Please reinstall PatchPulse.`);
       return;
     }
 
@@ -175,10 +161,7 @@ export const processNpmUntrack = internalAction({
     });
 
     if (!existing) {
-      await sendToSlack(
-        responseUrl,
-        `⚠️ workspace was never tracking *${packageName}* on _npm_ 📦`,
-      );
+      await sendToSlack(responseUrl, `*${packageName}* is not in your tracked packages.`);
       return;
     }
 
@@ -192,10 +175,8 @@ export const processNpmUntrack = internalAction({
     });
 
     if (details) {
-      await sendToSlack(details.webhookUrl, `🔔 stopped tracking *${packageName}* on _npm_ 📦`);
+      await sendToSlack(details.webhookUrl, `Stopped tracking *${packageName}*`);
     }
-
-    await sendToSlack(responseUrl, `✅ process complete`);
   },
 });
 
@@ -207,7 +188,7 @@ export const processList = internalAction({
   handler: async (ctx, { teamId, responseUrl }) => {
     const subscriber = await ctx.runQuery(internal.subscribers.getByTeamId, { teamId });
     if (!subscriber) {
-      await sendToSlack(responseUrl, `❌ workspace not found. Please reinstall PatchPulse.`);
+      await sendToSlack(responseUrl, `❌ Workspace not found. Please reinstall PatchPulse.`);
       return;
     }
 
@@ -218,22 +199,22 @@ export const processList = internalAction({
     if (subscriptions.length === 0) {
       await sendToSlack(
         responseUrl,
-        `📭 you are not currently tracking any packages on _npm_ 📦`,
+        `You're not tracking any packages yet. Use \`/npmtrack <package>\` to get started.`,
       );
       return;
     }
 
     const packageIds = subscriptions.map((s) => s.packageId);
     const packages = await ctx.runQuery(internal.packages.getByIds, { ids: packageIds });
-    const validPackages = packages.filter(Boolean);
 
-    const packageList = validPackages
+    const lines = packages
+      .filter(Boolean)
       .sort((a, b) => a!.name.localeCompare(b!.name))
-      .reduce((acc, pkg) => acc + `• ${pkg!.name}\n`, "");
+      .map((pkg) => `• *${pkg!.name}* — ${pkg!.currentVersion}`);
 
     await sendToSlack(
       responseUrl,
-      `📦 you are currently tracking *${validPackages.length}* packages on _npm_:\n${packageList}`,
+      `Tracking *${lines.length}* package${lines.length === 1 ? "" : "s"}:\n${lines.join("\n")}`,
     );
   },
 });

@@ -18,6 +18,7 @@ import type * as slack_events from "../slack/events.js";
 import type * as slack_oauth from "../slack/oauth.js";
 import type * as subscribers from "../subscribers.js";
 import type * as subscriptions from "../subscriptions.js";
+import type * as testNotification from "../testNotification.js";
 
 import type {
   ApiFromModules,
@@ -36,6 +37,7 @@ declare const fullApi: ApiFromModules<{
   "slack/oauth": typeof slack_oauth;
   subscribers: typeof subscribers;
   subscriptions: typeof subscriptions;
+  testNotification: typeof testNotification;
 }>;
 
 /**

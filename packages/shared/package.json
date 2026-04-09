@@ -2,14 +2,7 @@
   "name": "@patch-pulse/shared",
   "version": "0.1.0",
   "private": true,
-  "main": "./index.cjs",
-  "module": "./index.mjs",
-  "types": "./index.d.ts",
   "exports": {
-    ".": {
-      "types": "./index.d.ts",
-      "import": "./index.mjs",
-      "require": "./index.cjs"
-    }
+    ".": "./src/index.ts"
   }
 }
