@@ -37,25 +37,37 @@ export const getByPackageAndSubscriber = internalQuery({
 });
 
 /**
- * Returns the subscription for a specific (package, subscriber, channel) triple.
- * channelId === undefined matches the default-channel subscription (no explicit channel).
- * Uniqueness is (packageId, subscriberId, channelId) — the same package can be tracked
- * in multiple channels simultaneously.
+ * Looks up a subscription by its natural key:
+ * - channelId provided → channel subscription: unique by (packageId, subscriberId, channelId)
+ * - userId provided    → DM subscription: unique by (packageId, subscriberId, userId)
+ * - neither            → legacy default-channel subscription
  */
 export const exists = internalQuery({
   args: {
     packageId: v.id("packages"),
     subscriberId: v.id("subscribers"),
     channelId: v.optional(v.string()),
+    userId: v.optional(v.string()),
   },
-  handler: async (ctx, { packageId, subscriberId, channelId }) => {
-    const subs = await ctx.db
-      .query("subscriptions")
-      .withIndex("by_package_and_subscriber", (q) =>
-        q.eq("packageId", packageId).eq("subscriberId", subscriberId),
-      )
-      .collect();
-    return subs.find((s) => s.channelId === channelId) ?? null;
+  handler: async (ctx, { packageId, subscriberId, channelId, userId }) => {
+    if (channelId) {
+      const subs = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_package_and_subscriber", (q) =>
+          q.eq("packageId", packageId).eq("subscriberId", subscriberId),
+        )
+        .collect();
+      return subs.find((s) => s.channelId === channelId) ?? null;
+    }
+
+    return (
+      (await ctx.db
+        .query("subscriptions")
+        .withIndex("by_package_subscriber_user", (q) =>
+          q.eq("packageId", packageId).eq("subscriberId", subscriberId).eq("userId", userId),
+        )
+        .first()) ?? null
+    );
   },
 });
 
@@ -67,6 +79,7 @@ export const create = internalMutation({
     minUpdateType: v.optional(v.union(v.literal("patch"), v.literal("minor"), v.literal("major"))),
     channelId: v.optional(v.string()),
     channelName: v.optional(v.string()),
+    userId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await ctx.db.insert("subscriptions", {
@@ -77,45 +90,65 @@ export const create = internalMutation({
       minUpdateType: args.minUpdateType,
       channelId: args.channelId,
       channelName: args.channelName,
+      userId: args.userId,
     });
   },
 });
 
-/** Removes the subscription for a specific (package, subscriber, channel) triple. */
+/**
+ * Removes a subscription by its natural key (mirrors `exists`).
+ * - channelId provided → remove that channel subscription
+ * - userId provided    → remove that user's DM subscription
+ * - neither            → remove legacy default-channel subscription
+ */
 export const remove = internalMutation({
   args: {
     packageId: v.id("packages"),
     subscriberId: v.id("subscribers"),
     channelId: v.optional(v.string()),
+    userId: v.optional(v.string()),
   },
-  handler: async (ctx, { packageId, subscriberId, channelId }) => {
-    const subs = await ctx.db
-      .query("subscriptions")
-      .withIndex("by_package_and_subscriber", (q) =>
-        q.eq("packageId", packageId).eq("subscriberId", subscriberId),
-      )
-      .collect();
-    for (const sub of subs.filter((s) => s.channelId === channelId)) {
-      await ctx.db.delete(sub._id);
+  handler: async (ctx, { packageId, subscriberId, channelId, userId }) => {
+    if (channelId) {
+      const subs = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_package_and_subscriber", (q) =>
+          q.eq("packageId", packageId).eq("subscriberId", subscriberId),
+        )
+        .collect();
+      for (const sub of subs.filter((s) => s.channelId === channelId)) {
+        await ctx.db.delete(sub._id);
+      }
+      return;
     }
+
+    const sub = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_package_subscriber_user", (q) =>
+        q.eq("packageId", packageId).eq("subscriberId", subscriberId).eq("userId", userId),
+      )
+      .first();
+    if (sub) await ctx.db.delete(sub._id);
   },
 });
 
-/** Removes ALL subscriptions for a (package, subscriber) pair across all channels. */
-export const removeAll = internalMutation({
+export const updateLastNotifiedVersion = internalMutation({
   args: {
-    packageId: v.id("packages"),
-    subscriberId: v.id("subscribers"),
+    subscriptionId: v.id("subscriptions"),
+    version: v.string(),
   },
-  handler: async (ctx, { packageId, subscriberId }) => {
-    const subs = await ctx.db
-      .query("subscriptions")
-      .withIndex("by_package_and_subscriber", (q) =>
-        q.eq("packageId", packageId).eq("subscriberId", subscriberId),
-      )
-      .collect();
-    for (const sub of subs) {
-      await ctx.db.delete(sub._id);
-    }
+  handler: async (ctx, { subscriptionId, version }) => {
+    await ctx.db.patch(subscriptionId, { lastNotifiedVersion: version });
   },
 });
+
+export const updateMinUpdateType = internalMutation({
+  args: {
+    subscriptionId: v.id("subscriptions"),
+    minUpdateType: v.union(v.literal("patch"), v.literal("minor"), v.literal("major")),
+  },
+  handler: async (ctx, { subscriptionId, minUpdateType }) => {
+    await ctx.db.patch(subscriptionId, { minUpdateType });
+  },
+});
+

@@ -11,6 +11,13 @@ export const getByTeamId = internalQuery({
   },
 });
 
+export const getById = internalQuery({
+  args: { subscriberId: v.id("subscribers") },
+  handler: async (ctx, { subscriberId }) => {
+    return await ctx.db.get(subscriberId);
+  },
+});
+
 export const getSlackDetails = internalQuery({
   args: { subscriberId: v.id("subscribers") },
   handler: async (ctx, { subscriberId }) => {
@@ -27,10 +34,6 @@ export const upsertSlackWorkspace = internalMutation({
     botUserId: v.string(),
     teamId: v.string(),
     teamName: v.string(),
-    webhookUrl: v.string(),
-    webhookChannel: v.string(),
-    webhookChannelId: v.string(),
-    webhookConfigurationUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -53,10 +56,6 @@ export const upsertSlackWorkspace = internalMutation({
           accessToken: args.accessToken,
           botUserId: args.botUserId,
           teamName: args.teamName,
-          webhookUrl: args.webhookUrl,
-          webhookChannel: args.webhookChannel,
-          webhookChannelId: args.webhookChannelId,
-          webhookConfigurationUrl: args.webhookConfigurationUrl,
         });
       }
 
@@ -75,10 +74,6 @@ export const upsertSlackWorkspace = internalMutation({
       botUserId: args.botUserId,
       teamId: args.teamId,
       teamName: args.teamName,
-      webhookUrl: args.webhookUrl,
-      webhookChannel: args.webhookChannel,
-      webhookChannelId: args.webhookChannelId,
-      webhookConfigurationUrl: args.webhookConfigurationUrl,
     });
 
     return subscriberId;

@@ -16,6 +16,7 @@ import {
   formatSlackPackageLink,
   formatSlackVersionLink,
 } from "./slack/links";
+import { chatPostMessage, PrivateChannelError } from "./slack/api";
 
 const UPDATE_TYPE_RANK: Record<UpdateType, number> = { patch: 0, minor: 1, major: 2 };
 
@@ -63,31 +64,18 @@ function formatUpdateLine(
   );
 }
 
-async function chatPostMessage(token: string, channel: string, text: string): Promise<void> {
-  const response = await fetch("https://slack.com/api/chat.postMessage", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ channel, text }),
-  });
-
-  const data = await response.json();
-  if (!data.ok) throw new Error(`Slack error: ${data.error}`);
-}
-
 export const checkForUpdates = internalAction({
   args: {},
   handler: async (ctx) => {
     const packages = await ctx.runQuery(internal.packages.getAll);
 
-    // Collect updates: subscriberId → channelId → update lines
-    // channelId is undefined when the subscription uses the workspace default channel
-    const updatesBySubscriber = new Map<
-      Id<"subscribers">,
-      Map<string | undefined, string[]>
-    >();
+    // Collect updates: subscriberId → destination key → { lines, subscription stamps to write after send }
+    // Key format: "channel:<id>" | "dm:<userId>" | "default" (legacy fallback)
+    type DestinationEntry = {
+      lines: string[];
+      stamps: Array<{ subscriptionId: Id<"subscriptions">; newVersion: string }>;
+    };
+    const updatesBySubscriber = new Map<Id<"subscribers">, Map<string, DestinationEntry>>();
 
     for (const pkg of packages) {
       let manifest: NpmPackageManifest | undefined;
@@ -131,11 +119,14 @@ export const checkForUpdates = internalAction({
           const threshold = sub.minUpdateType ?? "patch";
           if (!meetsThreshold(updateType, threshold)) continue;
 
-          const channelMap =
-            updatesBySubscriber.get(sub.subscriberId) ?? new Map<string | undefined, string[]>();
-          const lines = channelMap.get(sub.channelId) ?? [];
-          lines.push(line);
-          channelMap.set(sub.channelId, lines);
+          if (!sub.channelId && !sub.userId) continue;
+          const key = sub.channelId ? `channel:${sub.channelId}` : `dm:${sub.userId}`;
+
+          const channelMap = updatesBySubscriber.get(sub.subscriberId) ?? new Map<string, DestinationEntry>();
+          const entry = channelMap.get(key) ?? { lines: [], stamps: [] };
+          entry.lines.push(line);
+          entry.stamps.push({ subscriptionId: sub._id, newVersion: version });
+          channelMap.set(key, entry);
           updatesBySubscriber.set(sub.subscriberId, channelMap);
         }
       }
@@ -145,22 +136,61 @@ export const checkForUpdates = internalAction({
 
     // Send one message per (subscriber, channel) pair
     for (const [subscriberId, channelMap] of updatesBySubscriber) {
+      const subscriber = await ctx.runQuery(internal.subscribers.getById, { subscriberId });
+      if (!subscriber?.active) continue;
+
       const details = await ctx.runQuery(internal.subscribers.getSlackDetails, {
         subscriberId,
       });
 
       if (!details) continue;
 
-      for (const [channelId, updates] of channelMap) {
-        const targetChannel = channelId ?? details.webhookChannelId;
-        const text =
-          `📦 *${updates.length} npm package update${updates.length === 1 ? "" : "s"}*\n\n` +
-          updates.join("\n");
+      for (const [key, { lines: updates, stamps }] of channelMap) {
+        const targetChannel = key.startsWith("channel:")
+          ? key.slice("channel:".length)
+          : key.slice("dm:".length);
 
-        try {
-          await chatPostMessage(details.accessToken, targetChannel, text);
-        } catch (error) {
-          console.error(`error sending to ${targetChannel}:`, error);
+        // Chunk updates into messages under ~3500 chars to stay within Slack's limits
+        const SLACK_CHAR_LIMIT = 3500;
+        const batches: string[][] = [];
+        let batch: string[] = [];
+        let batchLen = 0;
+        for (const line of updates) {
+          if (batch.length > 0 && batchLen + line.length + 1 > SLACK_CHAR_LIMIT) {
+            batches.push(batch);
+            batch = [];
+            batchLen = 0;
+          }
+          batch.push(line);
+          batchLen += line.length + 1;
+        }
+        if (batch.length > 0) batches.push(batch);
+
+        let sent = false;
+        for (const batchLines of batches) {
+          const text =
+            `📦 *${updates.length} npm package update${updates.length === 1 ? "" : "s"}*\n\n` +
+            batchLines.join("\n");
+          try {
+            await chatPostMessage(details.accessToken, targetChannel, text);
+            sent = true;
+          } catch (error) {
+            if (error instanceof PrivateChannelError) {
+              console.warn(`skipping private channel ${targetChannel}: bot not invited`);
+            } else {
+              console.error(`error sending to ${targetChannel}:`, error);
+            }
+            break;
+          }
+        }
+
+        if (sent) {
+          for (const { subscriptionId, newVersion } of stamps) {
+            await ctx.runMutation(internal.subscriptions.updateLastNotifiedVersion, {
+              subscriptionId,
+              version: newVersion,
+            });
+          }
         }
       }
     }

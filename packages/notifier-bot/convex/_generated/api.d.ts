@@ -10,13 +10,14 @@
 
 import type * as crons from "../crons.js";
 import type * as http from "../http.js";
-import type * as migration from "../migration.js";
 import type * as packages from "../packages.js";
 import type * as polling from "../polling.js";
+import type * as slack_api from "../slack/api.js";
 import type * as slack_commands from "../slack/commands.js";
 import type * as slack_events from "../slack/events.js";
 import type * as slack_links from "../slack/links.js";
 import type * as slack_oauth from "../slack/oauth.js";
+import type * as slack_verify from "../slack/verify.js";
 import type * as subscribers from "../subscribers.js";
 import type * as subscriptions from "../subscriptions.js";
 import type * as testNotification from "../testNotification.js";
@@ -30,13 +31,14 @@ import type {
 declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   http: typeof http;
-  migration: typeof migration;
   packages: typeof packages;
   polling: typeof polling;
+  "slack/api": typeof slack_api;
   "slack/commands": typeof slack_commands;
   "slack/events": typeof slack_events;
   "slack/links": typeof slack_links;
   "slack/oauth": typeof slack_oauth;
+  "slack/verify": typeof slack_verify;
   subscribers: typeof subscribers;
   subscriptions: typeof subscriptions;
   testNotification: typeof testNotification;

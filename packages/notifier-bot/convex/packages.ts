@@ -50,6 +50,38 @@ export const upsertVersion = internalMutation({
   },
 });
 
+/**
+ * Inserts the package if it doesn't exist yet; returns the ID and current DB version.
+ * Unlike upsertVersion, does NOT advance currentVersion on existing packages —
+ * that is polling's job, so existing subscribers don't miss the notification.
+ */
+export const ensureExists = internalMutation({
+  args: {
+    name: v.string(),
+    version: v.string(),
+    ecosystem: v.optional(v.string()),
+  },
+  handler: async (ctx, { name, version, ecosystem }) => {
+    const existing = await ctx.db
+      .query("packages")
+      .withIndex("by_name", (q) => q.eq("name", name))
+      .first();
+
+    if (existing) {
+      return { packageId: existing._id, dbVersion: existing.currentVersion };
+    }
+
+    const packageId = await ctx.db.insert("packages", {
+      name,
+      currentVersion: version,
+      ecosystem: ecosystem ?? "npm",
+      lastChecked: Date.now(),
+    });
+
+    return { packageId, dbVersion: version };
+  },
+});
+
 export const getByIds = internalQuery({
   args: { ids: v.array(v.id("packages")) },
   handler: async (ctx, { ids }) => {

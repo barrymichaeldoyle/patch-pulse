@@ -22,10 +22,6 @@ export default defineSchema({
     botUserId: v.string(),
     teamId: v.string(),
     teamName: v.string(),
-    webhookUrl: v.string(),
-    webhookChannel: v.string(),
-    webhookChannelId: v.string(),
-    webhookConfigurationUrl: v.optional(v.string()),
   })
     .index("by_subscriber", ["subscriberId"])
     .index("by_team_id", ["teamId"]),
@@ -36,11 +32,13 @@ export default defineSchema({
     lastNotifiedVersion: v.string(),
     subscriptionDate: v.number(),
     minUpdateType: v.optional(v.union(v.literal("patch"), v.literal("minor"), v.literal("major"))),
-    channelId: v.optional(v.string()),   // Slack channel ID (e.g. C1234567)
-    channelName: v.optional(v.string()), // Human-readable name for display (e.g. frontend)
+    channelId: v.optional(v.string()),   // Slack channel ID — set for channel subscriptions
+    channelName: v.optional(v.string()), // Human-readable channel name (e.g. frontend)
+    userId: v.optional(v.string()),      // Slack user ID — set for DM subscriptions (no channelId)
   })
     .index("by_package", ["packageId"])
     .index("by_subscriber", ["subscriberId"])
-    .index("by_package_and_subscriber", ["packageId", "subscriberId"]),
+    .index("by_package_and_subscriber", ["packageId", "subscriberId"])
+    .index("by_package_subscriber_user", ["packageId", "subscriberId", "userId"]),
 
 });

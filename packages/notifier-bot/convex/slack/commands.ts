@@ -1,10 +1,13 @@
 import { v } from "convex/values";
 import {
   fetchNpmLatestVersion,
+  isVersionOutdated,
 } from "@patch-pulse/shared";
 import { httpAction, internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { formatSlackPackageLink, formatSlackVersionText } from "./links";
+import { chatPostMessage, PrivateChannelError } from "./api";
+import { verifySlackRequest } from "./verify";
 
 type MinUpdateType = "patch" | "minor" | "major";
 
@@ -17,7 +20,8 @@ function cleanText(text: string): string {
 }
 
 /**
- * Parses "/npmtrack react [#channel] [minor|major]" in any order after the package name.
+ * Parses "/npmtrack react vue typescript [#channel] [minor|major]" in any order.
+ * Supports multiple space-separated package names before the optional channel and filter.
  * Uses regex extraction rather than positional splitting so it's robust to Slack's
  * various channel encoding formats (<#C1234|general> vs plain #general).
  *
@@ -25,10 +29,10 @@ function cleanText(text: string): string {
  * - Each (package, channel) pair is an independent subscription.
  * - "/npmtrack react #general" and "/npmtrack react #frontend" create two separate
  *   subscriptions that can have different minUpdateType filters and notify independently.
- * - Omitting a channel routes notifications to the workspace's default webhook channel.
+ * - Omitting a channel sends notifications to the invoking user's DMs.
  */
 function parseTrackArgs(raw: string): {
-  packageName: string;
+  packageNames: string[];
   channel: { id: string; name: string } | null;
   minUpdateType: MinUpdateType;
 } {
@@ -58,7 +62,9 @@ function parseTrackArgs(raw: string): {
     text = text.replace(filterMatch[0], " ").trim();
   }
 
-  return { packageName: cleanText(text), channel, minUpdateType };
+  const packageNames = text.split(/\s+/).map(cleanText).filter(Boolean);
+
+  return { packageNames, channel, minUpdateType };
 }
 
 function formatMinUpdateType(minUpdateType: MinUpdateType | undefined): string | null {
@@ -70,23 +76,12 @@ function formatChannelPhrase(channelName: string | undefined): string {
   return channelName ? ` in *#${channelName}*` : "";
 }
 
-function formatChannelDescriptor(channelName: string | undefined): string {
-  return channelName ? `*#${normalizeChannelName(channelName)}*` : "the workspace default channel";
+function formatChannelDescriptor(channelName: string | undefined, channelId: string | undefined): string {
+  return channelName ? `*#${normalizeChannelName(channelName)}*` : channelId ? `<#${channelId}>` : "this channel";
 }
 
-function formatTrackingTarget(
-  channelName: string | undefined,
-  defaultChannelName: string | undefined,
-): string {
-  if (channelName) {
-    return `*#${normalizeChannelName(channelName)}*`;
-  }
-
-  if (defaultChannelName) {
-    return `*#${normalizeChannelName(defaultChannelName)}* (default channel)`;
-  }
-
-  return "the workspace default channel";
+function formatTrackingTarget(channelName: string | undefined): string {
+  return channelName ? `*#${normalizeChannelName(channelName)}*` : "this channel";
 }
 
 function normalizeChannelName(channelName: string): string {
@@ -95,27 +90,19 @@ function normalizeChannelName(channelName: string): string {
 
 function getListChannelMetadata(
   channelName: string | undefined,
-  defaultChannelName: string | undefined,
+  userId: string | undefined,
 ): { key: string; heading: string } {
   if (channelName) {
     const normalized = normalizeChannelName(channelName);
     return {
-      key: normalized,
+      key: `channel:${normalized}`,
       heading: `📣 *#${normalized}*`,
     };
   }
 
-  if (defaultChannelName) {
-    const normalized = normalizeChannelName(defaultChannelName);
-    return {
-      key: normalized,
-      heading: `🏠 *#${normalized}* (default channel)`,
-    };
-  }
-
   return {
-    key: "__default__",
-    heading: "🏠 *Default channel*",
+    key: `dm:${userId}`,
+    heading: `💬 *Your DMs*`,
   };
 }
 
@@ -128,48 +115,60 @@ async function sendToSlack(url: string, text: string): Promise<void> {
   });
 }
 
-/** Posts a message to a Slack channel using the bot token. */
-async function chatPostMessage(token: string, channel: string, text: string): Promise<void> {
-  const response = await fetch("https://slack.com/api/chat.postMessage", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ channel, text }),
-  });
-  const data = await response.json();
-  if (!data.ok) throw new Error(`Slack error: ${data.error}`);
-}
 
 // HTTP action handlers — return immediately, schedule async work
 
 export const npmTrack = httpAction(async (ctx, request) => {
-  const body = parseSlashBody(await request.text());
-  const { packageName, channel, minUpdateType } = parseTrackArgs(body.text ?? "");
+  const rawBody = await verifySlackRequest(request);
+  if (rawBody === null) return new Response("Unauthorized", { status: 401 });
+
+  const body = parseSlashBody(rawBody);
+  const { packageNames, channel, minUpdateType } = parseTrackArgs(body.text ?? "");
   const teamId = body.team_id;
   const responseUrl = body.response_url;
+  const userId = body.user_id;
 
-  await ctx.scheduler.runAfter(0, internal.slack.commands.processNpmTrack, {
-    packageName,
-    teamId,
-    responseUrl,
-    minUpdateType,
-    channelId: channel?.id,
-    channelName: channel?.name,
+  for (const packageName of packageNames) {
+    await ctx.scheduler.runAfter(0, internal.slack.commands.processNpmTrack, {
+      packageName,
+      teamId,
+      responseUrl,
+      minUpdateType,
+      channelId: channel?.id,
+      channelName: channel?.name,
+      userId,
+    });
+  }
+
+  const packageList = packageNames.map((p) => `*${p}*`).join(", ");
+  const ackText =
+    packageNames.length === 0
+      ? `⚠️ Please provide a package name, e.g. \`/npmtrack react\``
+      : `⏳ Tracking ${packageList}${formatChannelPhrase(channel?.name)}…`;
+
+  return new Response(JSON.stringify({ text: ackText }), {
+    headers: { "Content-Type": "application/json" },
   });
-
-  return new Response(
-    JSON.stringify({ text: `⏳ Tracking *${packageName}*…` }),
-    { headers: { "Content-Type": "application/json" } },
-  );
 });
 
 export const npmUntrack = httpAction(async (ctx, request) => {
-  const body = parseSlashBody(await request.text());
-  const { packageName, channel } = parseTrackArgs(body.text ?? "");
+  const rawBody = await verifySlackRequest(request);
+  if (rawBody === null) return new Response("Unauthorized", { status: 401 });
+
+  const body = parseSlashBody(rawBody);
+  const { packageNames, channel } = parseTrackArgs(body.text ?? "");
+
+  if (packageNames.length === 0) {
+    return new Response(
+      JSON.stringify({ text: `⚠️ Please provide a package name, e.g. \`/npmuntrack react\`` }),
+      { headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  const packageName = packageNames[0];
   const teamId = body.team_id;
   const responseUrl = body.response_url;
+  const userId = body.user_id;
 
   await ctx.scheduler.runAfter(0, internal.slack.commands.processNpmUntrack, {
     packageName,
@@ -177,22 +176,53 @@ export const npmUntrack = httpAction(async (ctx, request) => {
     responseUrl,
     channelId: channel?.id,
     channelName: channel?.name,
+    userId,
   });
 
   return new Response(
-    JSON.stringify({ text: `⏳ Untracking *${packageName}*…` }),
+    JSON.stringify({ text: `⏳ Untracking *${packageName}*${formatChannelPhrase(channel?.name)}…` }),
     { headers: { "Content-Type": "application/json" } },
   );
 });
 
+export const help = httpAction(async (_ctx, request) => {
+  const rawBody = await verifySlackRequest(request);
+  if (rawBody === null) return new Response("Unauthorized", { status: 401 });
+  const text =
+    `*PatchPulse — command reference*\n\n` +
+    `*Tracking*\n` +
+    `• \`/npmtrack <package>\` — track a package via DM\n` +
+    `• \`/npmtrack react vue typescript\` — track multiple packages at once\n` +
+    `• \`/npmtrack <package> #channel\` — track a package in a channel\n` +
+    `• \`/npmtrack <package> minor\` — only notify on minor *and* major releases\n` +
+    `• \`/npmtrack <package> major\` — only notify on major releases\n\n` +
+    `*Untracking*\n` +
+    `• \`/npmuntrack <package>\` — stop tracking via DM\n` +
+    `• \`/npmuntrack <package> #channel\` — stop tracking in a specific channel\n\n` +
+    `*Listing*\n` +
+    `• \`/npmlist\` — see all packages you're tracking (your DMs + all channel subscriptions)\n\n` +
+    `*Tips*\n` +
+    `• Re-running \`/npmtrack\` with a different threshold (e.g. \`major\`) updates it in place.\n` +
+    `• To track in a private channel, first run \`/invite @PatchPulse\` in that channel.`;
+
+  return new Response(JSON.stringify({ text }), {
+    headers: { "Content-Type": "application/json" },
+  });
+});
+
 export const listPackages = httpAction(async (ctx, request) => {
-  const body = parseSlashBody(await request.text());
+  const rawBody = await verifySlackRequest(request);
+  if (rawBody === null) return new Response("Unauthorized", { status: 401 });
+
+  const body = parseSlashBody(rawBody);
   const teamId = body.team_id;
   const responseUrl = body.response_url;
+  const userId = body.user_id;
 
   await ctx.scheduler.runAfter(0, internal.slack.commands.processList, {
     teamId,
     responseUrl,
+    userId,
   });
 
   return new Response(
@@ -211,8 +241,9 @@ export const processNpmTrack = internalAction({
     minUpdateType: v.union(v.literal("patch"), v.literal("minor"), v.literal("major")),
     channelId: v.optional(v.string()),
     channelName: v.optional(v.string()),
+    userId: v.optional(v.string()),
   },
-  handler: async (ctx, { packageName, teamId, responseUrl, minUpdateType, channelId, channelName }) => {
+  handler: async (ctx, { packageName, teamId, responseUrl, minUpdateType, channelId, channelName, userId }) => {
     const subscriber = await ctx.runQuery(internal.subscribers.getByTeamId, { teamId });
     if (!subscriber) {
       await sendToSlack(responseUrl, `❌ Workspace not found. Please reinstall PatchPulse.`);
@@ -228,26 +259,47 @@ export const processNpmTrack = internalAction({
       return;
     }
 
-    const packageId = await ctx.runMutation(internal.packages.upsertVersion, {
+    // Use ensureExists so we don't silently advance pkg.currentVersion —
+    // that's polling's job, and advancing it here would cause existing
+    // subscribers to miss the notification.
+    const { packageId, dbVersion } = await ctx.runMutation(internal.packages.ensureExists, {
       name: packageName,
       version,
       ecosystem: "npm",
     });
 
-    // Check for an existing subscription on this exact (package, channel) pair
+    const pendingUpdate = isVersionOutdated({ current: dbVersion, latest: version });
+
+    // Check for an existing subscription on this exact (package, channel/user) pair
     const existing = await ctx.runQuery(internal.subscriptions.exists, {
       packageId,
       subscriberId: subscriber._id,
       channelId,
+      userId: channelId ? undefined : userId,
     });
 
     if (existing) {
-      const filterLabel = formatMinUpdateType(existing.minUpdateType as MinUpdateType);
-      const channelLabel = formatChannelPhrase(existing.channelName);
-      await sendToSlack(
-        responseUrl,
-        `Already tracking *${packageName}* — currently at *${existing.lastNotifiedVersion}*${channelLabel}${filterLabel ? ` ${filterLabel}` : ""}`,
-      );
+      // Fix 2: if the threshold changed, update in place instead of rejecting
+      if (existing.minUpdateType !== minUpdateType) {
+        await ctx.runMutation(internal.subscriptions.updateMinUpdateType, {
+          subscriptionId: existing._id,
+          minUpdateType,
+        });
+        const filterLabel = formatMinUpdateType(minUpdateType);
+        const channelLabel = formatChannelPhrase(existing.channelName);
+        await sendToSlack(
+          responseUrl,
+          `Updated: now tracking *${packageName}*${channelLabel} with ${filterLabel ?? "all"} notifications — currently at *${version}*`,
+        );
+      } else {
+        const filterLabel = formatMinUpdateType(existing.minUpdateType as MinUpdateType);
+        const channelLabel = formatChannelPhrase(existing.channelName);
+        // Fix 3: show current npm version, not the (potentially stale) lastNotifiedVersion
+        await sendToSlack(
+          responseUrl,
+          `Already tracking *${packageName}* — currently at *${version}*${channelLabel}${filterLabel ? ` ${filterLabel}` : ""}`,
+        );
+      }
       return;
     }
 
@@ -258,6 +310,7 @@ export const processNpmTrack = internalAction({
       minUpdateType,
       channelId,
       channelName,
+      userId: channelId ? undefined : userId,
     });
 
     const details = await ctx.runQuery(internal.subscribers.getSlackDetails, {
@@ -265,14 +318,43 @@ export const processNpmTrack = internalAction({
     });
 
     if (details) {
-      const targetChannel = channelId ?? details.webhookChannelId;
       const filterLabel = formatMinUpdateType(minUpdateType);
-      const channelLabel = formatTrackingTarget(channelName, details.webhookChannel);
-      await chatPostMessage(
-        details.accessToken,
-        targetChannel,
-        `Now tracking *${packageName}* in ${channelLabel} — current version *${version}*${filterLabel ? ` ${filterLabel}` : ""}`,
-      );
+      // Fix 3: if npm already has a newer version than our DB, mention it
+      const updateSuffix = pendingUpdate
+        ? ` There's already an update available (*${dbVersion}* → *${version}*) — I'll notify you about it shortly.`
+        : "";
+
+      if (channelId) {
+        const channelLabel = formatTrackingTarget(channelName);
+        const baseVersion = pendingUpdate ? dbVersion : version;
+        try {
+          await chatPostMessage(
+            details.accessToken,
+            channelId,
+            `<@${userId}> is now tracking *${packageName}* in ${channelLabel} — current version *${baseVersion}*${filterLabel ? ` ${filterLabel}` : ""}${updateSuffix}`,
+          );
+        } catch (error) {
+          if (error instanceof PrivateChannelError) {
+            await ctx.runMutation(internal.subscriptions.remove, {
+              packageId,
+              subscriberId: subscriber._id,
+              channelId,
+            });
+            await sendToSlack(
+              responseUrl,
+              `⚠️ *${packageName}* couldn't be tracked in ${channelLabel} — PatchPulse needs to be invited first. Run \`/invite @PatchPulse\` in that channel, then try again.`,
+            );
+          } else {
+            throw error;
+          }
+        }
+      } else if (userId) {
+        await chatPostMessage(
+          details.accessToken,
+          userId,
+          `You're now tracking *${packageName}* — current version *${pendingUpdate ? dbVersion : version}*${filterLabel ? ` ${filterLabel}` : ""}.${updateSuffix || " I'll DM you when updates are available."}`,
+        );
+      }
     }
   },
 });
@@ -284,8 +366,9 @@ export const processNpmUntrack = internalAction({
     responseUrl: v.string(),
     channelId: v.optional(v.string()),
     channelName: v.optional(v.string()),
+    userId: v.optional(v.string()),
   },
-  handler: async (ctx, { packageName, teamId, responseUrl, channelId, channelName }) => {
+  handler: async (ctx, { packageName, teamId, responseUrl, channelId, channelName, userId }) => {
     const pkg = await ctx.runQuery(internal.packages.getByName, { name: packageName });
     if (!pkg) {
       await sendToSlack(responseUrl, `*${packageName}* is not in your tracked packages.`);
@@ -313,7 +396,7 @@ export const processNpmUntrack = internalAction({
       if (!existing) {
         await sendToSlack(
           responseUrl,
-          `*${packageName}* is not tracked in ${formatChannelDescriptor(channelName ?? channelId)}.`,
+          `*${packageName}* is not tracked in ${formatChannelDescriptor(channelName, channelId)}.`,
         );
         return;
       }
@@ -328,35 +411,47 @@ export const processNpmUntrack = internalAction({
         await chatPostMessage(
           details.accessToken,
           channelId,
-          `Stopped tracking *${packageName}* in ${formatChannelDescriptor(channelName ?? channelId)}`,
+          `<@${userId}> stopped tracking *${packageName}* in ${formatChannelDescriptor(channelName, channelId)}`,
         );
       }
     } else {
-      // No channel specified — remove all subscriptions for this package in this workspace
-      const allSubs = await ctx.runQuery(internal.subscriptions.getByPackageAndSubscriber, {
+      // No channel specified — remove this user's DM subscription
+      const existing = await ctx.runQuery(internal.subscriptions.exists, {
         packageId: pkg._id,
         subscriberId: subscriber._id,
+        userId,
       });
 
-      if (allSubs.length === 0) {
-        await sendToSlack(responseUrl, `*${packageName}* is not in your tracked packages.`);
+      if (!existing) {
+        await sendToSlack(responseUrl, `You're not tracking *${packageName}* via DMs.`);
         return;
       }
 
-      await ctx.runMutation(internal.subscriptions.removeAll, {
+      await ctx.runMutation(internal.subscriptions.remove, {
+        packageId: pkg._id,
+        subscriberId: subscriber._id,
+        userId,
+      });
+
+      // Warn if channel subscriptions for this package still exist in the workspace
+      const remainingSubs = await ctx.runQuery(internal.subscriptions.getByPackageAndSubscriber, {
         packageId: pkg._id,
         subscriberId: subscriber._id,
       });
+      const channelSubs = remainingSubs.filter((s) => s.channelId);
+      const channelNote =
+        channelSubs.length > 0
+          ? ` Note: *${packageName}* is still tracked in ${channelSubs
+              .map((s) => `*#${normalizeChannelName(s.channelName ?? s.channelId!)}*`)
+              .join(", ")} by your workspace.`
+          : "";
 
-      if (details) {
-        for (const sub of allSubs) {
-          const targetChannel = sub.channelId ?? details.webhookChannelId;
-          await chatPostMessage(
-            details.accessToken,
-            targetChannel,
-            `Stopped tracking *${packageName}*`,
-          );
-        }
+      if (details && userId) {
+        await chatPostMessage(
+          details.accessToken,
+          userId,
+          `You stopped tracking *${packageName}* via DMs.${channelNote}`,
+        );
       }
     }
   },
@@ -366,8 +461,9 @@ export const processList = internalAction({
   args: {
     teamId: v.string(),
     responseUrl: v.string(),
+    userId: v.optional(v.string()),
   },
-  handler: async (ctx, { teamId, responseUrl }) => {
+  handler: async (ctx, { teamId, responseUrl, userId }) => {
     const subscriber = await ctx.runQuery(internal.subscribers.getByTeamId, { teamId });
     if (!subscriber) {
       await sendToSlack(responseUrl, `❌ Workspace not found. Please reinstall PatchPulse.`);
@@ -378,9 +474,15 @@ export const processList = internalAction({
       subscriberId: subscriber._id,
     });
 
-    const subscriptions = await ctx.runQuery(internal.subscriptions.getBySubscriber, {
+    const allSubscriptions = await ctx.runQuery(internal.subscriptions.getBySubscriber, {
       subscriberId: subscriber._id,
     });
+
+    // Show all channel subscriptions (workspace-wide) but only the invoking
+    // user's own DM subscriptions — other users' DMs are private to them.
+    const subscriptions = allSubscriptions.filter(
+      (sub) => sub.channelId || sub.userId === userId,
+    );
 
     if (subscriptions.length === 0) {
       await sendToSlack(
@@ -397,7 +499,7 @@ export const processList = internalAction({
       .map((sub) => {
         const pkg = packages.find((p) => p?._id === sub.packageId);
         if (!pkg) return null;
-        const channel = getListChannelMetadata(sub.channelName, details?.webhookChannel);
+        const channel = getListChannelMetadata(sub.channelName, sub.userId);
         return { sub, pkg, channel };
       })
       .filter((entry): entry is {
@@ -429,12 +531,33 @@ export const processList = internalAction({
     const header =
       uniquePackages === subscriptions.length
         ? `📦 Tracking *${subscriptions.length}* package${subscriptions.length === 1 ? "" : "s"}:`
-        : `📦 Tracking *${uniquePackages}* package${uniquePackages === 1 ? "" : "s"} across *${subscriptions.length}* channel subscriptions:`;
+        : `📦 Tracking *${uniquePackages}* package${uniquePackages === 1 ? "" : "s"} across *${subscriptions.length}* subscriptions:`;
 
     const sections = Array.from(groupedLines.values()).map(
       ({ heading, lines }) => `${heading}\n${lines.join("\n")}`,
     );
 
-    await sendToSlack(responseUrl, `${header}\n\n\n${sections.join("\n\n\n")}`);
+    // Chunk sections into messages under ~3500 chars to stay within Slack's limits
+    const SLACK_CHAR_LIMIT = 3500;
+    const chunks: string[][] = [];
+    let current: string[] = [];
+    let currentLen = header.length + 3;
+
+    for (const section of sections) {
+      if (current.length > 0 && currentLen + section.length + 3 > SLACK_CHAR_LIMIT) {
+        chunks.push(current);
+        current = [];
+        currentLen = 0;
+      }
+      current.push(section);
+      currentLen += section.length + 3;
+    }
+    if (current.length > 0) chunks.push(current);
+
+    const [first, ...rest] = chunks;
+    await sendToSlack(responseUrl, `${header}\n\n\n${first.join("\n\n\n")}`);
+    for (const chunk of rest) {
+      await sendToSlack(responseUrl, chunk.join("\n\n\n"));
+    }
   },
 });

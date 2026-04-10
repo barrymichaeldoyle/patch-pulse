@@ -1,39 +1,75 @@
-# Patch Pulse
+# PatchPulse
 
-![Patch Pulse Banner](./assets/banner.png)
+![PatchPulse Banner](./assets/banner.png)
 
-Patch Pulse now lives in a single `pnpm` monorepo for the CLI, notifier bot, shared runtime, and VS Code extension.
+Get notified in Slack when your npm packages release updates — right in your DMs or in a channel, filtered to only the release types you care about.
 
-## Packages
+## Add to Slack
 
-- `packages/cli`: Published npm CLI for checking outdated dependencies.
-- `packages/notifier-bot`: Convex-powered notifier backend for Slack today, with room for Discord, email, and other delivery channels later.
-- `packages/shared`: Shared runtime helpers and types used across Patch Pulse packages.
-- `packages/vscode-extension`: VS Code extension for surfacing dependency update information in the editor.
+<a href="https://slack.com/oauth/v2/authorize?client_id=180374136631.6017466448468&scope=chat:write,commands,channels:join"><img alt="Add to Slack" height="40" src="https://platform.slack-edge.com/img/add_to_slack.png" srcset="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x"></a>
 
-## Package Docs
+Once installed, run `/npmhelp` in any channel or DM to see the full command reference.
 
-- Notifier overview: [`packages/notifier-bot/README.md`](./packages/notifier-bot/README.md)
-- Slack behavior: [`packages/notifier-bot/docs/slack.md`](./packages/notifier-bot/docs/slack.md)
-- Notifier architecture: [`packages/notifier-bot/docs/architecture.md`](./packages/notifier-bot/docs/architecture.md)
-- Notifier deployment: [`packages/notifier-bot/docs/deployment.md`](./packages/notifier-bot/docs/deployment.md)
-- Notifier runbook: [`packages/notifier-bot/docs/runbook.md`](./packages/notifier-bot/docs/runbook.md)
+## Commands
 
-## Workspace commands
+| Command | Description |
+|---|---|
+| `/npmtrack <package>` | Track a package — notifies you via DM |
+| `/npmtrack react vue typescript` | Track multiple packages at once |
+| `/npmtrack <package> #channel` | Track a package in a channel |
+| `/npmtrack <package> minor` | Only notify on minor+ releases |
+| `/npmtrack <package> major` | Only notify on major releases |
+| `/npmuntrack <package>` | Stop tracking via DM |
+| `/npmuntrack <package> #channel` | Stop tracking in a channel |
+| `/npmlist` | See all packages you're tracking |
+| `/npmhelp` | Show command reference in Slack |
 
-- `pnpm install`
-- `pnpm build`
-- `pnpm build:cli`
-- `pnpm build:vscode-extension`
-- `pnpm dev:notifier`
-- `pnpm dev:cli`
-- `pnpm dev:vscode-extension`
-- `pnpm build:notifier`
-- `pnpm format`
-- `pnpm test:cli`
-- `pnpm test:vscode-extension`
+## Features
 
-## Notes
+- **Per-user DM tracking** — each person tracks privately; everyone gets their own notifications
+- **Channel tracking** — post updates to a shared channel so the whole team stays in sync
+- **Multi-package tracking** — `/npmtrack react vue typescript` in one command
+- **Update type filters** — reduce noise on busy packages by filtering to `minor` or `major` only
+- **Threshold updates in place** — re-run `/npmtrack` with a new filter to update without re-subscribing
+- **Grouped notifications** — multiple package updates are batched into a single message
+- **GitHub release links** — each notification links directly to the relevant GitHub release notes
+- **Private channel support** — invite `@PatchPulse` to a private channel, then track as normal
 
-- The packages are intentionally still mostly self-contained because they use different toolchains and release targets.
-- Root config is limited to low-risk workspace standards for now: `pnpm`, formatting defaults, ignore rules, and shared entrypoint scripts.
+---
+
+## Development
+
+PatchPulse is a `pnpm` monorepo.
+
+### Packages
+
+- `packages/cli` — npm CLI for checking outdated dependencies
+- `packages/notifier-bot` — Convex-powered Slack notification backend
+- `packages/shared` — shared runtime helpers and types
+- `packages/vscode-extension` — VS Code extension for in-editor dependency info
+
+### Docs
+
+- [Notifier overview](./packages/notifier-bot/README.md)
+- [Slack behavior](./packages/notifier-bot/docs/slack.md)
+- [Architecture](./packages/notifier-bot/docs/architecture.md)
+- [Deployment](./packages/notifier-bot/docs/deployment.md)
+- [Runbook](./packages/notifier-bot/docs/runbook.md)
+
+### Workspace commands
+
+```
+pnpm install
+pnpm build
+pnpm dev:notifier
+pnpm dev:cli
+pnpm dev:vscode-extension
+pnpm test:cli
+pnpm test:vscode-extension
+pnpm format
+```
+
+### Notes
+
+- Packages are intentionally self-contained — they use different toolchains and release targets.
+- Root config is limited to workspace standards: `pnpm`, formatting, ignore rules, and shared scripts.
