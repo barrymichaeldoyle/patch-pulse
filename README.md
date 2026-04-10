@@ -6,7 +6,7 @@ Get notified in Slack when your npm packages release updates — right in your D
 
 ## Add to Slack
 
-<a href="https://slack.com/oauth/v2/authorize?client_id=180374136631.6017466448468&scope=chat:write,commands,channels:join"><img alt="Add to Slack" height="40" src="https://platform.slack-edge.com/img/add_to_slack.png" srcset="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x"></a>
+<a href="https://grand-yak-92.convex.site/slack/install"><img alt="Add to Slack" height="40" src="https://platform.slack-edge.com/img/add_to_slack.png" srcset="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x"></a>
 
 Once installed, run `/npmhelp` in any channel or DM to see the full command reference.
 

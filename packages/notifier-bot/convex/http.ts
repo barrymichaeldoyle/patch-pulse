@@ -1,9 +1,15 @@
 import { httpRouter } from "convex/server";
-import { slackOAuthCallback } from "./slack/oauth";
+import { slackInstall, slackOAuthCallback } from "./slack/oauth";
 import { npmTrack, npmUntrack, listPackages, help } from "./slack/commands";
 import { slackEvents } from "./slack/events";
 
 const http = httpRouter();
+
+http.route({
+  path: "/slack/install",
+  method: "GET",
+  handler: slackInstall,
+});
 
 http.route({
   path: "/slack/oauth-callback",

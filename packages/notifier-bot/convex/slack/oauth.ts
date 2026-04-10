@@ -2,6 +2,25 @@ import { httpAction } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { chatPostMessage } from "./api";
 
+export const slackInstall = httpAction(async (_ctx, _request) => {
+  const clientId = process.env.SLACK_CLIENT_ID;
+  const redirectUri = process.env.SLACK_REDIRECT_URI;
+
+  if (!clientId || !redirectUri) {
+    return new Response("Server misconfiguration", { status: 500 });
+  }
+
+  const authorizeUrl = new URL("https://slack.com/oauth/v2/authorize");
+  authorizeUrl.searchParams.set("client_id", clientId);
+  authorizeUrl.searchParams.set("scope", "chat:write,commands,channels:join");
+  authorizeUrl.searchParams.set("redirect_uri", redirectUri);
+
+  return new Response(null, {
+    status: 302,
+    headers: { Location: authorizeUrl.toString() },
+  });
+});
+
 export const slackOAuthCallback = httpAction(async (ctx, request) => {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
