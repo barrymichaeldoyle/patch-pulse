@@ -18,6 +18,8 @@ function jsonResponse(body: unknown, status = 200): Response {
 function createFetchMock(
   responseMessages: string[],
   options?: {
+    npmVersions?: Record<string, string>;
+    postedMessages?: Array<{ channel: string; text: string }>;
     publishedViews?: Array<{ userId: string; blocks: unknown[] }>;
     channelNames?: Record<string, string>;
   },
@@ -31,14 +33,23 @@ function createFetchMock(
           : input.url;
 
     if (url.startsWith("https://registry.npmjs.org/")) {
+      const packageName = decodeURIComponent(url.replace("https://registry.npmjs.org/", ""));
+      const version = options?.npmVersions?.[packageName] ?? "19.0.0";
+      if (options?.npmVersions && !(packageName in options.npmVersions)) {
+        return jsonResponse({ error: "not_found" }, 404);
+      }
+
       return jsonResponse({
-        "dist-tags": { latest: "19.0.0" },
+        "dist-tags": { latest: version },
         repository: "github:facebook/react",
-        versions: { "19.0.0": {} },
+        versions: { [version]: {} },
       });
     }
 
     if (url === "https://slack.com/api/chat.postMessage") {
+      const raw = typeof init?.body === "string" ? init.body : "";
+      const body = JSON.parse(raw);
+      options?.postedMessages?.push({ channel: body.channel, text: body.text });
       return jsonResponse({ ok: true });
     }
 
@@ -173,6 +184,33 @@ describe("Slack multi-channel subscriptions", () => {
     expect(responseMessages[0]).toContain("[major only]");
   });
 
+  it("normalizes mixed-case package names when tracking", async () => {
+    const responseMessages: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      createFetchMock(responseMessages, {
+        npmVersions: { convex: "1.35.1" },
+      }),
+    );
+
+    const t = convexTest(schema, modules);
+    await seedWorkspace(t);
+
+    await t.action(internal.slack.commands.processNpmTrack, {
+      packageName: "Convex",
+      teamId: TEAM_ID,
+      responseUrl: RESPONSE_URL,
+      minUpdateType: "patch",
+      userId: "U_ALICE",
+    });
+
+    const pkg = await t.query(internal.packages.getByName, { name: "convex" });
+
+    expect(pkg?.name).toBe("convex");
+    expect(pkg?.currentVersion).toBe("1.35.1");
+    expect(responseMessages).toEqual([]);
+  });
+
   it("untracking without a channel removes only the user's DM subscription, not channel subscriptions", async () => {
     vi.stubGlobal("fetch", createFetchMock([]));
 
@@ -217,6 +255,83 @@ describe("Slack multi-channel subscriptions", () => {
     // Only Alice's DM subscription is removed; the channel subscription remains
     expect(subscriptions).toHaveLength(1);
     expect(subscriptions[0].channelId).toBe("C_FRONTEND");
+  });
+
+  it("normalizes mixed-case package names when untracking", async () => {
+    const responseMessages: string[] = [];
+    vi.stubGlobal("fetch", createFetchMock(responseMessages));
+
+    const t = convexTest(schema, modules);
+    const subscriberId = await seedWorkspace(t);
+    const packageId = await t.mutation(internal.packages.upsertVersion, {
+      name: "convex",
+      version: "1.35.1",
+      ecosystem: "npm",
+    });
+
+    await t.mutation(internal.subscriptions.create, {
+      packageId,
+      subscriberId,
+      lastNotifiedVersion: "1.35.1",
+      minUpdateType: "patch",
+      userId: "U_ALICE",
+    });
+
+    await t.action(internal.slack.commands.processNpmUntrack, {
+      packageName: "Convex",
+      teamId: TEAM_ID,
+      responseUrl: RESPONSE_URL,
+      userId: "U_ALICE",
+    });
+
+    const subscriptions = await t.query(internal.subscriptions.getByPackageAndSubscriber, {
+      packageId,
+      subscriberId,
+    });
+
+    expect(subscriptions).toHaveLength(0);
+  });
+
+  it("batches bulk tracking into one channel confirmation message", async () => {
+    const responseMessages: string[] = [];
+    const postedMessages: Array<{ channel: string; text: string }> = [];
+    vi.stubGlobal(
+      "fetch",
+      createFetchMock(responseMessages, {
+        postedMessages,
+        npmVersions: {
+          tsx: "4.21.0",
+          oxlint: "1.59.0",
+          vitest: "4.1.4",
+        },
+      }),
+    );
+
+    const t = convexTest(schema, modules);
+    const subscriberId = await seedWorkspace(t);
+
+    await t.action(internal.slack.commands.processBulkNpmTrack, {
+      packageNames: ["tsx", "oxlint", "vitest"],
+      teamId: TEAM_ID,
+      responseUrl: RESPONSE_URL,
+      minUpdateType: "patch",
+      channelId: "C_RELEASES",
+      channelName: "new-releases",
+      userId: "U_ALICE",
+    });
+
+    const subscriptions = await t.query(internal.subscriptions.getBySubscriber, {
+      subscriberId,
+    });
+
+    expect(subscriptions).toHaveLength(3);
+    expect(postedMessages).toHaveLength(1);
+    expect(postedMessages[0].channel).toBe("C_RELEASES");
+    expect(postedMessages[0].text).toContain("<@U_ALICE> processed *3* package requests in *#new-releases*:");
+    expect(postedMessages[0].text).toContain("• *tsx* — current version *4.21.0*");
+    expect(postedMessages[0].text).toContain("• *oxlint* — current version *1.59.0*");
+    expect(postedMessages[0].text).toContain("• *vitest* — current version *4.1.4*");
+    expect(responseMessages).toEqual([]);
   });
 
   it("lists subscriptions grouped by destination, showing only the invoking user's DM subscriptions", async () => {

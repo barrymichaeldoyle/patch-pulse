@@ -4,6 +4,10 @@ import { Id } from "../_generated/dataModel";
 import { verifySlackRequest } from "./verify";
 import { openTrackModal, openMoveChannelModal, TRACK_MODAL_CALLBACK_ID, MOVE_CHANNEL_MODAL_CALLBACK_ID } from "./api";
 
+function normalizeNpmPackageName(packageName: string): string {
+  return packageName.trim().toLowerCase();
+}
+
 export const slackInteractions = httpAction(async (ctx, request) => {
   const rawBody = await verifySlackRequest(request);
   if (rawBody === null) return new Response("Unauthorized", { status: 401 });
@@ -90,7 +94,11 @@ export const slackInteractions = httpAction(async (ctx, request) => {
       const minUpdateType: "patch" | "minor" | "major" =
         values.threshold_block?.threshold_input?.selected_option?.value ?? "patch";
 
-      const packageNames = rawPackages.trim().split(/\s+/).filter(Boolean);
+      const packageNames = rawPackages
+        .trim()
+        .split(/\s+/)
+        .map(normalizeNpmPackageName)
+        .filter(Boolean);
 
       for (const packageName of packageNames) {
         await ctx.scheduler.runAfter(0, internal.slack.commands.processNpmTrack, {
