@@ -15,7 +15,7 @@ describe('displayMadeWithLove', () => {
   it('prints the made with love message', () => {
     displayMadeWithLove();
     expect(logSpy).toHaveBeenCalledTimes(2);
-    const calls = logSpy.mock.calls.map((call) => call[0]);
+    const calls = logSpy.mock.calls.map((call: unknown[]) => call[0]);
     expect(calls[0]).toContain('─'.repeat(40));
     expect(calls[1]).toContain('Made with ❤️  by');
     expect(calls[1]).toContain('Barry Michael Doyle');

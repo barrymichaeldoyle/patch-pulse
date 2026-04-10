@@ -14,6 +14,7 @@
     "sourceMap": true,
     "resolveJsonModule": true,
     "moduleResolution": "node",
+    "ignoreDeprecations": "6.0",
     "types": ["node"],
     "typeRoots": ["./node_modules/@types", "./src/types"]
   },

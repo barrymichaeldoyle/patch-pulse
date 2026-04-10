@@ -36,14 +36,17 @@ ${chalk.cyan.bold.underline('📁 Configuration File:')}
   ${chalk.gray('}')}
 
 ${chalk.cyan.bold.underline('📝 Description:')}
-  Reads the \`package.json\` file in the current directory and displays
-  information about your project's dependencies, including version
-  status and update availability. After the summary, you can choose
-  to update patch, minor, or all outdated dependencies, unless
+  Scans the current project for \`package.json\` files outside
+  \`node_modules\` and displays information about each package's
+  dependencies, including version status and update availability.
+  In pnpm workspaces, \`catalog:\` dependencies are resolved from
+  \`pnpm-workspace.yaml\`, while \`workspace:*\` dependencies are ignored.
+  After the summary, you can choose to update patch, minor, or all
+  outdated dependencies across the scanned project, unless
   --no-update-prompt is set (in which case the CLI exits after summary).
 
 ${chalk.cyan.bold.underline('💡 Examples:')}
-  ${chalk.white('npx patch-pulse')}                          ${chalk.gray('# Check dependencies in current directory')}
+  ${chalk.white('npx patch-pulse')}                          ${chalk.gray('# Check dependencies across the current project')}
   ${chalk.white('npx patch-pulse --version')}                ${chalk.gray('# Show version information')}
   ${chalk.white('npx patch-pulse --license')}                ${chalk.gray('# Show license information')}
   ${chalk.white('npx patch-pulse --skip "lodash,@types/*"')} ${chalk.gray('# Skip specific packages and patterns')}

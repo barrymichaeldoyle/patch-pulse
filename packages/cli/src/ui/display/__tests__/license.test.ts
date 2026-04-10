@@ -33,7 +33,7 @@ describe('displayLicense', () => {
     }
     expect(fs.readFileSync).toHaveBeenCalled();
     expect(logSpy).toHaveBeenCalled();
-    const output = logSpy.mock.calls.map((call) => call[0]).join('\n');
+    const output = logSpy.mock.calls.map((call: unknown[]) => call[0]).join('\n');
     expect(output).toContain('License');
     expect(output).toContain('MIT License');
     expect(output).toContain('Copyright 2024');

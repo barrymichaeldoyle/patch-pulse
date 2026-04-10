@@ -34,9 +34,9 @@ describe('package-manager', () => {
       const result = detectPackageManager('/test');
 
       expect(result).toEqual({
+        installArgs: ['install'],
         name: 'npm',
         lockFiles: ['package-lock.json'],
-        addCommand: 'npm install',
       });
     });
 
@@ -54,9 +54,9 @@ describe('package-manager', () => {
       const result = detectPackageManager('/test');
 
       expect(result).toEqual({
+        installArgs: ['install'],
         name: 'pnpm',
         lockFiles: ['pnpm-lock.yaml'],
-        addCommand: 'pnpm add',
       });
     });
 
@@ -72,9 +72,9 @@ describe('package-manager', () => {
       const result = detectPackageManager('/test');
 
       expect(result).toEqual({
+        installArgs: ['install'],
         name: 'yarn',
         lockFiles: ['yarn.lock'],
-        addCommand: 'yarn add',
       });
     });
 
@@ -90,9 +90,9 @@ describe('package-manager', () => {
       const result = detectPackageManager('/test');
 
       expect(result).toEqual({
+        installArgs: ['install'],
         name: 'bun',
         lockFiles: ['bun.lock', 'bun.lockb'],
-        addCommand: 'bun add',
       });
     });
 
@@ -106,9 +106,9 @@ describe('package-manager', () => {
       const result = detectPackageManager('/test');
 
       expect(result).toEqual({
+        installArgs: ['install'],
         name: 'npm',
         lockFiles: ['package-lock.json'],
-        addCommand: 'npm install',
       });
     });
   });
@@ -118,9 +118,9 @@ describe('package-manager', () => {
       const result = getPackageManagerInfo('npm');
 
       expect(result).toEqual({
+        installArgs: ['install'],
         name: 'npm',
         lockFiles: ['package-lock.json'],
-        addCommand: 'npm install',
       });
     });
 
@@ -128,9 +128,9 @@ describe('package-manager', () => {
       const result = getPackageManagerInfo('pnpm');
 
       expect(result).toEqual({
+        installArgs: ['install'],
         name: 'pnpm',
         lockFiles: ['pnpm-lock.yaml'],
-        addCommand: 'pnpm add',
       });
     });
 
@@ -138,9 +138,9 @@ describe('package-manager', () => {
       const result = getPackageManagerInfo('yarn');
 
       expect(result).toEqual({
+        installArgs: ['install'],
         name: 'yarn',
         lockFiles: ['yarn.lock'],
-        addCommand: 'yarn add',
       });
     });
 
@@ -148,9 +148,9 @@ describe('package-manager', () => {
       const result = getPackageManagerInfo('bun');
 
       expect(result).toEqual({
+        installArgs: ['install'],
         name: 'bun',
         lockFiles: ['bun.lock', 'bun.lockb'],
-        addCommand: 'bun add',
       });
     });
   });

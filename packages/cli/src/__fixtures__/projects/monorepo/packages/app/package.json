@@ -1,0 +1,11 @@
+{
+  "name": "@fixture/app",
+  "version": "1.0.0",
+  "dependencies": {
+    "@repo/shared": "workspace:*",
+    "react": "catalog:"
+  },
+  "devDependencies": {
+    "vitest": "^4.0.0"
+  }
+}

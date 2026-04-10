@@ -5,6 +5,16 @@ export class PrivateChannelError extends Error {
   }
 }
 
+export class SlackMissingScopeError extends Error {
+  constructor(
+    public readonly endpoint: string,
+    public readonly suggestedScope?: string,
+  ) {
+    super(`Slack error: missing_scope`);
+    this.name = "SlackMissingScopeError";
+  }
+}
+
 /** Returns the human-readable name for a channel ID, or undefined if unavailable. */
 export async function conversationsInfo(token: string, channelId: string): Promise<string | undefined> {
   const response = await fetch(`https://slack.com/api/conversations.info?channel=${channelId}`, {
@@ -12,6 +22,45 @@ export async function conversationsInfo(token: string, channelId: string): Promi
   });
   const data = await response.json();
   return data.ok ? (data.channel?.name as string) : undefined;
+}
+
+export async function conversationsFindByName(
+  token: string,
+  channelName: string,
+): Promise<{ id: string; name: string } | null> {
+  const normalizedChannelName = channelName.replace(/^#/, "").trim().toLowerCase();
+  let cursor: string | undefined;
+
+  do {
+    const query = new URLSearchParams({
+      exclude_archived: "true",
+      limit: "1000",
+      types: "public_channel,private_channel",
+    });
+    if (cursor) query.set("cursor", cursor);
+
+    const response = await fetch(`https://slack.com/api/conversations.list?${query.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await response.json();
+    if (!data.ok) {
+      if (data.error === "missing_scope") {
+        throw new SlackMissingScopeError("conversations.list", "channels:read / groups:read");
+      }
+      throw new Error(`Slack error: ${data.error}`);
+    }
+
+    const match = (data.channels as Array<{ id?: string; name?: string }> | undefined)?.find(
+      (channel) => channel.name?.toLowerCase() === normalizedChannelName,
+    );
+    if (match?.id && match.name) {
+      return { id: match.id, name: match.name };
+    }
+
+    cursor = data.response_metadata?.next_cursor || undefined;
+  } while (cursor);
+
+  return null;
 }
 
 // Errors from conversations.join that mean the channel is private or invite-only
@@ -51,9 +100,9 @@ function channelLabel(channelId?: string, channelName?: string): string {
   return "this channel";
 }
 
-function homeFilterLabel(minUpdateType?: string): string {
-  if (!minUpdateType || minUpdateType === "patch") return "";
-  return minUpdateType === "major" ? " `[major only]`" : " `[minor+]`";
+function homeThresholdLabel(minUpdateType?: string): string {
+  if (!minUpdateType || minUpdateType === "patch") return "All updates";
+  return minUpdateType === "major" ? "Major only" : "Minor + major";
 }
 
 function relativeTime(ts: number): string {
@@ -239,13 +288,21 @@ export async function publishAppHome(
 
     for (const [, { heading, entries: groupEntries }] of sortedGroups) {
       blocks.push({ type: "section", text: { type: "mrkdwn", text: heading } });
+      blocks.push({
+        type: "section",
+        fields: [
+          { type: "mrkdwn", text: "*Package*" },
+          { type: "mrkdwn", text: "*Version*" },
+          { type: "mrkdwn", text: "*Notify on*" },
+        ],
+      });
 
       for (const entry of groupEntries) {
         const npmUrl = `https://www.npmjs.com/package/${entry.packageName}`;
         const versionText = entry.githubRepoUrl
           ? `<${entry.githubRepoUrl}/releases|${entry.currentVersion}>`
           : entry.currentVersion;
-        const filterLabel = homeFilterLabel(entry.minUpdateType);
+        const thresholdLabel = homeThresholdLabel(entry.minUpdateType);
 
         const sid = entry.subscriptionId;
 
@@ -275,10 +332,20 @@ export async function publishAppHome(
 
         blocks.push({
           type: "section",
-          text: {
-            type: "mrkdwn",
-            text: `*<${npmUrl}|${entry.packageName}>* — ${versionText}${filterLabel}`,
-          },
+          fields: [
+            {
+              type: "mrkdwn",
+              text: `<${npmUrl}|${entry.packageName}>`,
+            },
+            {
+              type: "mrkdwn",
+              text: versionText,
+            },
+            {
+              type: "mrkdwn",
+              text: thresholdLabel,
+            },
+          ],
           accessory: {
             type: "overflow",
             action_id: "package_menu",

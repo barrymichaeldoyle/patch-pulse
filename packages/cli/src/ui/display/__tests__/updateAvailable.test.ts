@@ -15,7 +15,7 @@ describe('displayUpdateAvailable', () => {
   it('displays update available message with version information', () => {
     displayUpdateAvailable('1.0.0', '2.0.0');
     expect(logSpy).toHaveBeenCalled();
-    const output = logSpy.mock.calls.map((call) => call[0]).join('\n');
+    const output = logSpy.mock.calls.map((call: unknown[]) => call[0]).join('\n');
     expect(output).toContain('═'.repeat(50));
     expect(output).toContain('🚀 UPDATE AVAILABLE!');
     expect(output).toContain('Current Version:');
@@ -28,7 +28,7 @@ describe('displayUpdateAvailable', () => {
 
   it('handles different version formats', () => {
     displayUpdateAvailable('1.2.3-beta.1', '1.2.3');
-    const output = logSpy.mock.calls.map((call) => call[0]).join('\n');
+    const output = logSpy.mock.calls.map((call: unknown[]) => call[0]).join('\n');
     expect(output).toContain('1.2.3-beta.1');
     expect(output).toContain('1.2.3');
   });

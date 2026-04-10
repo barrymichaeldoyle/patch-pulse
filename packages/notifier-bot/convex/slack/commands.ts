@@ -7,7 +7,7 @@ import { ActionCtx, httpAction, internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { Id } from "../_generated/dataModel";
 import { formatSlackPackageLink, formatSlackVersionText } from "./links";
-import { chatPostMessage, conversationsInfo, PrivateChannelError, publishAppHome, type HomePackageEntry, openTrackModal, openMoveChannelModal } from "./api";
+import { chatPostMessage, conversationsFindByName, conversationsInfo, PrivateChannelError, publishAppHome, SlackMissingScopeError, type HomePackageEntry, openTrackModal, openMoveChannelModal } from "./api";
 import { verifySlackRequest } from "./verify";
 
 type MinUpdateType = "patch" | "minor" | "major";
@@ -22,6 +22,14 @@ function cleanText(text: string): string {
 
 function normalizeNpmPackageName(packageName: string): string {
   return cleanText(packageName).toLowerCase();
+}
+
+function formatPackageName(packageName: string): string {
+  return `\`${packageName}\``;
+}
+
+function formatVersion(version: string): string {
+  return `\`${version}\``;
 }
 
 type TrackOutcome =
@@ -143,13 +151,13 @@ async function trackPackage(
 function formatTrackOutcomeLine(outcome: TrackOutcome): string {
   switch (outcome.kind) {
     case "tracked":
-      return `• *${outcome.packageName}* — current version *${outcome.displayVersion}*${outcome.filterLabel ? ` ${outcome.filterLabel}` : ""}${outcome.pendingUpdate ? ` (update available: *${outcome.version}*)` : ""}`;
+      return `• ${formatPackageName(outcome.packageName)} — current version ${formatVersion(outcome.displayVersion)}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ""}${outcome.pendingUpdate ? ` (update available: ${formatVersion(outcome.version)})` : ""}`;
     case "updated":
-      return `• *${outcome.packageName}* — updated threshold to ${outcome.filterLabel ?? "all"} notifications, current version *${outcome.version}*`;
+      return `• ${formatPackageName(outcome.packageName)} — updated threshold to ${outcome.filterLabel ?? "all"} notifications, current version ${formatVersion(outcome.version)}`;
     case "already":
-      return `• *${outcome.packageName}* — already tracked at *${outcome.version}*${outcome.filterLabel ? ` ${outcome.filterLabel}` : ""}`;
+      return `• ${formatPackageName(outcome.packageName)} — already tracked at ${formatVersion(outcome.version)}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ""}`;
     case "not_found":
-      return `• *${outcome.packageName}* — not found on npm`;
+      return `• ${formatPackageName(outcome.packageName)} — not found on npm`;
   }
 }
 
@@ -167,11 +175,11 @@ function formatTrackOutcomeLine(outcome: TrackOutcome): string {
  */
 function parseTrackArgs(raw: string): {
   packageNames: string[];
-  channel: { id: string; name: string } | null;
+  channel: { id?: string; name: string } | null;
   minUpdateType: MinUpdateType;
 } {
   let text = raw.trim();
-  let channel: { id: string; name: string } | null = null;
+  let channel: { id?: string; name: string } | null = null;
   let minUpdateType: MinUpdateType = "patch";
 
   // Extract Slack-escaped channel mention: <#C1234567|channel-name>
@@ -184,7 +192,7 @@ function parseTrackArgs(raw: string): {
     const hashMention = text.match(/(^|\s)(#\S+)/);
     if (hashMention) {
       const name = hashMention[2].slice(1); // strip leading #
-      channel = { id: name, name };
+      channel = { name };
       text = text.replace(hashMention[2], "").trim();
     }
   }
@@ -206,20 +214,65 @@ function formatMinUpdateType(minUpdateType: MinUpdateType | undefined): string |
   return minUpdateType === "major" ? "[major only]" : "[minor+]";
 }
 
-function formatChannelPhrase(channelName: string | undefined): string {
+function formatChannelPhrase(channelName: string | undefined, channelId?: string): string {
+  if (channelId) return ` in <#${channelId}>`;
   return channelName ? ` in *#${channelName}*` : "";
 }
 
 function formatChannelDescriptor(channelName: string | undefined, channelId: string | undefined): string {
-  return channelName ? `*#${normalizeChannelName(channelName)}*` : channelId ? `<#${channelId}>` : "this channel";
+  return channelId ? `<#${channelId}>` : channelName ? `*#${normalizeChannelName(channelName)}*` : "this channel";
 }
 
-function formatTrackingTarget(channelName: string | undefined): string {
-  return channelName ? `*#${normalizeChannelName(channelName)}*` : "this channel";
+function formatTrackingTarget(channelName: string | undefined, channelId: string | undefined): string {
+  return channelId ? `<#${channelId}>` : channelName ? `*#${normalizeChannelName(channelName)}*` : "this channel";
 }
 
 function normalizeChannelName(channelName: string): string {
   return channelName.replace(/^#/, "");
+}
+
+function looksLikeSlackChannelId(channelId: string | undefined): channelId is string {
+  return typeof channelId === "string" && /^[CGD][A-Z0-9_]+$/i.test(channelId);
+}
+
+async function resolveChannelTarget(
+  token: string,
+  channelId: string | undefined,
+  channelName: string | undefined,
+): Promise<{ channelId: string | undefined; channelName: string | undefined }> {
+  if (looksLikeSlackChannelId(channelId)) {
+    const resolvedChannelName = channelName ?? (await conversationsInfo(token, channelId));
+    return {
+      channelId,
+      channelName: resolvedChannelName ?? channelName,
+    };
+  }
+
+  const candidateName = channelName ?? channelId;
+  if (!candidateName) {
+    return { channelId, channelName };
+  }
+
+  const channel = await conversationsFindByName(token, candidateName);
+  if (!channel) {
+    return {
+      channelId: undefined,
+      channelName: normalizeChannelName(candidateName),
+    };
+  }
+
+  return {
+    channelId: channel.id,
+    channelName: channel.name,
+  };
+}
+
+function missingChannelLookupScopeMessage(channelName: string | undefined): string {
+  const target = channelName ? `*#${normalizeChannelName(channelName)}*` : "that channel";
+  return (
+    `⚠️ I couldn't resolve ${target} because this Slack app is missing the channel lookup scope required ` +
+    `for typed channel names. Reinstall PatchPulse with channel read access, or pick the channel from the modal / Slack channel picker so Slack sends the channel ID directly.`
+  );
 }
 
 function getListChannelMetadata(
@@ -286,11 +339,11 @@ export const npmTrack = httpAction(async (ctx, request) => {
     }
   }
 
-  const packageList = packageNames.map((p) => `*${p}*`).join(", ");
+  const packageList = packageNames.map((p) => formatPackageName(p)).join(", ");
   const ackText =
     packageNames.length === 0
       ? `⚠️ Please provide a package name, e.g. \`/npmtrack react\``
-      : `⏳ Tracking ${packageList}${formatChannelPhrase(channel?.name)}…`;
+      : `⏳ Tracking ${packageList}${formatChannelPhrase(channel?.name, channel?.id)}…`;
 
   return new Response(JSON.stringify({ text: ackText }), {
     headers: { "Content-Type": "application/json" },
@@ -326,7 +379,7 @@ export const npmUntrack = httpAction(async (ctx, request) => {
   });
 
   return new Response(
-    JSON.stringify({ text: `⏳ Untracking *${packageName}*${formatChannelPhrase(channel?.name)}…` }),
+    JSON.stringify({ text: `⏳ Untracking ${formatPackageName(packageName)}${formatChannelPhrase(channel?.name, channel?.id)}…` }),
     { headers: { "Content-Type": "application/json" } },
   );
 });
@@ -410,9 +463,16 @@ export const processNpmTrack = internalAction({
 
     const details = await ctx.runQuery(internal.subscribers.getSlackDetails, { subscriberId: subscriber._id });
 
-    // Resolve channel name if not provided (e.g. when tracking from the modal)
-    if (channelId && !channelName && details) {
-      channelName = await conversationsInfo(details.accessToken, channelId);
+    if (details && (channelId || channelName)) {
+      try {
+        ({ channelId, channelName } = await resolveChannelTarget(details.accessToken, channelId, channelName));
+      } catch (error) {
+        if (error instanceof SlackMissingScopeError) {
+          await sendFeedback(details, missingChannelLookupScopeMessage(channelName));
+          return;
+        }
+        throw error;
+      }
     }
 
     const outcome = await trackPackage(ctx, {
@@ -433,7 +493,7 @@ export const processNpmTrack = internalAction({
       const channelLabel = formatChannelPhrase(outcome.channelName);
       await sendFeedback(
         details,
-        `Updated: now tracking *${packageName}*${channelLabel} with ${outcome.filterLabel ?? "all"} notifications — currently at *${outcome.version}*`,
+        `Updated: now tracking ${formatPackageName(packageName)}${channelLabel} with ${outcome.filterLabel ?? "all"} notifications — currently at ${formatVersion(outcome.version)}`,
       );
       if (!responseUrl && userId) {
         await ctx.scheduler.runAfter(0, internal.slack.commands.refreshAppHome, { teamId, userId });
@@ -445,7 +505,7 @@ export const processNpmTrack = internalAction({
       const channelLabel = formatChannelPhrase(outcome.channelName);
       await sendFeedback(
         details,
-        `Already tracking *${packageName}* — currently at *${outcome.version}*${channelLabel}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ""}`,
+        `Already tracking ${formatPackageName(packageName)} — currently at ${formatVersion(outcome.version)}${channelLabel}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ""}`,
       );
       if (!responseUrl && userId) {
         await ctx.scheduler.runAfter(0, internal.slack.commands.refreshAppHome, { teamId, userId });
@@ -455,16 +515,16 @@ export const processNpmTrack = internalAction({
 
     if (details) {
       const updateSuffix = outcome.pendingUpdate
-        ? ` There's already an update available (*${outcome.displayVersion}* → *${outcome.version}*) — I'll notify you about it shortly.`
+        ? ` There's already an update available (${formatVersion(outcome.displayVersion)} → ${formatVersion(outcome.version)}) — I'll notify you about it shortly.`
         : "";
 
       if (channelId) {
-        const channelLabel = formatTrackingTarget(channelName);
+        const channelLabel = formatTrackingTarget(channelName, channelId);
         try {
           await chatPostMessage(
             details.accessToken,
             channelId,
-            `<@${userId}> is now tracking *${packageName}* in ${channelLabel} — current version *${outcome.displayVersion}*${outcome.filterLabel ? ` ${outcome.filterLabel}` : ""}${updateSuffix}`,
+            `<@${userId}> is now tracking ${formatPackageName(packageName)} in this channel — current version ${formatVersion(outcome.displayVersion)}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ""}${updateSuffix}`,
           );
         } catch (error) {
           if (error instanceof PrivateChannelError) {
@@ -475,7 +535,7 @@ export const processNpmTrack = internalAction({
             });
             await sendFeedback(
               details,
-              `⚠️ *${packageName}* couldn't be tracked in ${channelLabel} — PatchPulse needs to be invited first. Run \`/invite @PatchPulse\` in that channel, then try again.`,
+              `⚠️ ${formatPackageName(packageName)} couldn't be tracked in ${channelLabel} — PatchPulse needs to be invited first. Run \`/invite @PatchPulse\` in that channel, then try again.`,
             );
             return;
           } else {
@@ -486,7 +546,7 @@ export const processNpmTrack = internalAction({
         await chatPostMessage(
           details.accessToken,
           userId,
-          `You're now tracking *${packageName}* — current version *${outcome.displayVersion}*${outcome.filterLabel ? ` ${outcome.filterLabel}` : ""}.${updateSuffix || " I'll DM you when updates are available."}`,
+          `You're now tracking ${formatPackageName(packageName)} — current version ${formatVersion(outcome.displayVersion)}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ""}.${updateSuffix || " I'll DM you when updates are available."}`,
         );
       }
     }
@@ -519,8 +579,20 @@ export const processBulkNpmTrack = internalAction({
     }
 
     const details = await ctx.runQuery(internal.subscribers.getSlackDetails, { subscriberId: subscriber._id });
-    if (channelId && !channelName && details) {
-      channelName = await conversationsInfo(details.accessToken, channelId);
+    if (details && (channelId || channelName)) {
+      try {
+        ({ channelId, channelName } = await resolveChannelTarget(details.accessToken, channelId, channelName));
+      } catch (error) {
+        if (error instanceof SlackMissingScopeError) {
+          if (responseUrl) {
+            await sendToSlack(responseUrl, missingChannelLookupScopeMessage(channelName));
+          } else if (details && userId) {
+            await chatPostMessage(details.accessToken, userId, missingChannelLookupScopeMessage(channelName));
+          }
+          return;
+        }
+        throw error;
+      }
     }
 
     const outcomes: TrackOutcome[] = [];
@@ -541,7 +613,7 @@ export const processBulkNpmTrack = internalAction({
       }
     }
 
-    const targetLabel = channelId ? formatTrackingTarget(channelName) : "your DMs";
+    const targetLabel = channelId ? "this channel" : "your DMs";
     const summary =
       `${channelId ? `<@${userId}>` : "You"} processed *${normalizedPackageNames.length}* package request${normalizedPackageNames.length === 1 ? "" : "s"} in ${targetLabel}:\n` +
       outcomes.map(formatTrackOutcomeLine).join("\n");
@@ -598,7 +670,7 @@ export const processNpmUntrack = internalAction({
 
     const pkg = await ctx.runQuery(internal.packages.getByName, { name: packageName });
     if (!pkg) {
-      await sendToSlack(responseUrl, `*${packageName}* is not in your tracked packages.`);
+      await sendToSlack(responseUrl, `${formatPackageName(packageName)} is not in your tracked packages.`);
       return;
     }
 
@@ -612,6 +684,18 @@ export const processNpmUntrack = internalAction({
       subscriberId: subscriber._id,
     });
 
+    if (details && (channelId || channelName)) {
+      try {
+        ({ channelId, channelName } = await resolveChannelTarget(details.accessToken, channelId, channelName));
+      } catch (error) {
+        if (error instanceof SlackMissingScopeError) {
+          await sendToSlack(responseUrl, missingChannelLookupScopeMessage(channelName));
+          return;
+        }
+        throw error;
+      }
+    }
+
     if (channelId) {
       // Remove the subscription for this specific channel
       const existing = await ctx.runQuery(internal.subscriptions.exists, {
@@ -623,7 +707,7 @@ export const processNpmUntrack = internalAction({
       if (!existing) {
         await sendToSlack(
           responseUrl,
-          `*${packageName}* is not tracked in ${formatChannelDescriptor(channelName, channelId)}.`,
+          `${formatPackageName(packageName)} is not tracked in ${formatChannelDescriptor(channelName, channelId)}.`,
         );
         return;
       }
@@ -638,7 +722,7 @@ export const processNpmUntrack = internalAction({
         await chatPostMessage(
           details.accessToken,
           channelId,
-          `<@${userId}> stopped tracking *${packageName}* in ${formatChannelDescriptor(channelName, channelId)}`,
+          `<@${userId}> stopped tracking ${formatPackageName(packageName)} in ${formatChannelDescriptor(channelName, channelId)}`,
         );
       }
     } else {
@@ -650,7 +734,7 @@ export const processNpmUntrack = internalAction({
       });
 
       if (!existing) {
-        await sendToSlack(responseUrl, `You're not tracking *${packageName}* via DMs.`);
+        await sendToSlack(responseUrl, `You're not tracking ${formatPackageName(packageName)} via DMs.`);
         return;
       }
 
@@ -669,7 +753,7 @@ export const processNpmUntrack = internalAction({
       const channelNote =
         channelSubs.length > 0
           ? ` Note: *${packageName}* is still tracked in ${channelSubs
-              .map((s) => `*#${normalizeChannelName(s.channelName ?? s.channelId!)}*`)
+              .map((s) => formatChannelDescriptor(s.channelName, s.channelId))
               .join(", ")} by your workspace.`
           : "";
 
@@ -677,7 +761,7 @@ export const processNpmUntrack = internalAction({
         await chatPostMessage(
           details.accessToken,
           userId,
-          `You stopped tracking *${packageName}* via DMs.${channelNote}`,
+          `You stopped tracking ${formatPackageName(packageName)} via DMs.${channelNote}`,
         );
       }
     }

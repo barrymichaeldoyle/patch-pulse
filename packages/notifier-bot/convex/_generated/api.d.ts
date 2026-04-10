@@ -13,6 +13,7 @@ import type * as http from "../http.js";
 import type * as packages from "../packages.js";
 import type * as polling from "../polling.js";
 import type * as slack_api from "../slack/api.js";
+import type * as slack_bannerAsset from "../slack/bannerAsset.js";
 import type * as slack_commands from "../slack/commands.js";
 import type * as slack_events from "../slack/events.js";
 import type * as slack_interactions from "../slack/interactions.js";
@@ -34,6 +35,7 @@ declare const fullApi: ApiFromModules<{
   packages: typeof packages;
   polling: typeof polling;
   "slack/api": typeof slack_api;
+  "slack/bannerAsset": typeof slack_bannerAsset;
   "slack/commands": typeof slack_commands;
   "slack/events": typeof slack_events;
   "slack/interactions": typeof slack_interactions;

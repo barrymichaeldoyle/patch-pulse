@@ -10,8 +10,21 @@ export type { UpdateType };
 
 export interface PackageJson extends PackageJsonLike {}
 
+export interface DependencySource {
+  catalogName?: string;
+  packageJsonPath: string;
+  projectDisplayName: string;
+  projectRelativePath: string;
+  rawVersion: string;
+  resolvedVersion: string;
+  section: 'dependencies' | 'devDependencies' | 'peerDependencies' | 'optionalDependencies';
+  sourceType: 'direct' | 'catalog';
+  workspaceManifestPath?: string;
+}
+
 export interface DependencyInfo extends DependencyCheckResult {
   isSkipped?: boolean;
+  source?: DependencySource;
   status?: DependencyStatusKind;
 }
 
@@ -25,4 +38,5 @@ export interface UpdateableDependency {
   latestVersion: string;
   updateType: UpdateType;
   category: string;
+  source: DependencySource;
 }

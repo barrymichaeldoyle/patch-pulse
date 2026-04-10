@@ -271,7 +271,8 @@ describe('displaySummary', () => {
     displaySummary(dependencies);
 
     const outdatedCall = consoleSpy.mock.calls.find(
-      (call) => typeof call[0] === 'string' && call[0].includes('⚠  Outdated:'),
+      (call: unknown[]) =>
+        typeof call[0] === 'string' && call[0].includes('⚠  Outdated:'),
     );
     expect(outdatedCall && outdatedCall[0]).not.toContain('(');
   });

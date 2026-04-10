@@ -2,7 +2,7 @@
 
 This package lives in the Patch Pulse monorepo at `packages/cli`.
 
-Check for outdated npm dependencies in your `package.json` file.
+Check for outdated npm dependencies across your project.
 
 ![License](https://img.shields.io/github/license/PatchPulse/cli.svg?color=blue)
 [![npm Version](https://img.shields.io/npm/v/patch-pulse.svg)](https://npmjs.com/package/patch-pulse)
@@ -18,7 +18,7 @@ Check for outdated npm dependencies in your `package.json` file.
 npx patch-pulse
 ```
 
-That's it! Patch Pulse scans your `package.json` and shows which dependencies are outdated.
+That's it! Patch Pulse scans the current project for `package.json` files and shows which dependencies are outdated.
 
 ![Example Screenshot](assets/example.png)
 
@@ -70,6 +70,14 @@ CLI arguments override file configuration:
 npx patch-pulse --skip "react,react-dom" --package-manager pnpm --no-update-prompt
 ```
 
+## Monorepos
+
+When run from a repository root, Patch Pulse scans every `package.json` under the current directory except anything inside `node_modules`.
+
+- `workspace:*` dependencies are ignored
+- pnpm `catalog:` dependencies are resolved from `pnpm-workspace.yaml`
+- interactive dependency updates can update both direct dependency ranges and pnpm catalog entries
+
 ## Ecosystem
 
 - **🔧 CLI Tool** (this repo) - Check dependencies from terminal
@@ -78,7 +86,7 @@ npx patch-pulse --skip "react,react-dom" --package-manager pnpm --no-update-prom
 
 ## Troubleshooting
 
-- **"No dependencies found"** - Run from directory with `package.json`
+- **"No dependencies found"** - Run from a project directory that contains dependency-bearing `package.json` files
 - **"Error reading package.json"** - Check JSON syntax and file permissions
 - **Network errors** - Verify internet connection and npm registry access
 

@@ -14,9 +14,15 @@ export interface PatchPulseConfig {
  * @param argv - The command line arguments
  * @returns The merged configuration
  */
-export function getConfig() {
-  const fileConfig = readConfigFile();
-  const cliConfig = parseCliConfig(process.argv.slice(2));
+export function getConfig({
+  argv = process.argv.slice(2),
+  cwd = process.cwd(),
+}: {
+  argv?: string[];
+  cwd?: string;
+} = {}) {
+  const fileConfig = readConfigFile(cwd);
+  const cliConfig = parseCliConfig(argv);
   return mergeConfigs(fileConfig, cliConfig);
 }
 

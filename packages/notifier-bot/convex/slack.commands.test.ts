@@ -22,6 +22,8 @@ function createFetchMock(
     postedMessages?: Array<{ channel: string; text: string }>;
     publishedViews?: Array<{ userId: string; blocks: unknown[] }>;
     channelNames?: Record<string, string>;
+    channelIdsByName?: Record<string, string>;
+    conversationsListError?: string;
   },
 ) {
   return vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
@@ -61,6 +63,14 @@ function createFetchMock(
           ? { ok: true, channel: { name: channelName } }
           : { ok: false, error: "channel_not_found" },
       );
+    }
+
+    if (url.startsWith("https://slack.com/api/conversations.list")) {
+      if (options?.conversationsListError) {
+        return jsonResponse({ ok: false, error: options.conversationsListError });
+      }
+      const channels = Object.entries(options?.channelIdsByName ?? {}).map(([name, id]) => ({ id, name }));
+      return jsonResponse({ ok: true, channels, response_metadata: { next_cursor: "" } });
     }
 
     if (url === "https://slack.com/api/views.publish") {
@@ -148,7 +158,7 @@ describe("Slack multi-channel subscriptions", () => {
     ).toBe(true);
 
     expect(responseMessages).toEqual([
-      "Already tracking *react* — currently at *19.0.0* in *#frontend* [minor+]",
+      "Already tracking `react` — currently at `19.0.0` in *#frontend* [minor+]",
     ]);
   });
 
@@ -180,7 +190,7 @@ describe("Slack multi-channel subscriptions", () => {
     const subscriptions = await t.query(internal.subscriptions.getBySubscriber, { subscriberId });
     expect(subscriptions).toHaveLength(1);
     expect(subscriptions[0].minUpdateType).toBe("major");
-    expect(responseMessages[0]).toContain("Updated: now tracking *react*");
+    expect(responseMessages[0]).toContain("Updated: now tracking `react`");
     expect(responseMessages[0]).toContain("[major only]");
   });
 
@@ -327,11 +337,119 @@ describe("Slack multi-channel subscriptions", () => {
     expect(subscriptions).toHaveLength(3);
     expect(postedMessages).toHaveLength(1);
     expect(postedMessages[0].channel).toBe("C_RELEASES");
-    expect(postedMessages[0].text).toContain("<@U_ALICE> processed *3* package requests in *#new-releases*:");
-    expect(postedMessages[0].text).toContain("• *tsx* — current version *4.21.0*");
-    expect(postedMessages[0].text).toContain("• *oxlint* — current version *1.59.0*");
-    expect(postedMessages[0].text).toContain("• *vitest* — current version *4.1.4*");
+    expect(postedMessages[0].text).toContain("<@U_ALICE> processed *3* package requests in this channel:");
+    expect(postedMessages[0].text).toContain("• `tsx` — current version `4.21.0`");
+    expect(postedMessages[0].text).toContain("• `oxlint` — current version `1.59.0`");
+    expect(postedMessages[0].text).toContain("• `vitest` — current version `4.1.4`");
     expect(responseMessages).toEqual([]);
+  });
+
+  it("resolves a typed channel name to a Slack channel ID before posting and storing", async () => {
+    const responseMessages: string[] = [];
+    const postedMessages: Array<{ channel: string; text: string }> = [];
+    vi.stubGlobal(
+      "fetch",
+      createFetchMock(responseMessages, {
+        postedMessages,
+        npmVersions: { pnpm: "10.33.0" },
+        channelIdsByName: { "new-releases": "C_RELEASES" },
+      }),
+    );
+
+    const t = convexTest(schema, modules);
+    const subscriberId = await seedWorkspace(t);
+
+    await t.action(internal.slack.commands.processNpmTrack, {
+      packageName: "pnpm",
+      teamId: TEAM_ID,
+      responseUrl: RESPONSE_URL,
+      minUpdateType: "patch",
+      channelName: "new-releases",
+      userId: "U_ALICE",
+    });
+
+    const subscriptions = await t.query(internal.subscriptions.getBySubscriber, {
+      subscriberId,
+    });
+
+    expect(subscriptions).toHaveLength(1);
+    expect(subscriptions[0].channelId).toBe("C_RELEASES");
+    expect(subscriptions[0].channelName).toBe("new-releases");
+    expect(postedMessages).toHaveLength(1);
+    expect(postedMessages[0].channel).toBe("C_RELEASES");
+    expect(postedMessages[0].text).toContain("is now tracking `pnpm` in this channel");
+    expect(responseMessages).toEqual([]);
+  });
+
+
+  it("returns a helpful message when typed channel lookup is missing Slack scope", async () => {
+    const responseMessages: string[] = [];
+    const postedMessages: Array<{ channel: string; text: string }> = [];
+    vi.stubGlobal(
+      "fetch",
+      createFetchMock(responseMessages, {
+        postedMessages,
+        npmVersions: { pnpm: "10.33.0" },
+        conversationsListError: "missing_scope",
+      }),
+    );
+
+    const t = convexTest(schema, modules);
+    const subscriberId = await seedWorkspace(t);
+
+    await t.action(internal.slack.commands.processNpmTrack, {
+      packageName: "pnpm",
+      teamId: TEAM_ID,
+      responseUrl: RESPONSE_URL,
+      minUpdateType: "patch",
+      channelName: "new-releases",
+      userId: "U_ALICE",
+    });
+
+    const subscriptions = await t.query(internal.subscriptions.getBySubscriber, {
+      subscriberId,
+    });
+
+    expect(subscriptions).toHaveLength(0);
+    expect(postedMessages).toHaveLength(0);
+    expect(responseMessages).toHaveLength(1);
+    expect(responseMessages[0]).toContain("missing the channel lookup scope");
+    expect(responseMessages[0]).toContain("*#new-releases*");
+  });
+
+  it("does not crash bulk tracking when typed channel lookup is missing Slack scope", async () => {
+    const responseMessages: string[] = [];
+    const postedMessages: Array<{ channel: string; text: string }> = [];
+    vi.stubGlobal(
+      "fetch",
+      createFetchMock(responseMessages, {
+        postedMessages,
+        npmVersions: { tsx: "4.21.0", oxlint: "1.59.0" },
+        conversationsListError: "missing_scope",
+      }),
+    );
+
+    const t = convexTest(schema, modules);
+    const subscriberId = await seedWorkspace(t);
+
+    await t.action(internal.slack.commands.processBulkNpmTrack, {
+      packageNames: ["tsx", "oxlint"],
+      teamId: TEAM_ID,
+      responseUrl: RESPONSE_URL,
+      minUpdateType: "patch",
+      channelName: "new-releases",
+      userId: "U_ALICE",
+    });
+
+    const subscriptions = await t.query(internal.subscriptions.getBySubscriber, {
+      subscriberId,
+    });
+
+    expect(subscriptions).toHaveLength(0);
+    expect(postedMessages).toHaveLength(0);
+    expect(responseMessages).toHaveLength(1);
+    expect(responseMessages[0]).toContain("missing the channel lookup scope");
+    expect(responseMessages[0]).toContain("*#new-releases*");
   });
 
   it("lists subscriptions grouped by destination, showing only the invoking user's DM subscriptions", async () => {

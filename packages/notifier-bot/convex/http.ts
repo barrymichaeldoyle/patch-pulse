@@ -1,5 +1,10 @@
 import { httpRouter } from "convex/server";
-import { slackInstall, slackOAuthCallback } from "./slack/oauth";
+import {
+  slackBannerImage,
+  slackInstall,
+  slackOAuthCallback,
+  slackOAuthPreview,
+} from "./slack/oauth";
 import { npmTrack, npmUntrack, listPackages, help } from "./slack/commands";
 import { slackEvents } from "./slack/events";
 import { slackInteractions } from "./slack/interactions";
@@ -16,6 +21,18 @@ http.route({
   path: "/slack/oauth-callback",
   method: "GET",
   handler: slackOAuthCallback,
+});
+
+http.route({
+  path: "/slack/oauth-preview",
+  method: "GET",
+  handler: slackOAuthPreview,
+});
+
+http.route({
+  path: "/slack/banner.png",
+  method: "GET",
+  handler: slackBannerImage,
 });
 
 http.route({
