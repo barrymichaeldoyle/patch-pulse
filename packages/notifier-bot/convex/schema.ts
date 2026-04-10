@@ -7,6 +7,7 @@ export default defineSchema({
     currentVersion: v.string(),
     ecosystem: v.string(),
     lastChecked: v.optional(v.number()),
+    githubRepoUrl: v.optional(v.string()),
   }).index("by_name", ["name"]),
 
   subscribers: defineTable({
@@ -34,6 +35,9 @@ export default defineSchema({
     subscriberId: v.id("subscribers"),
     lastNotifiedVersion: v.string(),
     subscriptionDate: v.number(),
+    minUpdateType: v.optional(v.union(v.literal("patch"), v.literal("minor"), v.literal("major"))),
+    channelId: v.optional(v.string()),   // Slack channel ID (e.g. C1234567)
+    channelName: v.optional(v.string()), // Human-readable name for display (e.g. frontend)
   })
     .index("by_package", ["packageId"])
     .index("by_subscriber", ["subscriberId"])

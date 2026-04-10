@@ -1,66 +1,60 @@
-# Patch Pulse Notifier Workflow
+# Patch Pulse Notifier
 
-This package lives in the Patch Pulse monorepo at `packages/notifier-bot`.
+This package contains the Convex-powered notifier backend for Patch Pulse.
 
-This document describes how the Patch Pulse works.
+It currently supports:
 
-## Polling
+- Slack workspace subscriptions
+- npm package polling
+- Multi-channel Slack tracking per workspace
 
-A CRON job is run every _interval_ (currently 1 hour) that checks all our ecosystems (currently only `npm`) if any of the packages in the database have been updated.
+More detailed docs live here:
 
-If a package has been updated, the package is updated in the database with the new version and all subscribers (currently Slack Workspaces and Discord Channels).
+- [`docs/slack.md`](./docs/slack.md): Slack install flow, slash commands, list formatting, and channel behavior
+- [`docs/architecture.md`](./docs/architecture.md): schema, polling flow, metadata enrichment, and implementation notes
+- [`docs/deployment.md`](./docs/deployment.md): environment variables, Slack endpoint setup, and deployment checks
+- [`docs/runbook.md`](./docs/runbook.md): troubleshooting common Slack, polling, and `/list` issues
 
-### Diagram
+## What This Package Does
 
-This diagram explains the process in a step-by-step manner:
+The notifier stores tracked packages, Slack workspace details, and per-channel subscriptions in Convex.
 
-1. We start with a database that contains all packages being tracked.
-2. An hourly CRON job triggers the process.
-3. For each package in the database, the relevant ecosystem is checked for updates.
-4. If there's no update, the process ends for that package.
-5. If there is an update, the package record is updated in the database.
-6. For each subscriber of the updated package, a notification is sent.
-7. The process ends after all notifications are sent.
+An hourly cron checks tracked packages for updates. When a newer version is found:
 
-```mermaid
-  graph LR
-    id1(Database: All Tracked Packages)-->id2{Hourly CRON Trigger}
-    id2-->id3{For Each Package}
-    id3-->id4{Check Ecosystem<br/>for Updates}
-    id4-->id5{Is There<br/>an Update?}
-    id5-- No -->id6[End]
-    id5-- Yes -->id7(Update Package<br/>Record in Database)
-    id7-->id8{For Each<br/>Subscriber}
-    id8-->id9(Send Notification)
-    id9-->id10[End]
-```
+1. The package record is updated in Convex.
+2. GitHub repo metadata is stored on the package when it can be derived from npm metadata.
+3. Matching subscribers are grouped by Slack target channel.
+4. Slack notifications are sent to the relevant channel or the workspace default channel.
 
-## Ecosystems
+## Slack Summary
 
-Currently, only `npm` is supported. Support for other ecosystems is planned.
+Slack tracking is subscription-based:
 
-### npm
+- A workspace has one default channel, chosen when the app is installed.
+- The same package can also be tracked in additional explicit channels.
+- A subscription is effectively scoped by `(workspace, package, channel)`.
+- `/list` groups subscriptions by channel.
 
-The `npm` ecosystem is supported by the [npmjs.com](https://npmjs.com) registry. We fetch the package information using the package name in an api call to `https://registry.npmjs.org/${packageName}/latest` to check if the package has been updated from what we last recorded.
+Examples:
 
-## Subscribers
+- `/npmtrack react`
+- `/npmtrack react #frontend`
+- `/npmtrack react #frontend minor`
+- `/npmuntrack react`
+- `/npmuntrack react #frontend`
+- `/list`
 
-Currently, only Slack Workspaces and Discord Channels are supported. Support for other subscribers is planned.
+## Development
 
-### Slack
+Useful commands from this package directory:
 
-With Slack workspaces, whenever the Patch Pulse Slack App is added to a workspace, the workspace information along with it's specified channel for the bot is added to the database. The specified channel is then notified whenever a package it is subscribed to is updated.
+- `pnpm dev`
+- `pnpm test`
+- `pnpm lint`
+- `pnpm exec tsc --noEmit`
 
-#### Slack Commands
+## Notes
 
-Current we support the following commands on slack:
-
-- `/npmtrack [package-name]` - Adds the specified npm package to the workspace's list of tracked packages.
-- `/npmuntrack [package-name]` - Removes the specified npm package from the workspace's list of tracked packages.
-- `/list` - Lists all the packages being tracked by the workspace.
-
-The polling process checks if any of the packages being tracked by a workspace have been updated and notifies the workspace's specified channel if any of them have been updated.
-
-### Discord
-
-wip...
+- `/list` does not perform live npm lookups. It uses stored package metadata so the response stays fast.
+- GitHub links in `/list` appear after polling has enriched a package with repo metadata.
+- Update notifications can include richer release links because polling already fetches npm manifests during the update check.

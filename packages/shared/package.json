@@ -1,6 +1,10 @@
 {
   "name": "@patch-pulse/shared",
   "version": "0.1.0",
+  "author": {
+    "name": "Barry Michael Doyle",
+    "email": "barry@barrymichaeldoyle.com"
+  },
   "private": true,
   "exports": {
     ".": "./src/index.ts"

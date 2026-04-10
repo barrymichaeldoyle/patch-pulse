@@ -3,6 +3,10 @@
   "displayName": "Patch Pulse",
   "description": "Keep a pulse on npm package updates! Shows inline version information for packages in package.json files.",
   "version": "0.0.1",
+  "author": {
+    "name": "Barry Michael Doyle",
+    "email": "barry@barrymichaeldoyle.com"
+  },
   "publisher": "patch-pulse",
   "license": "MIT",
   "engines": {

@@ -7,9 +7,17 @@ Patch Pulse now lives in a single `pnpm` monorepo for the CLI, notifier bot, sha
 ## Packages
 
 - `packages/cli`: Published npm CLI for checking outdated dependencies.
-- `packages/notifier-bot`: NestJS notification service for Slack today, with room for Discord, email, and other delivery channels later.
+- `packages/notifier-bot`: Convex-powered notifier backend for Slack today, with room for Discord, email, and other delivery channels later.
 - `packages/shared`: Shared runtime helpers and types used across Patch Pulse packages.
 - `packages/vscode-extension`: VS Code extension for surfacing dependency update information in the editor.
+
+## Package Docs
+
+- Notifier overview: [`packages/notifier-bot/README.md`](./packages/notifier-bot/README.md)
+- Slack behavior: [`packages/notifier-bot/docs/slack.md`](./packages/notifier-bot/docs/slack.md)
+- Notifier architecture: [`packages/notifier-bot/docs/architecture.md`](./packages/notifier-bot/docs/architecture.md)
+- Notifier deployment: [`packages/notifier-bot/docs/deployment.md`](./packages/notifier-bot/docs/deployment.md)
+- Notifier runbook: [`packages/notifier-bot/docs/runbook.md`](./packages/notifier-bot/docs/runbook.md)
 
 ## Workspace commands
 

@@ -5,7 +5,6 @@ import {
   getUpdateType,
   isVersionOutdated,
   fetchNpmPackageManifest,
-  getNpmLatestVersion,
   type NpmPackageManifest,
 } from "@patch-pulse/shared";
 

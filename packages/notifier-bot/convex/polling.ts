@@ -4,46 +4,31 @@ import {
   getNpmLatestVersion,
   fetchNpmPackageManifest,
   isVersionOutdated,
+  type UpdateType,
   type NpmPackageManifest,
 } from "@patch-pulse/shared";
 import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
+import {
+  buildNpmPackageUrl,
+  extractGitHubRepoUrl,
+  formatSlackPackageLink,
+  formatSlackVersionLink,
+} from "./slack/links";
 
-function extractGitHubUrl(manifest: NpmPackageManifest): string | undefined {
-  const repo = manifest.repository;
-  let raw: string | undefined;
+const UPDATE_TYPE_RANK: Record<UpdateType, number> = { patch: 0, minor: 1, major: 2 };
 
-  if (typeof repo === "string") {
-    raw = repo;
-  } else if (repo && typeof repo === "object" && "url" in repo) {
-    raw = (repo as { url: string }).url;
-  }
-
-  if (!raw) return undefined;
-
-  // Normalize git+https://github.com/x/y.git → https://github.com/x/y
-  const normalized = raw
-    .replace(/^git\+/, "")
-    .replace(/^git:\/\//, "https://")
-    .replace(/\.git$/, "")
-    .replace(/^github:/, "https://github.com/");
-
-  return normalized.includes("github.com") ? normalized : undefined;
+function meetsThreshold(updateType: UpdateType, minUpdateType: UpdateType): boolean {
+  return UPDATE_TYPE_RANK[updateType] >= UPDATE_TYPE_RANK[minUpdateType];
 }
 
-/**
- * Returns all stable release versions published between fromVersion (exclusive)
- * and toVersion (inclusive), sorted ascending.
- */
 function getIntermediateVersions(
   manifest: NpmPackageManifest,
   fromVersion: string,
   toVersion: string,
 ): string[] {
-  const allVersions = Object.keys(manifest.versions ?? {});
-
-  return allVersions
+  return Object.keys(manifest.versions ?? {})
     .filter((v) => {
       if (v.includes("-")) return false; // skip pre-releases (alpha, beta, rc)
       const newerThanFrom = isVersionOutdated({ current: fromVersion, latest: v });
@@ -57,11 +42,11 @@ function formatUpdateLine(
   name: string,
   fromVersion: string,
   toVersion: string,
+  updateType: UpdateType,
   manifest: NpmPackageManifest,
 ): string {
-  const type = getUpdateType({ current: fromVersion, latest: toVersion });
-  const npmUrl = `https://www.npmjs.com/package/${name}`;
-  const githubUrl = extractGitHubUrl(manifest);
+  const npmUrl = buildNpmPackageUrl(name);
+  const githubUrl = extractGitHubRepoUrl(manifest);
 
   const releaseLinks = githubUrl
     ? getIntermediateVersions(manifest, fromVersion, toVersion).map(
@@ -71,7 +56,24 @@ function formatUpdateLine(
 
   const links = [...releaseLinks, `<${npmUrl}|npm>`].join(" · ");
 
-  return `• *${name}* ${fromVersion} → ${toVersion} [${type}]\n  ↳ ${links}`;
+  return (
+    `• ${formatSlackPackageLink(name)} ${fromVersion} → ` +
+    `${formatSlackVersionLink(name, toVersion, manifest)} [${updateType}]\n  ↳ ${links}`
+  );
+}
+
+async function chatPostMessage(token: string, channel: string, text: string): Promise<void> {
+  const response = await fetch("https://slack.com/api/chat.postMessage", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ channel, text }),
+  });
+
+  const data = await response.json();
+  if (!data.ok) throw new Error(`Slack error: ${data.error}`);
 }
 
 export const checkForUpdates = internalAction({
@@ -79,8 +81,12 @@ export const checkForUpdates = internalAction({
   handler: async (ctx) => {
     const packages = await ctx.runQuery(internal.packages.getAll);
 
-    // Collect updates: subscriberId → list of formatted update lines
-    const updatesBySubscriber = new Map<Id<"subscribers">, string[]>();
+    // Collect updates: subscriberId → channelId → update lines
+    // channelId is undefined when the subscription uses the workspace default channel
+    const updatesBySubscriber = new Map<
+      Id<"subscribers">,
+      Map<string | undefined, string[]>
+    >();
 
     for (const pkg of packages) {
       let manifest: NpmPackageManifest | undefined;
@@ -104,11 +110,13 @@ export const checkForUpdates = internalAction({
       });
 
       if (status === "update-available") {
-        const line = formatUpdateLine(pkg.name, pkg.currentVersion, version, manifest);
+        const updateType = getUpdateType({ current: pkg.currentVersion, latest: version });
+        const line = formatUpdateLine(pkg.name, pkg.currentVersion, version, updateType, manifest);
 
         await ctx.runMutation(internal.packages.upsertVersion, {
           name: pkg.name,
           version,
+          githubRepoUrl: extractGitHubRepoUrl(manifest),
         });
 
         console.log(`updated ${pkg.name} from ${pkg.currentVersion} to ${version}`);
@@ -119,39 +127,40 @@ export const checkForUpdates = internalAction({
         );
 
         for (const sub of subscriptions) {
-          const existing = updatesBySubscriber.get(sub.subscriberId) ?? [];
-          existing.push(line);
-          updatesBySubscriber.set(sub.subscriberId, existing);
+          const threshold = sub.minUpdateType ?? "patch";
+          if (!meetsThreshold(updateType, threshold)) continue;
+
+          const channelMap =
+            updatesBySubscriber.get(sub.subscriberId) ?? new Map<string | undefined, string[]>();
+          const lines = channelMap.get(sub.channelId) ?? [];
+          lines.push(line);
+          channelMap.set(sub.channelId, lines);
+          updatesBySubscriber.set(sub.subscriberId, channelMap);
         }
       }
     }
 
     if (updatesBySubscriber.size === 0) return;
 
-    // Send one batched message per subscriber
-    for (const [subscriberId, updates] of updatesBySubscriber) {
+    // Send one message per (subscriber, channel) pair
+    for (const [subscriberId, channelMap] of updatesBySubscriber) {
       const details = await ctx.runQuery(internal.subscribers.getSlackDetails, {
         subscriberId,
       });
 
       if (!details) continue;
 
-      const text =
-        `📦 *${updates.length} npm package update${updates.length === 1 ? "" : "s"}*\n\n` +
-        updates.join("\n");
+      for (const [channelId, updates] of channelMap) {
+        const targetChannel = channelId ?? details.webhookChannelId;
+        const text =
+          `📦 *${updates.length} npm package update${updates.length === 1 ? "" : "s"}*\n\n` +
+          updates.join("\n");
 
-      try {
-        const response = await fetch(details.webhookUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
-        });
-
-        if (!response.ok) {
-          console.error(`failed to notify ${subscriberId}: ${response.statusText}`);
+        try {
+          await chatPostMessage(details.accessToken, targetChannel, text);
+        } catch (error) {
+          console.error(`error sending to ${targetChannel}:`, error);
         }
-      } catch (error) {
-        console.error(`error sending notification to ${subscriberId}:`, error);
       }
     }
   },

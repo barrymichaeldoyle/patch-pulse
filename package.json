@@ -2,6 +2,10 @@
   "name": "@patch-pulse/root",
   "private": true,
   "version": "0.1.0",
+  "author": {
+    "name": "Barry Michael Doyle",
+    "email": "barry@barrymichaeldoyle.com"
+  },
   "packageManager": "pnpm@10.30.3",
   "devDependencies": {
     "knip": "6.3.1",

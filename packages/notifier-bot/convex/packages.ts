@@ -23,8 +23,9 @@ export const upsertVersion = internalMutation({
     name: v.string(),
     version: v.string(),
     ecosystem: v.optional(v.string()),
+    githubRepoUrl: v.optional(v.string()),
   },
-  handler: async (ctx, { name, version, ecosystem }) => {
+  handler: async (ctx, { name, version, ecosystem, githubRepoUrl }) => {
     const existing = await ctx.db
       .query("packages")
       .withIndex("by_name", (q) => q.eq("name", name))
@@ -34,6 +35,7 @@ export const upsertVersion = internalMutation({
       await ctx.db.patch(existing._id, {
         currentVersion: version,
         lastChecked: Date.now(),
+        githubRepoUrl,
       });
       return existing._id;
     }
@@ -43,6 +45,7 @@ export const upsertVersion = internalMutation({
       currentVersion: version,
       ecosystem: ecosystem ?? "npm",
       lastChecked: Date.now(),
+      githubRepoUrl,
     });
   },
 });
