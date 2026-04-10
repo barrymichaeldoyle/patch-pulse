@@ -2,6 +2,7 @@ import { httpRouter } from "convex/server";
 import { slackInstall, slackOAuthCallback } from "./slack/oauth";
 import { npmTrack, npmUntrack, listPackages, help } from "./slack/commands";
 import { slackEvents } from "./slack/events";
+import { slackInteractions } from "./slack/interactions";
 
 const http = httpRouter();
 
@@ -45,6 +46,12 @@ http.route({
   path: "/slack/events",
   method: "POST",
   handler: slackEvents,
+});
+
+http.route({
+  path: "/slack/interactions",
+  method: "POST",
+  handler: slackInteractions,
 });
 
 export default http;

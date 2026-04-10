@@ -82,6 +82,13 @@ export const ensureExists = internalMutation({
   },
 });
 
+export const touchLastChecked = internalMutation({
+  args: { packageId: v.id("packages") },
+  handler: async (ctx, { packageId }) => {
+    await ctx.db.patch(packageId, { lastChecked: Date.now() });
+  },
+});
+
 export const getByIds = internalQuery({
   args: { ids: v.array(v.id("packages")) },
   handler: async (ctx, { ids }) => {

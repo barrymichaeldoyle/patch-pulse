@@ -6,7 +6,7 @@ import {
 import { httpAction, internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { formatSlackPackageLink, formatSlackVersionText } from "./links";
-import { chatPostMessage, PrivateChannelError } from "./api";
+import { chatPostMessage, conversationsInfo, PrivateChannelError, publishAppHome, type HomePackageEntry, openTrackModal, openMoveChannelModal } from "./api";
 import { verifySlackRequest } from "./verify";
 
 type MinUpdateType = "patch" | "minor" | "major";
@@ -203,7 +203,8 @@ export const help = httpAction(async (_ctx, request) => {
     `• \`/npmlist\` — see all packages you're tracking (your DMs + all channel subscriptions)\n\n` +
     `*Tips*\n` +
     `• Re-running \`/npmtrack\` with a different threshold (e.g. \`major\`) updates it in place.\n` +
-    `• To track in a private channel, first run \`/invite @PatchPulse\` in that channel.`;
+    `• To track in a private channel, first run \`/invite @PatchPulse\` in that channel.\n\n` +
+    `🐛 Found a bug or have a feature request? <https://github.com/barrymichaeldoyle/patch-pulse/issues|Open an issue on GitHub>`;
 
   return new Response(JSON.stringify({ text }), {
     headers: { "Content-Type": "application/json" },
@@ -237,16 +238,25 @@ export const processNpmTrack = internalAction({
   args: {
     packageName: v.string(),
     teamId: v.string(),
-    responseUrl: v.string(),
+    responseUrl: v.optional(v.string()),
     minUpdateType: v.union(v.literal("patch"), v.literal("minor"), v.literal("major")),
     channelId: v.optional(v.string()),
     channelName: v.optional(v.string()),
     userId: v.optional(v.string()),
   },
   handler: async (ctx, { packageName, teamId, responseUrl, minUpdateType, channelId, channelName, userId }) => {
+    // When invoked from a modal there is no responseUrl — fall back to DMing the user
+    async function sendFeedback(details: { accessToken: string } | null, text: string) {
+      if (responseUrl) {
+        await sendToSlack(responseUrl, text);
+      } else if (details && userId) {
+        await chatPostMessage(details.accessToken, userId, text);
+      }
+    }
+
     const subscriber = await ctx.runQuery(internal.subscribers.getByTeamId, { teamId });
     if (!subscriber) {
-      await sendToSlack(responseUrl, `❌ Workspace not found. Please reinstall PatchPulse.`);
+      await sendFeedback(null, `❌ Workspace not found. Please reinstall PatchPulse.`);
       return;
     }
 
@@ -255,7 +265,8 @@ export const processNpmTrack = internalAction({
     }).catch(() => null);
 
     if (!version) {
-      await sendToSlack(responseUrl, `❌ Could not find *${packageName}* on npm.`);
+      const details = await ctx.runQuery(internal.subscribers.getSlackDetails, { subscriberId: subscriber._id });
+      await sendFeedback(details, `❌ Could not find *${packageName}* on npm.`);
       return;
     }
 
@@ -278,8 +289,14 @@ export const processNpmTrack = internalAction({
       userId: channelId ? undefined : userId,
     });
 
+    const details = await ctx.runQuery(internal.subscribers.getSlackDetails, { subscriberId: subscriber._id });
+
+    // Resolve channel name if not provided (e.g. when tracking from the modal)
+    if (channelId && !channelName && details) {
+      channelName = await conversationsInfo(details.accessToken, channelId);
+    }
+
     if (existing) {
-      // Fix 2: if the threshold changed, update in place instead of rejecting
       if (existing.minUpdateType !== minUpdateType) {
         await ctx.runMutation(internal.subscriptions.updateMinUpdateType, {
           subscriptionId: existing._id,
@@ -287,18 +304,20 @@ export const processNpmTrack = internalAction({
         });
         const filterLabel = formatMinUpdateType(minUpdateType);
         const channelLabel = formatChannelPhrase(existing.channelName);
-        await sendToSlack(
-          responseUrl,
+        await sendFeedback(
+          details,
           `Updated: now tracking *${packageName}*${channelLabel} with ${filterLabel ?? "all"} notifications — currently at *${version}*`,
         );
       } else {
         const filterLabel = formatMinUpdateType(existing.minUpdateType as MinUpdateType);
         const channelLabel = formatChannelPhrase(existing.channelName);
-        // Fix 3: show current npm version, not the (potentially stale) lastNotifiedVersion
-        await sendToSlack(
-          responseUrl,
+        await sendFeedback(
+          details,
           `Already tracking *${packageName}* — currently at *${version}*${channelLabel}${filterLabel ? ` ${filterLabel}` : ""}`,
         );
+      }
+      if (!responseUrl && userId) {
+        await ctx.scheduler.runAfter(0, internal.slack.commands.refreshAppHome, { teamId, userId });
       }
       return;
     }
@@ -313,13 +332,8 @@ export const processNpmTrack = internalAction({
       userId: channelId ? undefined : userId,
     });
 
-    const details = await ctx.runQuery(internal.subscribers.getSlackDetails, {
-      subscriberId: subscriber._id,
-    });
-
     if (details) {
       const filterLabel = formatMinUpdateType(minUpdateType);
-      // Fix 3: if npm already has a newer version than our DB, mention it
       const updateSuffix = pendingUpdate
         ? ` There's already an update available (*${dbVersion}* → *${version}*) — I'll notify you about it shortly.`
         : "";
@@ -340,10 +354,11 @@ export const processNpmTrack = internalAction({
               subscriberId: subscriber._id,
               channelId,
             });
-            await sendToSlack(
-              responseUrl,
+            await sendFeedback(
+              details,
               `⚠️ *${packageName}* couldn't be tracked in ${channelLabel} — PatchPulse needs to be invited first. Run \`/invite @PatchPulse\` in that channel, then try again.`,
             );
+            return;
           } else {
             throw error;
           }
@@ -355,6 +370,11 @@ export const processNpmTrack = internalAction({
           `You're now tracking *${packageName}* — current version *${pendingUpdate ? dbVersion : version}*${filterLabel ? ` ${filterLabel}` : ""}.${updateSuffix || " I'll DM you when updates are available."}`,
         );
       }
+    }
+
+    // Refresh home tab when invoked from modal
+    if (!responseUrl && userId) {
+      await ctx.scheduler.runAfter(0, internal.slack.commands.refreshAppHome, { teamId, userId });
     }
   },
 });
@@ -558,6 +578,169 @@ export const processList = internalAction({
     await sendToSlack(responseUrl, `${header}\n\n\n${first.join("\n\n\n")}`);
     for (const chunk of rest) {
       await sendToSlack(responseUrl, chunk.join("\n\n\n"));
+    }
+  },
+});
+
+export const processUntrackAction = internalAction({
+  args: {
+    teamId: v.string(),
+    viewingUserId: v.string(),
+    subscriptionId: v.id("subscriptions"),
+  },
+  handler: async (ctx, { teamId, viewingUserId, subscriptionId }) => {
+    const sub = await ctx.runQuery(internal.subscriptions.getById, { subscriptionId });
+    if (!sub) return;
+
+    await ctx.runMutation(internal.subscriptions.remove, {
+      packageId: sub.packageId,
+      subscriberId: sub.subscriberId,
+      channelId: sub.channelId,
+      userId: sub.userId,
+    });
+
+    // Refresh the home tab so the package disappears immediately
+    await ctx.scheduler.runAfter(0, internal.slack.commands.refreshAppHome, {
+      teamId,
+      userId: viewingUserId,
+    });
+  },
+});
+
+export const processThresholdChange = internalAction({
+  args: {
+    teamId: v.string(),
+    viewingUserId: v.string(),
+    subscriptionId: v.id("subscriptions"),
+    minUpdateType: v.union(v.literal("patch"), v.literal("minor"), v.literal("major")),
+  },
+  handler: async (ctx, { teamId, viewingUserId, subscriptionId, minUpdateType }) => {
+    await ctx.runMutation(internal.subscriptions.updateMinUpdateType, {
+      subscriptionId,
+      minUpdateType,
+    });
+
+    await ctx.scheduler.runAfter(0, internal.slack.commands.refreshAppHome, {
+      teamId,
+      userId: viewingUserId,
+    });
+  },
+});
+
+export const processMoveAction = internalAction({
+  args: {
+    teamId: v.string(),
+    viewingUserId: v.string(),
+    subscriptionId: v.id("subscriptions"),
+    newChannelId: v.string(),
+  },
+  handler: async (ctx, { teamId, viewingUserId, subscriptionId, newChannelId }) => {
+    const subscriber = await ctx.runQuery(internal.subscribers.getByTeamId, { teamId });
+    if (!subscriber) return;
+
+    const details = await ctx.runQuery(internal.subscribers.getSlackDetails, {
+      subscriberId: subscriber._id,
+    });
+    if (!details) return;
+
+    const sub = await ctx.runQuery(internal.subscriptions.getById, { subscriptionId });
+    if (!sub) return;
+
+    const newChannelName = await conversationsInfo(details.accessToken, newChannelId);
+
+    // Remove old subscription and create a new one for the new channel
+    await ctx.runMutation(internal.subscriptions.remove, {
+      packageId: sub.packageId,
+      subscriberId: sub.subscriberId,
+      channelId: sub.channelId,
+      userId: sub.userId,
+    });
+
+    await ctx.runMutation(internal.subscriptions.create, {
+      packageId: sub.packageId,
+      subscriberId: sub.subscriberId,
+      lastNotifiedVersion: sub.lastNotifiedVersion,
+      minUpdateType: sub.minUpdateType,
+      channelId: newChannelId,
+      channelName: newChannelName,
+    });
+
+    await ctx.scheduler.runAfter(0, internal.slack.commands.refreshAppHome, {
+      teamId,
+      userId: viewingUserId,
+    });
+  },
+});
+
+export const refreshAppHome = internalAction({
+  args: {
+    teamId: v.string(),
+    userId: v.string(),
+  },
+  handler: async (ctx, { teamId, userId }) => {
+    const subscriber = await ctx.runQuery(internal.subscribers.getByTeamId, { teamId });
+    if (!subscriber?.active) return;
+
+    const details = await ctx.runQuery(internal.subscribers.getSlackDetails, {
+      subscriberId: subscriber._id,
+    });
+    if (!details) return;
+
+    const allSubscriptions = await ctx.runQuery(internal.subscriptions.getBySubscriber, {
+      subscriberId: subscriber._id,
+    });
+
+    // Show channel subs (workspace-wide) + this user's own DM subs
+    const subscriptions = allSubscriptions.filter(
+      (sub) => sub.channelId || sub.userId === userId,
+    );
+
+    const hydratedSubscriptions = await Promise.all(
+      subscriptions.map(async (sub) => {
+        if (!sub.channelId || sub.channelName) return sub;
+
+        try {
+          const channelName = await conversationsInfo(details.accessToken, sub.channelId);
+          if (!channelName) return sub;
+
+          await ctx.runMutation(internal.subscriptions.updateChannelName, {
+            subscriptionId: sub._id,
+            channelName,
+          });
+
+          return { ...sub, channelName };
+        } catch (error) {
+          console.error("Failed to resolve Slack channel name:", error);
+          return sub;
+        }
+      }),
+    );
+
+    const packageIds = [...new Set(hydratedSubscriptions.map((s) => s.packageId))];
+    const packages = await ctx.runQuery(internal.packages.getByIds, { ids: packageIds });
+
+    const entries = hydratedSubscriptions
+      .map((sub): HomePackageEntry | null => {
+        const pkg = packages.find((p) => p?._id === sub.packageId);
+        if (!pkg) return null;
+        return {
+          subscriptionId: sub._id,
+          packageName: pkg.name,
+          currentVersion: pkg.currentVersion,
+          githubRepoUrl: pkg.githubRepoUrl,
+          minUpdateType: sub.minUpdateType,
+          channelId: sub.channelId,
+          channelName: sub.channelName,
+          userId: sub.userId,
+          lastChecked: pkg.lastChecked,
+        };
+      })
+      .filter((e): e is HomePackageEntry => e !== null);
+
+    try {
+      await publishAppHome(details.accessToken, userId, entries);
+    } catch (error) {
+      console.error("Failed to publish App Home:", error);
     }
   },
 });

@@ -1,6 +1,11 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
 
+export const getById = internalQuery({
+  args: { subscriptionId: v.id("subscriptions") },
+  handler: async (ctx, { subscriptionId }) => ctx.db.get(subscriptionId),
+});
+
 export const getBySubscriber = internalQuery({
   args: { subscriberId: v.id("subscribers") },
   handler: async (ctx, { subscriberId }) => {
@@ -152,3 +157,12 @@ export const updateMinUpdateType = internalMutation({
   },
 });
 
+export const updateChannelName = internalMutation({
+  args: {
+    subscriptionId: v.id("subscriptions"),
+    channelName: v.string(),
+  },
+  handler: async (ctx, { subscriptionId, channelName }) => {
+    await ctx.db.patch(subscriptionId, { channelName });
+  },
+});

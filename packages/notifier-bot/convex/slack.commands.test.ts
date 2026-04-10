@@ -15,7 +15,13 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-function createFetchMock(responseMessages: string[]) {
+function createFetchMock(
+  responseMessages: string[],
+  options?: {
+    publishedViews?: Array<{ userId: string; blocks: unknown[] }>;
+    channelNames?: Record<string, string>;
+  },
+) {
   return vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url =
       typeof input === "string"
@@ -33,6 +39,23 @@ function createFetchMock(responseMessages: string[]) {
     }
 
     if (url === "https://slack.com/api/chat.postMessage") {
+      return jsonResponse({ ok: true });
+    }
+
+    if (url.startsWith("https://slack.com/api/conversations.info")) {
+      const channelId = new URL(url).searchParams.get("channel") ?? "";
+      const channelName = options?.channelNames?.[channelId];
+      return jsonResponse(
+        channelName
+          ? { ok: true, channel: { name: channelName } }
+          : { ok: false, error: "channel_not_found" },
+      );
+    }
+
+    if (url === "https://slack.com/api/views.publish") {
+      const raw = typeof init?.body === "string" ? init.body : "";
+      const body = JSON.parse(raw);
+      options?.publishedViews?.push({ userId: body.user_id, blocks: body.view.blocks });
       return jsonResponse({ ok: true });
     }
 
@@ -282,5 +305,87 @@ describe("Slack multi-channel subscriptions", () => {
     const pkg = await t.query(internal.packages.getByName, { name: "react" });
 
     expect(pkg?.githubRepoUrl).toBe("https://github.com/facebook/react");
+  });
+
+  it("refreshAppHome heals missing channel names before publishing the home view", async () => {
+    const responseMessages: string[] = [];
+    const publishedViews: Array<{ userId: string; blocks: unknown[] }> = [];
+    vi.stubGlobal(
+      "fetch",
+      createFetchMock(responseMessages, {
+        publishedViews,
+        channelNames: { C_FRONTEND: "frontend" },
+      }),
+    );
+
+    const t = convexTest(schema, modules);
+    const subscriberId = await seedWorkspace(t);
+    const packageId = await t.mutation(internal.packages.upsertVersion, {
+      name: "react",
+      version: "19.0.0",
+      ecosystem: "npm",
+      githubRepoUrl: "https://github.com/facebook/react",
+    });
+
+    await t.mutation(internal.subscriptions.create, {
+      packageId,
+      subscriberId,
+      lastNotifiedVersion: "19.0.0",
+      minUpdateType: "patch",
+      channelId: "C_FRONTEND",
+    });
+
+    await t.action(internal.slack.commands.refreshAppHome, {
+      teamId: TEAM_ID,
+      userId: "U_ALICE",
+    });
+
+    const subscriptions = await t.query(internal.subscriptions.getBySubscriber, {
+      subscriberId,
+    });
+
+    expect(subscriptions).toHaveLength(1);
+    expect(subscriptions[0].channelName).toBe("frontend");
+    expect(publishedViews).toHaveLength(1);
+    expect(JSON.stringify(publishedViews[0].blocks)).toContain("#frontend");
+    expect(JSON.stringify(publishedViews[0].blocks)).not.toContain("C_FRONTEND");
+  });
+
+  it("refreshAppHome falls back to a Slack channel mention when channel name lookup fails", async () => {
+    const responseMessages: string[] = [];
+    const publishedViews: Array<{ userId: string; blocks: unknown[] }> = [];
+    vi.stubGlobal(
+      "fetch",
+      createFetchMock(responseMessages, {
+        publishedViews,
+      }),
+    );
+
+    const t = convexTest(schema, modules);
+    const subscriberId = await seedWorkspace(t);
+    const packageId = await t.mutation(internal.packages.upsertVersion, {
+      name: "react",
+      version: "19.0.0",
+      ecosystem: "npm",
+      githubRepoUrl: "https://github.com/facebook/react",
+    });
+
+    await t.mutation(internal.subscriptions.create, {
+      packageId,
+      subscriberId,
+      lastNotifiedVersion: "19.0.0",
+      minUpdateType: "patch",
+      channelId: "C_FRONTEND",
+    });
+
+    await t.action(internal.slack.commands.refreshAppHome, {
+      teamId: TEAM_ID,
+      userId: "U_ALICE",
+    });
+
+    expect(publishedViews).toHaveLength(1);
+    const blocksJson = JSON.stringify(publishedViews[0].blocks);
+    expect(blocksJson).toContain("<#C_FRONTEND>");
+    expect(blocksJson).not.toContain("\"confirm\"");
   });
 });

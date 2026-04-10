@@ -22,6 +22,11 @@ export const slackEvents = httpAction(async (ctx, request) => {
         await ctx.runMutation(internal.subscribers.setInactive, {
           teamId: data.team_id,
         });
+      } else if (data.event?.type === "app_home_opened" && data.event?.tab === "home") {
+        await ctx.scheduler.runAfter(0, internal.slack.commands.refreshAppHome, {
+          teamId: data.team_id,
+          userId: data.event.user,
+        });
       }
       return new Response(null, { status: 200 });
 

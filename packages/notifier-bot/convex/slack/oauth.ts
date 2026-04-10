@@ -1,6 +1,6 @@
 import { httpAction } from "../_generated/server";
 import { internal } from "../_generated/api";
-import { chatPostMessage } from "./api";
+import { chatPostMessage, publishAppHome } from "./api";
 
 export const slackInstall = httpAction(async (_ctx, _request) => {
   const clientId = process.env.SLACK_CLIENT_ID;
@@ -12,7 +12,7 @@ export const slackInstall = httpAction(async (_ctx, _request) => {
 
   const authorizeUrl = new URL("https://slack.com/oauth/v2/authorize");
   authorizeUrl.searchParams.set("client_id", clientId);
-  authorizeUrl.searchParams.set("scope", "chat:write,commands,channels:join");
+  authorizeUrl.searchParams.set("scope", "chat:write,commands,channels:join,channels:read,groups:read");
   authorizeUrl.searchParams.set("redirect_uri", redirectUri);
 
   return new Response(null, {
@@ -58,6 +58,12 @@ export const slackOAuthCallback = httpAction(async (ctx, request) => {
       teamId: data.team.id,
       teamName: data.team.name,
     });
+
+    try {
+      await publishAppHome(data.access_token, data.authed_user.id);
+    } catch (error) {
+      console.warn("Could not publish App Home on install:", error);
+    }
 
     try {
       await chatPostMessage(

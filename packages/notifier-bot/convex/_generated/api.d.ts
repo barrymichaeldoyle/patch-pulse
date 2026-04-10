@@ -15,6 +15,7 @@ import type * as polling from "../polling.js";
 import type * as slack_api from "../slack/api.js";
 import type * as slack_commands from "../slack/commands.js";
 import type * as slack_events from "../slack/events.js";
+import type * as slack_interactions from "../slack/interactions.js";
 import type * as slack_links from "../slack/links.js";
 import type * as slack_oauth from "../slack/oauth.js";
 import type * as slack_verify from "../slack/verify.js";
@@ -35,6 +36,7 @@ declare const fullApi: ApiFromModules<{
   "slack/api": typeof slack_api;
   "slack/commands": typeof slack_commands;
   "slack/events": typeof slack_events;
+  "slack/interactions": typeof slack_interactions;
   "slack/links": typeof slack_links;
   "slack/oauth": typeof slack_oauth;
   "slack/verify": typeof slack_verify;
