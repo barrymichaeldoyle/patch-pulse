@@ -342,7 +342,10 @@ export async function fetchNpmPackageManifest(
 ): Promise<NpmPackageManifest> {
   const { registryUrl = DEFAULT_NPM_REGISTRY_URL, userAgent } = options;
   const response = await fetch(createRegistryUrl(packageName, registryUrl), {
-    headers: userAgent ? { "User-Agent": userAgent } : undefined,
+    headers: {
+      Accept: "application/vnd.npm.install-v1+json",
+      ...(userAgent ? { "User-Agent": userAgent } : {}),
+    },
   });
 
   if (!response.ok) {

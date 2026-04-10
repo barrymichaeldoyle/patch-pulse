@@ -35,7 +35,8 @@ function getIntermediateVersions(
       const notNewerThanTo = !isVersionOutdated({ current: toVersion, latest: v });
       return newerThanFrom && notNewerThanTo;
     })
-    .sort((a, b) => (isVersionOutdated({ current: a, latest: b }) ? -1 : 1));
+    .sort((a, b) => (isVersionOutdated({ current: a, latest: b }) ? -1 : 1))
+    .slice(0, 10);
 }
 
 function formatUpdateLine(
