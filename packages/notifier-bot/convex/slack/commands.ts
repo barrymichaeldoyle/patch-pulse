@@ -534,7 +534,10 @@ export const processNpmTrack = internalAction({
           await chatPostMessage(details.accessToken, userId, text);
         }
       } catch (error) {
-        console.error('sendFeedback: failed to deliver feedback to user:', error);
+        console.error(
+          'sendFeedback: failed to deliver feedback to user:',
+          error,
+        );
       }
     }
 

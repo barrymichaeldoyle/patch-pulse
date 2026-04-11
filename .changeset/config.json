@@ -7,7 +7,5 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": [
-    "patch-pulse-vscode-extension"
-  ]
+  "ignore": ["patch-pulse-vscode-extension"]
 }

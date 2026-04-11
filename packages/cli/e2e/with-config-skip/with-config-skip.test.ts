@@ -24,7 +24,7 @@ describe('project with config skip', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(fetchNpmPackageManifest).mockResolvedValue({
-      'dist-tags': { latest: '2.9.0' },
+      'dist-tags': { latest: '3.0.0' },
     });
     vi.mocked(checkNpmDependencyStatuses).mockResolvedValue([
       {

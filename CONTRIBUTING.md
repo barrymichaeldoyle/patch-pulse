@@ -68,6 +68,7 @@ pnpm changeset
 ```
 
 The interactive CLI will ask:
+
 - **Which packages are affected?** Select `patch-pulse` (use space to select, enter to confirm).
 - **What kind of change is it?**
   - `patch` — bug fix, internal refactor, dependency update, docs
@@ -111,13 +112,13 @@ pnpm changeset:publish
 
 ### Versioning guide
 
-| Change type | Example | Bump |
-| --- | --- | --- |
-| Bug fix, typo, docs | Fix crash when `package.json` is malformed | `patch` |
-| New flag or config option | Add `--only-outdated` flag | `minor` |
-| New major feature | Monorepo support | `minor` or `major` |
-| Removed flag or config option | Remove `--legacy` flag | `major` |
-| Changed output format | Restructure `--json` output shape | `major` |
-| Breaking config change | Remove regex pattern support | `major` |
+| Change type                   | Example                                    | Bump               |
+| ----------------------------- | ------------------------------------------ | ------------------ |
+| Bug fix, typo, docs           | Fix crash when `package.json` is malformed | `patch`            |
+| New flag or config option     | Add `--only-outdated` flag                 | `minor`            |
+| New major feature             | Monorepo support                           | `minor` or `major` |
+| Removed flag or config option | Remove `--legacy` flag                     | `major`            |
+| Changed output format         | Restructure `--json` output shape          | `major`            |
+| Breaking config change        | Remove regex pattern support               | `major`            |
 
 When in doubt, prefer `minor` over `major` — breaking changes should be rare and deliberate.

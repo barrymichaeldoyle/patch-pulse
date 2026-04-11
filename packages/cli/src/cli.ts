@@ -176,7 +176,9 @@ export async function runCli({
         //   - verbose monorepo
         // In both cases silent: false lets checkDependencyVersions handle display.
         const streamInline =
-          (!workspace.isMonorepo || verboseProjects) && !jsonOutput && !bufferAll;
+          (!workspace.isMonorepo || verboseProjects) &&
+          !jsonOutput &&
+          !bufferAll;
 
         // Show a per-project spinner for non-verbose monorepo (non-buffered).
         const useProjectSpinner =
