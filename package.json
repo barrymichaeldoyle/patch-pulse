@@ -6,6 +6,9 @@
     "name": "Barry Michael Doyle",
     "email": "barry@barrymichaeldoyle.com"
   },
+  "engines": {
+    "node": ">=22"
+  },
   "packageManager": "pnpm@10.30.3",
   "devDependencies": {
     "@types/node": "25.6.0",
@@ -17,23 +20,23 @@
     "vitest": "4.1.4"
   },
   "scripts": {
-    "build:shared": "node -e \"console.log('@patch-pulse/shared does not require a build step')\"",
-    "build:notifier": "pnpm --filter @patch-pulse/notifier-bot build",
     "build:cli": "pnpm --filter patch-pulse build",
     "build:vscode-extension": "pnpm --filter patch-pulse-vscode-extension compile",
-    "build": "pnpm run build:shared && pnpm run build:notifier && pnpm run build:cli && pnpm run build:vscode-extension",
-    "dev:notifier": "pnpm --filter @patch-pulse/notifier-bot start:dev",
+    "build": "pnpm run build:cli && pnpm run build:vscode-extension",
+    "dev:notifier": "pnpm --filter @patch-pulse/notifier-bot dev",
     "dev:cli": "pnpm --filter patch-pulse dev",
     "dev:vscode-extension": "pnpm --filter patch-pulse-vscode-extension watch",
     "format": "pnpm exec oxfmt --write .",
     "format:check": "pnpm exec oxfmt --check .",
-    "ci:check": "pnpm lint && pnpm format:check && pnpm knip && pnpm test:cli && pnpm build:cli && pnpm build:vscode-extension",
+    "ci:check": "pnpm lint && pnpm format:check && pnpm knip && pnpm typecheck && pnpm test:cli && pnpm test:notifier && pnpm build:cli && pnpm build:vscode-extension",
     "knip": "pnpm exec knip",
     "lint": "pnpm exec oxlint .",
     "lint:fix": "pnpm exec oxlint --fix .",
     "start:notifier": "pnpm --filter @patch-pulse/notifier-bot start",
     "test:cli": "pnpm --filter patch-pulse test:run",
+    "test:notifier": "pnpm --filter @patch-pulse/notifier-bot test",
     "test:vscode-extension": "pnpm --filter patch-pulse-vscode-extension test",
-    "test": "pnpm run test:cli"
+    "test": "pnpm run test:cli && pnpm run test:notifier",
+    "typecheck": "pnpm --filter patch-pulse typecheck && pnpm --filter @patch-pulse/notifier-bot typecheck"
   }
 }

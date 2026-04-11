@@ -3,7 +3,6 @@ import { ProgressSpinner } from '../progress';
 
 describe('ProgressSpinner', () => {
   let progressSpinner: ProgressSpinner;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let mockStdout: any;
 
   beforeEach(() => {

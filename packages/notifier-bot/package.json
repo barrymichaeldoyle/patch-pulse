@@ -10,11 +10,8 @@
   "license": "MIT",
   "scripts": {
     "dev": "convex dev",
+    "typecheck": "tsc --noEmit",
     "deploy": "convex deploy",
-    "format": "pnpm exec oxfmt --write .",
-    "format:check": "pnpm exec oxfmt --check .",
-    "lint": "pnpm exec oxlint .",
-    "lint:fix": "pnpm exec oxlint --fix .",
     "test": "vitest run",
     "test:watch": "vitest"
   },

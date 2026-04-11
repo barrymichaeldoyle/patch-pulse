@@ -146,13 +146,11 @@ export function mergeConfigs(
  * @param config - The configuration to validate
  * @returns The validated configuration
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function validateConfig(config: any): PatchPulseConfig {
   const validated: PatchPulseConfig = {};
 
   if (config.skip && Array.isArray(config.skip)) {
     validated.skip = config.skip.filter(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (item: any) => typeof item === 'string',
     );
   }

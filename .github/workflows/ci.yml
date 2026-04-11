@@ -32,8 +32,14 @@ jobs:
       - name: Knip
         run: pnpm knip
 
+      - name: Typecheck
+        run: pnpm typecheck
+
       - name: Test (CLI)
         run: pnpm test:cli
+
+      - name: Test (notifier)
+        run: pnpm test:notifier
 
       - name: Build (CLI)
         run: pnpm build:cli

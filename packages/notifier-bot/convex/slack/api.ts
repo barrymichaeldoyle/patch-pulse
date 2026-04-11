@@ -286,7 +286,6 @@ export async function publishAppHome(
   viewingUserId: string,
   entries?: HomePackageEntry[],
 ): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const blocks: any[] = [
     {
       type: 'header',

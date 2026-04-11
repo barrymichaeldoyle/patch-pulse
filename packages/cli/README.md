@@ -4,11 +4,11 @@ This package lives in the Patch Pulse monorepo at `packages/cli`.
 
 Check for outdated npm dependencies across your project.
 
-![License](https://img.shields.io/github/license/PatchPulse/cli.svg?color=blue)
+![License](https://img.shields.io/github/license/barrymichaeldoyle/patch-pulse.svg?color=blue)
 [![npm Version](https://img.shields.io/npm/v/patch-pulse.svg)](https://npmjs.com/package/patch-pulse)
 [![npm Downloads](https://img.shields.io/npm/dm/patch-pulse.svg)](https://npmjs.com/package/patch-pulse)
-[![CI/CD](https://github.com/PatchPulse/cli/actions/workflows/ci.yml/badge.svg)](https://github.com/PatchPulse/cli/actions/workflows/ci.yml)
-![GitHub stars](https://img.shields.io/github/stars/PatchPulse/cli.svg?style=social)
+[![CI/CD](https://github.com/barrymichaeldoyle/patch-pulse/actions/workflows/ci.yml/badge.svg)](https://github.com/barrymichaeldoyle/patch-pulse/actions/workflows/ci.yml)
+![GitHub stars](https://img.shields.io/github/stars/barrymichaeldoyle/patch-pulse.svg?style=social)
 
 ![Patch Pulse Banner](../../assets/banner.png)
 
