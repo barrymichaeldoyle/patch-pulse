@@ -5,6 +5,7 @@ import {
   fetchNpmPackageManifest,
 } from '@patch-pulse/shared';
 import { runCli } from '../../cli';
+import { stripAnsi } from '../test-utils';
 
 vi.mock('@patch-pulse/shared', async () => {
   const actual = await vi.importActual<typeof import('@patch-pulse/shared')>(
@@ -18,7 +19,6 @@ vi.mock('@patch-pulse/shared', async () => {
 });
 
 const fixturePath = fileURLToPath(new URL('./__fixtures__/', import.meta.url));
-const stripAnsi = (str: string) => str.replace(/\x1B\[[0-9;]*m/g, '');
 
 describe('monorepo project', () => {
   beforeEach(() => {
