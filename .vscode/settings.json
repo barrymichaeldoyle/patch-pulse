@@ -39,7 +39,10 @@
     "editor.formatOnSave": true
   },
   "cSpell.words": [
+    "npmhelp",
+    "npmlist",
     "npmtrack",
+    "npmuntrack",
     "oxfmt",
     "oxlint"
   ]

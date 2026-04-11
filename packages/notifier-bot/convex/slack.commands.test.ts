@@ -1,17 +1,17 @@
-import { convexTest } from "convex-test";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { internal } from "./_generated/api";
-import schema from "./schema";
+import { convexTest } from 'convex-test';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { internal } from './_generated/api';
+import schema from './schema';
 
-const modules = import.meta.glob("./**/*.ts");
+const modules = import.meta.glob('./**/*.ts');
 
-const TEAM_ID = "T_TEST";
-const RESPONSE_URL = "https://example.com/slack/response";
+const TEAM_ID = 'T_TEST';
+const RESPONSE_URL = 'https://example.com/slack/response';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { 'Content-Type': 'application/json' },
   });
 }
 
@@ -28,60 +28,74 @@ function createFetchMock(
 ) {
   return vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url =
-      typeof input === "string"
+      typeof input === 'string'
         ? input
         : input instanceof URL
           ? input.toString()
           : input.url;
 
-    if (url.startsWith("https://registry.npmjs.org/")) {
-      const packageName = decodeURIComponent(url.replace("https://registry.npmjs.org/", ""));
-      const version = options?.npmVersions?.[packageName] ?? "19.0.0";
+    if (url.startsWith('https://registry.npmjs.org/')) {
+      const packageName = decodeURIComponent(
+        url.replace('https://registry.npmjs.org/', ''),
+      );
+      const version = options?.npmVersions?.[packageName] ?? '19.0.0';
       if (options?.npmVersions && !(packageName in options.npmVersions)) {
-        return jsonResponse({ error: "not_found" }, 404);
+        return jsonResponse({ error: 'not_found' }, 404);
       }
 
       return jsonResponse({
-        "dist-tags": { latest: version },
-        repository: "github:facebook/react",
+        'dist-tags': { latest: version },
+        repository: 'github:facebook/react',
         versions: { [version]: {} },
       });
     }
 
-    if (url === "https://slack.com/api/chat.postMessage") {
-      const raw = typeof init?.body === "string" ? init.body : "";
+    if (url === 'https://slack.com/api/chat.postMessage') {
+      const raw = typeof init?.body === 'string' ? init.body : '';
       const body = JSON.parse(raw);
       options?.postedMessages?.push({ channel: body.channel, text: body.text });
       return jsonResponse({ ok: true });
     }
 
-    if (url.startsWith("https://slack.com/api/conversations.info")) {
-      const channelId = new URL(url).searchParams.get("channel") ?? "";
+    if (url.startsWith('https://slack.com/api/conversations.info')) {
+      const channelId = new URL(url).searchParams.get('channel') ?? '';
       const channelName = options?.channelNames?.[channelId];
       return jsonResponse(
         channelName
           ? { ok: true, channel: { name: channelName } }
-          : { ok: false, error: "channel_not_found" },
+          : { ok: false, error: 'channel_not_found' },
       );
     }
 
-    if (url.startsWith("https://slack.com/api/conversations.list")) {
+    if (url.startsWith('https://slack.com/api/conversations.list')) {
       if (options?.conversationsListError) {
-        return jsonResponse({ ok: false, error: options.conversationsListError });
+        return jsonResponse({
+          ok: false,
+          error: options.conversationsListError,
+        });
       }
-      const channels = Object.entries(options?.channelIdsByName ?? {}).map(([name, id]) => ({ id, name }));
-      return jsonResponse({ ok: true, channels, response_metadata: { next_cursor: "" } });
+      const channels = Object.entries(options?.channelIdsByName ?? {}).map(
+        ([name, id]) => ({ id, name }),
+      );
+      return jsonResponse({
+        ok: true,
+        channels,
+        response_metadata: { next_cursor: '' },
+      });
     }
 
-    if (url === "https://slack.com/api/views.publish") {
-      const raw = typeof init?.body === "string" ? init.body : "";
+    if (url === 'https://slack.com/api/views.publish') {
+      const raw = typeof init?.body === 'string' ? init.body : '';
       const body = JSON.parse(raw);
-      options?.publishedViews?.push({ userId: body.user_id, blocks: body.view.blocks });
+      options?.publishedViews?.push({
+        userId: body.user_id,
+        blocks: body.view.blocks,
+      });
       return jsonResponse({ ok: true });
     }
 
     if (url === RESPONSE_URL) {
-      const raw = typeof init?.body === "string" ? init.body : "";
+      const raw = typeof init?.body === 'string' ? init.body : '';
       responseMessages.push(JSON.parse(raw).text);
       return new Response(null, { status: 200 });
     }
@@ -92,14 +106,14 @@ function createFetchMock(
 
 async function seedWorkspace(t: ReturnType<typeof convexTest>) {
   return await t.mutation(internal.subscribers.upsertSlackWorkspace, {
-    accessToken: "xoxb-test-token",
-    botUserId: "B_TEST",
+    accessToken: 'xoxb-test-token',
+    botUserId: 'B_TEST',
     teamId: TEAM_ID,
-    teamName: "Patch Pulse Test",
+    teamName: 'Patch Pulse Test',
   });
 }
 
-describe("Slack multi-channel subscriptions", () => {
+describe('Slack multi-channel subscriptions', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -108,98 +122,111 @@ describe("Slack multi-channel subscriptions", () => {
     vi.restoreAllMocks();
   });
 
-  it("tracks the same package separately via DM and an explicit channel", async () => {
+  it('tracks the same package separately via DM and an explicit channel', async () => {
     const responseMessages: string[] = [];
-    vi.stubGlobal("fetch", createFetchMock(responseMessages));
+    vi.stubGlobal('fetch', createFetchMock(responseMessages));
 
     const t = convexTest(schema, modules);
     const subscriberId = await seedWorkspace(t);
 
     await t.action(internal.slack.commands.processNpmTrack, {
-      packageName: "react",
+      packageName: 'react',
       teamId: TEAM_ID,
       responseUrl: RESPONSE_URL,
-      minUpdateType: "patch",
-      userId: "U_ALICE",
+      minUpdateType: 'patch',
+      userId: 'U_ALICE',
     });
 
     await t.action(internal.slack.commands.processNpmTrack, {
-      packageName: "react",
+      packageName: 'react',
       teamId: TEAM_ID,
       responseUrl: RESPONSE_URL,
-      minUpdateType: "minor",
-      channelId: "C_FRONTEND",
-      channelName: "frontend",
+      minUpdateType: 'minor',
+      channelId: 'C_FRONTEND',
+      channelName: 'frontend',
     });
 
     // Re-tracking same channel with same threshold → "already tracking"
     await t.action(internal.slack.commands.processNpmTrack, {
-      packageName: "react",
+      packageName: 'react',
       teamId: TEAM_ID,
       responseUrl: RESPONSE_URL,
-      minUpdateType: "minor",
-      channelId: "C_FRONTEND",
-      channelName: "frontend",
+      minUpdateType: 'minor',
+      channelId: 'C_FRONTEND',
+      channelName: 'frontend',
     });
 
-    const subscriptions = await t.query(internal.subscriptions.getBySubscriber, {
-      subscriberId,
-    });
+    const subscriptions = await t.query(
+      internal.subscriptions.getBySubscriber,
+      {
+        subscriberId,
+      },
+    );
 
     expect(subscriptions).toHaveLength(2);
-    expect(subscriptions.some((sub) => sub.userId === "U_ALICE" && sub.minUpdateType === "patch" && !sub.channelId)).toBe(true);
     expect(
       subscriptions.some(
         (sub) =>
-          sub.channelId === "C_FRONTEND" &&
-          sub.channelName === "frontend" &&
-          sub.minUpdateType === "minor",
+          sub.userId === 'U_ALICE' &&
+          sub.minUpdateType === 'patch' &&
+          !sub.channelId,
+      ),
+    ).toBe(true);
+    expect(
+      subscriptions.some(
+        (sub) =>
+          sub.channelId === 'C_FRONTEND' &&
+          sub.channelName === 'frontend' &&
+          sub.minUpdateType === 'minor',
       ),
     ).toBe(true);
 
     expect(responseMessages).toEqual([
-      "Already tracking `react` — currently at `19.0.0` in *#frontend* [minor+]",
+      'Already tracking `react` — currently at `19.0.0` in *#frontend* [minor+]',
     ]);
   });
 
-  it("updates threshold in place when re-tracking with a different minUpdateType", async () => {
+  it('updates threshold in place when re-tracking with a different minUpdateType', async () => {
     const responseMessages: string[] = [];
-    vi.stubGlobal("fetch", createFetchMock(responseMessages));
+    vi.stubGlobal('fetch', createFetchMock(responseMessages));
 
     const t = convexTest(schema, modules);
     const subscriberId = await seedWorkspace(t);
 
     await t.action(internal.slack.commands.processNpmTrack, {
-      packageName: "react",
+      packageName: 'react',
       teamId: TEAM_ID,
       responseUrl: RESPONSE_URL,
-      minUpdateType: "patch",
-      channelId: "C_FRONTEND",
-      channelName: "frontend",
+      minUpdateType: 'patch',
+      channelId: 'C_FRONTEND',
+      channelName: 'frontend',
     });
 
     await t.action(internal.slack.commands.processNpmTrack, {
-      packageName: "react",
+      packageName: 'react',
       teamId: TEAM_ID,
       responseUrl: RESPONSE_URL,
-      minUpdateType: "major",
-      channelId: "C_FRONTEND",
-      channelName: "frontend",
+      minUpdateType: 'major',
+      channelId: 'C_FRONTEND',
+      channelName: 'frontend',
     });
 
-    const subscriptions = await t.query(internal.subscriptions.getBySubscriber, { subscriberId });
+    const subscriptions = await t.query(
+      internal.subscriptions.getBySubscriber,
+      { subscriberId },
+    );
     expect(subscriptions).toHaveLength(1);
-    expect(subscriptions[0].minUpdateType).toBe("major");
-    expect(responseMessages[0]).toContain("Updated: now tracking `react`");
-    expect(responseMessages[0]).toContain("[major only]");
+    expect(subscriptions[0].minUpdateType).toBe('major');
+    expect(responseMessages[0]).toContain('Updated: now tracking `react`');
+    expect(responseMessages[0]).toContain('[major only]');
   });
 
-  it("normalizes mixed-case package names when tracking", async () => {
+  it('normalizes mixed-case package names when tracking', async () => {
     const responseMessages: string[] = [];
     vi.stubGlobal(
-      "fetch",
+      'fetch',
       createFetchMock(responseMessages, {
-        npmVersions: { convex: "1.35.1" },
+        npmVersions: { convex: '1.35.1' },
       }),
     );
 
@@ -207,112 +234,118 @@ describe("Slack multi-channel subscriptions", () => {
     await seedWorkspace(t);
 
     await t.action(internal.slack.commands.processNpmTrack, {
-      packageName: "Convex",
+      packageName: 'Convex',
       teamId: TEAM_ID,
       responseUrl: RESPONSE_URL,
-      minUpdateType: "patch",
-      userId: "U_ALICE",
+      minUpdateType: 'patch',
+      userId: 'U_ALICE',
     });
 
-    const pkg = await t.query(internal.packages.getByName, { name: "convex" });
+    const pkg = await t.query(internal.packages.getByName, { name: 'convex' });
 
-    expect(pkg?.name).toBe("convex");
-    expect(pkg?.currentVersion).toBe("1.35.1");
+    expect(pkg?.name).toBe('convex');
+    expect(pkg?.currentVersion).toBe('1.35.1');
     expect(responseMessages).toEqual([]);
   });
 
   it("untracking without a channel removes only the user's DM subscription, not channel subscriptions", async () => {
-    vi.stubGlobal("fetch", createFetchMock([]));
+    vi.stubGlobal('fetch', createFetchMock([]));
 
     const t = convexTest(schema, modules);
     const subscriberId = await seedWorkspace(t);
     const packageId = await t.mutation(internal.packages.upsertVersion, {
-      name: "react",
-      version: "19.0.0",
-      ecosystem: "npm",
-      githubRepoUrl: "https://github.com/facebook/react",
+      name: 'react',
+      version: '19.0.0',
+      ecosystem: 'npm',
+      githubRepoUrl: 'https://github.com/facebook/react',
     });
 
     await t.mutation(internal.subscriptions.create, {
       packageId,
       subscriberId,
-      lastNotifiedVersion: "19.0.0",
-      minUpdateType: "patch",
-      userId: "U_ALICE",
+      lastNotifiedVersion: '19.0.0',
+      minUpdateType: 'patch',
+      userId: 'U_ALICE',
     });
 
     await t.mutation(internal.subscriptions.create, {
       packageId,
       subscriberId,
-      lastNotifiedVersion: "19.0.0",
-      minUpdateType: "major",
-      channelId: "C_FRONTEND",
-      channelName: "frontend",
+      lastNotifiedVersion: '19.0.0',
+      minUpdateType: 'major',
+      channelId: 'C_FRONTEND',
+      channelName: 'frontend',
     });
 
     await t.action(internal.slack.commands.processNpmUntrack, {
-      packageName: "react",
+      packageName: 'react',
       teamId: TEAM_ID,
       responseUrl: RESPONSE_URL,
-      userId: "U_ALICE",
+      userId: 'U_ALICE',
     });
 
-    const subscriptions = await t.query(internal.subscriptions.getByPackageAndSubscriber, {
-      packageId,
-      subscriberId,
-    });
+    const subscriptions = await t.query(
+      internal.subscriptions.getByPackageAndSubscriber,
+      {
+        packageId,
+        subscriberId,
+      },
+    );
 
     // Only Alice's DM subscription is removed; the channel subscription remains
     expect(subscriptions).toHaveLength(1);
-    expect(subscriptions[0].channelId).toBe("C_FRONTEND");
+    expect(subscriptions[0].channelId).toBe('C_FRONTEND');
   });
 
-  it("normalizes mixed-case package names when untracking", async () => {
+  it('normalizes mixed-case package names when untracking', async () => {
     const responseMessages: string[] = [];
-    vi.stubGlobal("fetch", createFetchMock(responseMessages));
+    vi.stubGlobal('fetch', createFetchMock(responseMessages));
 
     const t = convexTest(schema, modules);
     const subscriberId = await seedWorkspace(t);
     const packageId = await t.mutation(internal.packages.upsertVersion, {
-      name: "convex",
-      version: "1.35.1",
-      ecosystem: "npm",
+      name: 'convex',
+      version: '1.35.1',
+      ecosystem: 'npm',
     });
 
     await t.mutation(internal.subscriptions.create, {
       packageId,
       subscriberId,
-      lastNotifiedVersion: "1.35.1",
-      minUpdateType: "patch",
-      userId: "U_ALICE",
+      lastNotifiedVersion: '1.35.1',
+      minUpdateType: 'patch',
+      userId: 'U_ALICE',
     });
 
     await t.action(internal.slack.commands.processNpmUntrack, {
-      packageName: "Convex",
+      packageName: 'Convex',
       teamId: TEAM_ID,
       responseUrl: RESPONSE_URL,
-      userId: "U_ALICE",
+      userId: 'U_ALICE',
     });
 
-    const subscriptions = await t.query(internal.subscriptions.getByPackageAndSubscriber, {
-      packageId,
-      subscriberId,
-    });
+    const subscriptions = await t.query(
+      internal.subscriptions.getByPackageAndSubscriber,
+      {
+        packageId,
+        subscriberId,
+      },
+    );
 
     expect(subscriptions).toHaveLength(0);
   });
 
-  it("batches bulk tracking into one channel confirmation message", async () => {
+  it('batches bulk tracking into one channel confirmation message', async () => {
     const responseMessages: string[] = [];
     const postedMessages: Array<{ channel: string; text: string }> = [];
     vi.stubGlobal(
-      "fetch",
+      'fetch',
       createFetchMock(responseMessages, {
         postedMessages,
         npmVersions: {
-          tsx: "4.21.0",
-          oxlint: "1.59.0",
-          vitest: "4.1.4",
+          tsx: '4.21.0',
+          oxlint: '1.59.0',
+          vitest: '4.1.4',
         },
       }),
     );
@@ -321,38 +354,49 @@ describe("Slack multi-channel subscriptions", () => {
     const subscriberId = await seedWorkspace(t);
 
     await t.action(internal.slack.commands.processBulkNpmTrack, {
-      packageNames: ["tsx", "oxlint", "vitest"],
+      packageNames: ['tsx', 'oxlint', 'vitest'],
       teamId: TEAM_ID,
       responseUrl: RESPONSE_URL,
-      minUpdateType: "patch",
-      channelId: "C_RELEASES",
-      channelName: "new-releases",
-      userId: "U_ALICE",
+      minUpdateType: 'patch',
+      channelId: 'C_RELEASES',
+      channelName: 'new-releases',
+      userId: 'U_ALICE',
     });
 
-    const subscriptions = await t.query(internal.subscriptions.getBySubscriber, {
-      subscriberId,
-    });
+    const subscriptions = await t.query(
+      internal.subscriptions.getBySubscriber,
+      {
+        subscriberId,
+      },
+    );
 
     expect(subscriptions).toHaveLength(3);
     expect(postedMessages).toHaveLength(1);
-    expect(postedMessages[0].channel).toBe("C_RELEASES");
-    expect(postedMessages[0].text).toContain("<@U_ALICE> processed *3* package requests in this channel:");
-    expect(postedMessages[0].text).toContain("• `tsx` — current version `4.21.0`");
-    expect(postedMessages[0].text).toContain("• `oxlint` — current version `1.59.0`");
-    expect(postedMessages[0].text).toContain("• `vitest` — current version `4.1.4`");
+    expect(postedMessages[0].channel).toBe('C_RELEASES');
+    expect(postedMessages[0].text).toContain(
+      '<@U_ALICE> processed *3* package requests in this channel:',
+    );
+    expect(postedMessages[0].text).toContain(
+      '• `tsx` — current version `4.21.0`',
+    );
+    expect(postedMessages[0].text).toContain(
+      '• `oxlint` — current version `1.59.0`',
+    );
+    expect(postedMessages[0].text).toContain(
+      '• `vitest` — current version `4.1.4`',
+    );
     expect(responseMessages).toEqual([]);
   });
 
-  it("resolves a typed channel name to a Slack channel ID before posting and storing", async () => {
+  it('resolves a typed channel name to a Slack channel ID before posting and storing', async () => {
     const responseMessages: string[] = [];
     const postedMessages: Array<{ channel: string; text: string }> = [];
     vi.stubGlobal(
-      "fetch",
+      'fetch',
       createFetchMock(responseMessages, {
         postedMessages,
-        npmVersions: { pnpm: "10.33.0" },
-        channelIdsByName: { "new-releases": "C_RELEASES" },
+        npmVersions: { pnpm: '10.33.0' },
+        channelIdsByName: { 'new-releases': 'C_RELEASES' },
       }),
     );
 
@@ -360,37 +404,41 @@ describe("Slack multi-channel subscriptions", () => {
     const subscriberId = await seedWorkspace(t);
 
     await t.action(internal.slack.commands.processNpmTrack, {
-      packageName: "pnpm",
+      packageName: 'pnpm',
       teamId: TEAM_ID,
       responseUrl: RESPONSE_URL,
-      minUpdateType: "patch",
-      channelName: "new-releases",
-      userId: "U_ALICE",
+      minUpdateType: 'patch',
+      channelName: 'new-releases',
+      userId: 'U_ALICE',
     });
 
-    const subscriptions = await t.query(internal.subscriptions.getBySubscriber, {
-      subscriberId,
-    });
+    const subscriptions = await t.query(
+      internal.subscriptions.getBySubscriber,
+      {
+        subscriberId,
+      },
+    );
 
     expect(subscriptions).toHaveLength(1);
-    expect(subscriptions[0].channelId).toBe("C_RELEASES");
-    expect(subscriptions[0].channelName).toBe("new-releases");
+    expect(subscriptions[0].channelId).toBe('C_RELEASES');
+    expect(subscriptions[0].channelName).toBe('new-releases');
     expect(postedMessages).toHaveLength(1);
-    expect(postedMessages[0].channel).toBe("C_RELEASES");
-    expect(postedMessages[0].text).toContain("is now tracking `pnpm` in this channel");
+    expect(postedMessages[0].channel).toBe('C_RELEASES');
+    expect(postedMessages[0].text).toContain(
+      'is now tracking `pnpm` in this channel',
+    );
     expect(responseMessages).toEqual([]);
   });
 
-
-  it("returns a helpful message when typed channel lookup is missing Slack scope", async () => {
+  it('returns a helpful message when typed channel lookup is missing Slack scope', async () => {
     const responseMessages: string[] = [];
     const postedMessages: Array<{ channel: string; text: string }> = [];
     vi.stubGlobal(
-      "fetch",
+      'fetch',
       createFetchMock(responseMessages, {
         postedMessages,
-        npmVersions: { pnpm: "10.33.0" },
-        conversationsListError: "missing_scope",
+        npmVersions: { pnpm: '10.33.0' },
+        conversationsListError: 'missing_scope',
       }),
     );
 
@@ -398,34 +446,37 @@ describe("Slack multi-channel subscriptions", () => {
     const subscriberId = await seedWorkspace(t);
 
     await t.action(internal.slack.commands.processNpmTrack, {
-      packageName: "pnpm",
+      packageName: 'pnpm',
       teamId: TEAM_ID,
       responseUrl: RESPONSE_URL,
-      minUpdateType: "patch",
-      channelName: "new-releases",
-      userId: "U_ALICE",
+      minUpdateType: 'patch',
+      channelName: 'new-releases',
+      userId: 'U_ALICE',
     });
 
-    const subscriptions = await t.query(internal.subscriptions.getBySubscriber, {
-      subscriberId,
-    });
+    const subscriptions = await t.query(
+      internal.subscriptions.getBySubscriber,
+      {
+        subscriberId,
+      },
+    );
 
     expect(subscriptions).toHaveLength(0);
     expect(postedMessages).toHaveLength(0);
     expect(responseMessages).toHaveLength(1);
-    expect(responseMessages[0]).toContain("missing the channel lookup scope");
-    expect(responseMessages[0]).toContain("*#new-releases*");
+    expect(responseMessages[0]).toContain('missing the channel lookup scope');
+    expect(responseMessages[0]).toContain('*#new-releases*');
   });
 
-  it("does not crash bulk tracking when typed channel lookup is missing Slack scope", async () => {
+  it('does not crash bulk tracking when typed channel lookup is missing Slack scope', async () => {
     const responseMessages: string[] = [];
     const postedMessages: Array<{ channel: string; text: string }> = [];
     vi.stubGlobal(
-      "fetch",
+      'fetch',
       createFetchMock(responseMessages, {
         postedMessages,
-        npmVersions: { tsx: "4.21.0", oxlint: "1.59.0" },
-        conversationsListError: "missing_scope",
+        npmVersions: { tsx: '4.21.0', oxlint: '1.59.0' },
+        conversationsListError: 'missing_scope',
       }),
     );
 
@@ -433,162 +484,172 @@ describe("Slack multi-channel subscriptions", () => {
     const subscriberId = await seedWorkspace(t);
 
     await t.action(internal.slack.commands.processBulkNpmTrack, {
-      packageNames: ["tsx", "oxlint"],
+      packageNames: ['tsx', 'oxlint'],
       teamId: TEAM_ID,
       responseUrl: RESPONSE_URL,
-      minUpdateType: "patch",
-      channelName: "new-releases",
-      userId: "U_ALICE",
+      minUpdateType: 'patch',
+      channelName: 'new-releases',
+      userId: 'U_ALICE',
     });
 
-    const subscriptions = await t.query(internal.subscriptions.getBySubscriber, {
-      subscriberId,
-    });
+    const subscriptions = await t.query(
+      internal.subscriptions.getBySubscriber,
+      {
+        subscriberId,
+      },
+    );
 
     expect(subscriptions).toHaveLength(0);
     expect(postedMessages).toHaveLength(0);
     expect(responseMessages).toHaveLength(1);
-    expect(responseMessages[0]).toContain("missing the channel lookup scope");
-    expect(responseMessages[0]).toContain("*#new-releases*");
+    expect(responseMessages[0]).toContain('missing the channel lookup scope');
+    expect(responseMessages[0]).toContain('*#new-releases*');
   });
 
   it("lists subscriptions grouped by destination, showing only the invoking user's DM subscriptions", async () => {
     const responseMessages: string[] = [];
-    vi.stubGlobal("fetch", createFetchMock(responseMessages));
+    vi.stubGlobal('fetch', createFetchMock(responseMessages));
 
     const t = convexTest(schema, modules);
     const subscriberId = await seedWorkspace(t);
     const packageId = await t.mutation(internal.packages.upsertVersion, {
-      name: "react",
-      version: "19.0.0",
-      ecosystem: "npm",
-      githubRepoUrl: "https://github.com/facebook/react",
+      name: 'react',
+      version: '19.0.0',
+      ecosystem: 'npm',
+      githubRepoUrl: 'https://github.com/facebook/react',
     });
 
     // Alice's DM subscription
     await t.mutation(internal.subscriptions.create, {
       packageId,
       subscriberId,
-      lastNotifiedVersion: "19.0.0",
-      minUpdateType: "patch",
-      userId: "U_ALICE",
+      lastNotifiedVersion: '19.0.0',
+      minUpdateType: 'patch',
+      userId: 'U_ALICE',
     });
 
     // Bob's DM subscription (should NOT appear in Alice's list)
     await t.mutation(internal.subscriptions.create, {
       packageId,
       subscriberId,
-      lastNotifiedVersion: "19.0.0",
-      minUpdateType: "patch",
-      userId: "U_BOB",
+      lastNotifiedVersion: '19.0.0',
+      minUpdateType: 'patch',
+      userId: 'U_BOB',
     });
 
     // Channel subscription (visible to everyone)
     await t.mutation(internal.subscriptions.create, {
       packageId,
       subscriberId,
-      lastNotifiedVersion: "19.0.0",
-      minUpdateType: "minor",
-      channelId: "C_FRONTEND",
-      channelName: "frontend",
+      lastNotifiedVersion: '19.0.0',
+      minUpdateType: 'minor',
+      channelId: 'C_FRONTEND',
+      channelName: 'frontend',
     });
 
     await t.action(internal.slack.commands.processList, {
       teamId: TEAM_ID,
       responseUrl: RESPONSE_URL,
-      userId: "U_ALICE",
+      userId: 'U_ALICE',
     });
 
     expect(responseMessages).toHaveLength(1);
     // Alice sees 2 subscriptions: her DM + the channel (not Bob's DM)
-    expect(responseMessages[0]).toContain("📦 Tracking *1* package across *2* subscriptions:");
-    expect(responseMessages[0]).toContain("💬 *Your DMs*");
-    expect(responseMessages[0]).toContain("📣 *#frontend*");
     expect(responseMessages[0]).toContain(
-      "    • *<https://www.npmjs.com/package/react|react>* — <https://github.com/facebook/react/releases|19.0.0>",
+      '📦 Tracking *1* package across *2* subscriptions:',
+    );
+    expect(responseMessages[0]).toContain('💬 *Your DMs*');
+    expect(responseMessages[0]).toContain('📣 *#frontend*');
+    expect(responseMessages[0]).toContain(
+      '    • *<https://www.npmjs.com/package/react|react>* — <https://github.com/facebook/react/releases|19.0.0>',
     );
     expect(responseMessages[0]).toContain(
-      "    • *<https://www.npmjs.com/package/react|react>* — <https://github.com/facebook/react/releases|19.0.0> [minor+]",
+      '    • *<https://www.npmjs.com/package/react|react>* — <https://github.com/facebook/react/releases|19.0.0> [minor+]',
     );
-    expect(responseMessages[0]).not.toContain("U_BOB");
-    expect(responseMessages[0]).not.toContain("##frontend");
+    expect(responseMessages[0]).not.toContain('U_BOB');
+    expect(responseMessages[0]).not.toContain('##frontend');
   });
 
-  it("stores github repo metadata during polling so list can use it later", async () => {
+  it('stores github repo metadata during polling so list can use it later', async () => {
     const responseMessages: string[] = [];
-    vi.stubGlobal("fetch", createFetchMock(responseMessages));
+    vi.stubGlobal('fetch', createFetchMock(responseMessages));
 
     const t = convexTest(schema, modules);
     const subscriberId = await seedWorkspace(t);
     const packageId = await t.mutation(internal.packages.upsertVersion, {
-      name: "react",
-      version: "18.2.0",
-      ecosystem: "npm",
+      name: 'react',
+      version: '18.2.0',
+      ecosystem: 'npm',
     });
 
     await t.mutation(internal.subscriptions.create, {
       packageId,
       subscriberId,
-      lastNotifiedVersion: "18.2.0",
-      minUpdateType: "patch",
+      lastNotifiedVersion: '18.2.0',
+      minUpdateType: 'patch',
     });
 
     await t.action(internal.polling.checkForUpdates, {});
 
-    const pkg = await t.query(internal.packages.getByName, { name: "react" });
+    const pkg = await t.query(internal.packages.getByName, { name: 'react' });
 
-    expect(pkg?.githubRepoUrl).toBe("https://github.com/facebook/react");
+    expect(pkg?.githubRepoUrl).toBe('https://github.com/facebook/react');
   });
 
-  it("refreshAppHome heals missing channel names before publishing the home view", async () => {
+  it('refreshAppHome heals missing channel names before publishing the home view', async () => {
     const responseMessages: string[] = [];
     const publishedViews: Array<{ userId: string; blocks: unknown[] }> = [];
     vi.stubGlobal(
-      "fetch",
+      'fetch',
       createFetchMock(responseMessages, {
         publishedViews,
-        channelNames: { C_FRONTEND: "frontend" },
+        channelNames: { C_FRONTEND: 'frontend' },
       }),
     );
 
     const t = convexTest(schema, modules);
     const subscriberId = await seedWorkspace(t);
     const packageId = await t.mutation(internal.packages.upsertVersion, {
-      name: "react",
-      version: "19.0.0",
-      ecosystem: "npm",
-      githubRepoUrl: "https://github.com/facebook/react",
+      name: 'react',
+      version: '19.0.0',
+      ecosystem: 'npm',
+      githubRepoUrl: 'https://github.com/facebook/react',
     });
 
     await t.mutation(internal.subscriptions.create, {
       packageId,
       subscriberId,
-      lastNotifiedVersion: "19.0.0",
-      minUpdateType: "patch",
-      channelId: "C_FRONTEND",
+      lastNotifiedVersion: '19.0.0',
+      minUpdateType: 'patch',
+      channelId: 'C_FRONTEND',
     });
 
     await t.action(internal.slack.commands.refreshAppHome, {
       teamId: TEAM_ID,
-      userId: "U_ALICE",
+      userId: 'U_ALICE',
     });
 
-    const subscriptions = await t.query(internal.subscriptions.getBySubscriber, {
-      subscriberId,
-    });
+    const subscriptions = await t.query(
+      internal.subscriptions.getBySubscriber,
+      {
+        subscriberId,
+      },
+    );
 
     expect(subscriptions).toHaveLength(1);
-    expect(subscriptions[0].channelName).toBe("frontend");
+    expect(subscriptions[0].channelName).toBe('frontend');
     expect(publishedViews).toHaveLength(1);
-    expect(JSON.stringify(publishedViews[0].blocks)).toContain("#frontend");
-    expect(JSON.stringify(publishedViews[0].blocks)).not.toContain("C_FRONTEND");
+    expect(JSON.stringify(publishedViews[0].blocks)).toContain('#frontend');
+    expect(JSON.stringify(publishedViews[0].blocks)).not.toContain(
+      'C_FRONTEND',
+    );
   });
 
-  it("refreshAppHome falls back to a Slack channel mention when channel name lookup fails", async () => {
+  it('refreshAppHome falls back to a Slack channel mention when channel name lookup fails', async () => {
     const responseMessages: string[] = [];
     const publishedViews: Array<{ userId: string; blocks: unknown[] }> = [];
     vi.stubGlobal(
-      "fetch",
+      'fetch',
       createFetchMock(responseMessages, {
         publishedViews,
       }),
@@ -597,28 +658,28 @@ describe("Slack multi-channel subscriptions", () => {
     const t = convexTest(schema, modules);
     const subscriberId = await seedWorkspace(t);
     const packageId = await t.mutation(internal.packages.upsertVersion, {
-      name: "react",
-      version: "19.0.0",
-      ecosystem: "npm",
-      githubRepoUrl: "https://github.com/facebook/react",
+      name: 'react',
+      version: '19.0.0',
+      ecosystem: 'npm',
+      githubRepoUrl: 'https://github.com/facebook/react',
     });
 
     await t.mutation(internal.subscriptions.create, {
       packageId,
       subscriberId,
-      lastNotifiedVersion: "19.0.0",
-      minUpdateType: "patch",
-      channelId: "C_FRONTEND",
+      lastNotifiedVersion: '19.0.0',
+      minUpdateType: 'patch',
+      channelId: 'C_FRONTEND',
     });
 
     await t.action(internal.slack.commands.refreshAppHome, {
       teamId: TEAM_ID,
-      userId: "U_ALICE",
+      userId: 'U_ALICE',
     });
 
     expect(publishedViews).toHaveLength(1);
     const blocksJson = JSON.stringify(publishedViews[0].blocks);
-    expect(blocksJson).toContain("<#C_FRONTEND>");
-    expect(blocksJson).not.toContain("\"confirm\"");
+    expect(blocksJson).toContain('<#C_FRONTEND>');
+    expect(blocksJson).not.toContain('"confirm"');
   });
 });

@@ -21,7 +21,9 @@ describe('displayVersion', () => {
   it('prints version information and calls displayMadeWithLove', () => {
     displayVersion();
     expect(logSpy).toHaveBeenCalled();
-    const output = logSpy.mock.calls.map((call: unknown[]) => call[0]).join('\n');
+    const output = logSpy.mock.calls
+      .map((call: unknown[]) => call[0])
+      .join('\n');
     expect(output).toContain('Patch Pulse CLI');
     expect(output).toContain('Version:');
     expect(output).toContain('Author:');

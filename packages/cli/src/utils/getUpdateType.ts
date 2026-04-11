@@ -16,8 +16,9 @@ export function getUpdateType({
   const updateType = getSharedUpdateType({ current, latest });
 
   if (updateType === 'patch') {
-    const hasInvalidVersion = !/^[\^~>=<]*\d+\.\d+\.\d+/.test(current)
-      || !/^[\^~>=<]*\d+\.\d+\.\d+/.test(latest);
+    const hasInvalidVersion =
+      !/^[\^~>=<]*\d+\.\d+\.\d+/.test(current) ||
+      !/^[\^~>=<]*\d+\.\d+\.\d+/.test(latest);
 
     if (hasInvalidVersion) {
       console.warn(

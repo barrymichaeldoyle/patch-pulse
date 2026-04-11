@@ -237,7 +237,11 @@ function collectDirectUpdates(
       continue;
     }
 
-    const key = [dep.source.packageJsonPath, dep.packageName, dep.source.section].join('::');
+    const key = [
+      dep.source.packageJsonPath,
+      dep.packageName,
+      dep.source.section,
+    ].join('::');
     updatesByKey.set(key, {
       category: dep.category,
       packageJsonPath: dep.source.packageJsonPath,
@@ -245,7 +249,10 @@ function collectDirectUpdates(
       projectDisplayName: dep.source.projectDisplayName,
       projectRelativePath: dep.source.projectRelativePath,
       section: dep.source.section,
-      targetVersion: preserveWildcardPrefix(dep.source.rawVersion, dep.latestVersion),
+      targetVersion: preserveWildcardPrefix(
+        dep.source.rawVersion,
+        dep.latestVersion,
+      ),
     });
   }
 
@@ -258,7 +265,10 @@ function collectCatalogUpdates(
   const updatesByKey = new Map<string, CatalogDependencyUpdate>();
 
   for (const dep of dependencies) {
-    if (dep.source.sourceType !== 'catalog' || !dep.source.workspaceManifestPath) {
+    if (
+      dep.source.sourceType !== 'catalog' ||
+      !dep.source.workspaceManifestPath
+    ) {
       continue;
     }
 
@@ -272,7 +282,10 @@ function collectCatalogUpdates(
     updatesByKey.set(key, {
       catalogName,
       packageName: dep.packageName,
-      targetVersion: preserveWildcardPrefix(dep.source.resolvedVersion, dep.latestVersion),
+      targetVersion: preserveWildcardPrefix(
+        dep.source.resolvedVersion,
+        dep.latestVersion,
+      ),
       workspaceManifestPath: dep.source.workspaceManifestPath,
     });
   }
@@ -293,12 +306,15 @@ function updatePackageJsonFiles(updates: DirectDependencyUpdate[]): void {
   );
 
   for (const [packageJsonPath, fileUpdates] of Object.entries(updatesByFile)) {
-    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as Record<string, unknown>;
+    const packageJson = JSON.parse(
+      readFileSync(packageJsonPath, 'utf-8'),
+    ) as Record<string, unknown>;
 
     for (const update of fileUpdates) {
       const section = packageJson[update.section];
       if (section && typeof section === 'object' && section !== null) {
-        (section as Record<string, string>)[update.packageName] = update.targetVersion;
+        (section as Record<string, string>)[update.packageName] =
+          update.targetVersion;
       }
     }
 
@@ -318,7 +334,9 @@ function updateCatalogFiles(updates: CatalogDependencyUpdate[]): void {
     {} as Record<string, CatalogDependencyUpdate[]>,
   );
 
-  for (const [workspaceManifestPath, fileUpdates] of Object.entries(updatesByFile)) {
+  for (const [workspaceManifestPath, fileUpdates] of Object.entries(
+    updatesByFile,
+  )) {
     const contents = readFileSync(workspaceManifestPath, 'utf-8');
     const lines = contents.split('\n');
 
@@ -335,7 +353,10 @@ function updateCatalogFiles(updates: CatalogDependencyUpdate[]): void {
         );
       }
 
-      lines[lineIndex] = replaceYamlValue(lines[lineIndex], update.targetVersion);
+      lines[lineIndex] = replaceYamlValue(
+        lines[lineIndex],
+        update.targetVersion,
+      );
     }
 
     writeFileSync(workspaceManifestPath, lines.join('\n'));
@@ -422,7 +443,9 @@ function replaceYamlValue(line: string, value: string): string {
   return `${prefix} ${formattedValue}`;
 }
 
-function parseYamlKeyValue(line: string): { key: string; value: string } | null {
+function parseYamlKeyValue(
+  line: string,
+): { key: string; value: string } | null {
   const separatorIndex = line.indexOf(':');
   if (separatorIndex === -1) {
     return null;

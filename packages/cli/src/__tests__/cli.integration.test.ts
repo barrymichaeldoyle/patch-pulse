@@ -1,11 +1,5 @@
 import { fileURLToPath } from 'url';
-import {
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   checkNpmDependencyStatuses,
   fetchNpmPackageManifest,
@@ -14,10 +8,9 @@ import {
 import { runCli } from '../cli';
 
 vi.mock('@patch-pulse/shared', async () => {
-  const actual =
-    await vi.importActual<typeof import('@patch-pulse/shared')>(
-      '@patch-pulse/shared',
-    );
+  const actual = await vi.importActual<typeof import('@patch-pulse/shared')>(
+    '@patch-pulse/shared',
+  );
 
   return {
     ...actual,

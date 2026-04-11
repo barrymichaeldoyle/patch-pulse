@@ -10,18 +10,22 @@
  *
  * If SLACK_SIGNING_SECRET is not set the check is skipped (local dev convenience).
  */
-export async function verifySlackRequest(request: Request): Promise<string | null> {
+export async function verifySlackRequest(
+  request: Request,
+): Promise<string | null> {
   const signingSecret = process.env.SLACK_SIGNING_SECRET;
 
   const body = await request.text();
 
   if (!signingSecret) {
-    console.warn("SLACK_SIGNING_SECRET not set — skipping request verification");
+    console.warn(
+      'SLACK_SIGNING_SECRET not set — skipping request verification',
+    );
     return body;
   }
 
-  const timestamp = request.headers.get("X-Slack-Request-Timestamp");
-  const signature = request.headers.get("X-Slack-Signature");
+  const timestamp = request.headers.get('X-Slack-Request-Timestamp');
+  const signature = request.headers.get('X-Slack-Signature');
 
   if (!timestamp || !signature) return null;
 
@@ -32,22 +36,22 @@ export async function verifySlackRequest(request: Request): Promise<string | nul
   const baseString = `v0:${timestamp}:${body}`;
 
   const key = await crypto.subtle.importKey(
-    "raw",
+    'raw',
     new TextEncoder().encode(signingSecret),
-    { name: "HMAC", hash: "SHA-256" },
+    { name: 'HMAC', hash: 'SHA-256' },
     false,
-    ["sign"],
+    ['sign'],
   );
 
   const mac = await crypto.subtle.sign(
-    "HMAC",
+    'HMAC',
     key,
     new TextEncoder().encode(baseString),
   );
 
   const hex = Array.from(new Uint8Array(mac))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 
   const expected = `v0=${hex}`;
 

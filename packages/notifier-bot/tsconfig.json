@@ -1,12 +1,10 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "target": "ESNext",
     "lib": ["ESNext", "DOM"],
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "strict": true,
-    "skipLibCheck": true,
-    "allowSyntheticDefaultImports": true,
     "types": ["node"]
   },
   "include": ["convex"],

@@ -1,7 +1,4 @@
-import chalk from 'chalk';
-import {
-  fetchNpmPackageManifest,
-} from '@patch-pulse/shared';
+import { fetchNpmPackageManifest } from '@patch-pulse/shared';
 
 import { VERSION } from '../gen/version.gen';
 import { displayUpdateAvailable } from '../ui/display/updateAvailable';

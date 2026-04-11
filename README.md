@@ -2,9 +2,17 @@
 
 ![PatchPulse Banner](./assets/banner.png)
 
-Get notified in Slack when your npm packages release updates — right in your DMs or in a channel, filtered to only the release types you care about.
+PatchPulse helps you stay on top of npm dependency updates across your projects.
 
-## Add to Slack
+| Tool                                             | Status                          | Description                                              |
+| ------------------------------------------------ | ------------------------------- | -------------------------------------------------------- |
+| [Slack bot](#add-to-slack)                       | Live                            | Get notified in Slack when your packages release updates |
+| [CLI](./packages/cli)                            | v2.x on npm · v3 in development | Check for outdated dependencies from the terminal        |
+| [VS Code extension](./packages/vscode-extension) | Early development               | In-editor dependency info (not yet released)             |
+
+---
+
+## Slack Bot
 
 <a href="https://grand-yak-92.convex.site/slack/install"><img alt="Add to Slack" height="40" src="https://platform.slack-edge.com/img/add_to_slack.png" srcset="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x"></a>
 
@@ -12,17 +20,17 @@ Once installed, run `/npmhelp` in any channel or DM to see the full command refe
 
 ## Commands
 
-| Command | Description |
-|---|---|
-| `/npmtrack <package>` | Track a package — notifies you via DM |
-| `/npmtrack react vue typescript` | Track multiple packages at once |
-| `/npmtrack <package> #channel` | Track a package in a channel |
-| `/npmtrack <package> minor` | Only notify on minor+ releases |
-| `/npmtrack <package> major` | Only notify on major releases |
-| `/npmuntrack <package>` | Stop tracking via DM |
-| `/npmuntrack <package> #channel` | Stop tracking in a channel |
-| `/npmlist` | See all packages you're tracking |
-| `/npmhelp` | Show command reference in Slack |
+| Command                          | Description                           |
+| -------------------------------- | ------------------------------------- |
+| `/npmtrack <package>`            | Track a package — notifies you via DM |
+| `/npmtrack react vue typescript` | Track multiple packages at once       |
+| `/npmtrack <package> #channel`   | Track a package in a channel          |
+| `/npmtrack <package> minor`      | Only notify on minor+ releases        |
+| `/npmtrack <package> major`      | Only notify on major releases         |
+| `/npmuntrack <package>`          | Stop tracking via DM                  |
+| `/npmuntrack <package> #channel` | Stop tracking in a channel            |
+| `/npmlist`                       | See all packages you're tracking      |
+| `/npmhelp`                       | Show command reference in Slack       |
 
 ## Features
 
@@ -34,6 +42,12 @@ Once installed, run `/npmhelp` in any channel or DM to see the full command refe
 - **Grouped notifications** — multiple package updates are batched into a single message
 - **GitHub release links** — each notification links directly to the relevant GitHub release notes
 - **Private channel support** — invite `@PatchPulse` to a private channel, then track as normal
+
+---
+
+## Contributing & Support
+
+Bug reports and feature requests are welcome — [open an issue](https://github.com/barrymichaeldoyle/patch-pulse/issues). See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup and guidelines.
 
 ---
 

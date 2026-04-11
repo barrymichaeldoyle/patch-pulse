@@ -14,7 +14,7 @@ interface ResolvedCatalogs {
   named: Record<string, Record<string, string>>;
 }
 
-export interface WorkspaceProject {
+interface WorkspaceProject {
   cwd: string;
   displayName: string;
   packageJson: PackageJson;
@@ -24,7 +24,7 @@ export interface WorkspaceProject {
   usesCatalogProtocol: boolean;
 }
 
-export interface WorkspaceScanResult {
+interface WorkspaceScanResult {
   hasCatalogDependencies: boolean;
   isMonorepo: boolean;
   projects: WorkspaceProject[];
@@ -32,12 +32,14 @@ export interface WorkspaceScanResult {
 
 const IGNORED_DIRECTORIES = new Set(['node_modules', '.git']);
 
-export interface ResolvedDependencySpec {
+interface ResolvedDependencySpec {
   packageName: string;
   source: DependencySource;
 }
 
-export async function scanWorkspace(rootCwd: string): Promise<WorkspaceScanResult> {
+export async function scanWorkspace(
+  rootCwd: string,
+): Promise<WorkspaceScanResult> {
   const packageJsonPaths = findPackageJsonPaths(rootCwd);
   const catalogs = readPnpmCatalogs(rootCwd);
   const workspaceManifestPath = join(rootCwd, 'pnpm-workspace.yaml');
@@ -128,8 +130,13 @@ function resolveDependencySections({
   workspaceManifestPath: string;
 }): Partial<Record<DependencySectionName, ResolvedDependencySpec[]>> {
   const sections = getDependencySections(packageJson);
-  const resolvedSections: Partial<Record<DependencySectionName, ResolvedDependencySpec[]>> = {};
-  const projectDisplayName = getProjectDisplayName({ packageJson, relativePath });
+  const resolvedSections: Partial<
+    Record<DependencySectionName, ResolvedDependencySpec[]>
+  > = {};
+  const projectDisplayName = getProjectDisplayName({
+    packageJson,
+    relativePath,
+  });
 
   for (const field of PACKAGE_JSON_DEPENDENCY_FIELDS) {
     const section = sections[field];
@@ -224,9 +231,10 @@ function resolveCatalogVersion({
       version: string;
     }
   | undefined {
-  const catalogName = versionRange === 'catalog:'
-    ? 'default'
-    : versionRange.slice('catalog:'.length);
+  const catalogName =
+    versionRange === 'catalog:'
+      ? 'default'
+      : versionRange.slice('catalog:'.length);
 
   if (catalogName === 'default') {
     const version = catalogs.default[packageName];
@@ -352,7 +360,9 @@ function parsePnpmCatalogs(contents: string): ResolvedCatalogs {
   return catalogs;
 }
 
-function parseYamlKeyValue(line: string): { key: string; value: string } | null {
+function parseYamlKeyValue(
+  line: string,
+): { key: string; value: string } | null {
   const separatorIndex = line.indexOf(':');
   if (separatorIndex === -1) {
     return null;

@@ -100,7 +100,10 @@ export async function runCli({
               ]),
             );
             const sourceMap = new Map(
-              value.map((dependency) => [dependency.packageName, dependency.source]),
+              value.map((dependency) => [
+                dependency.packageName,
+                dependency.source,
+              ]),
             );
             const dependencies = await checkDependencyVersions(
               dependencyMap,

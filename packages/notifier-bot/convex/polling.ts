@@ -6,21 +6,32 @@ import {
   isVersionOutdated,
   type UpdateType,
   type NpmPackageManifest,
-} from "@patch-pulse/shared";
-import { internalAction } from "./_generated/server";
-import { internal } from "./_generated/api";
-import { Id } from "./_generated/dataModel";
+} from '@patch-pulse/shared';
+import { internalAction } from './_generated/server';
+import { internal } from './_generated/api';
+import { Id } from './_generated/dataModel';
 import {
   buildNpmPackageUrl,
   extractGitHubRepoUrl,
   formatSlackPackageLink,
   formatSlackVersionLink,
-} from "./slack/links";
-import { chatPostMessage, conversationsFindByName, PrivateChannelError } from "./slack/api";
+} from './slack/links';
+import {
+  chatPostMessage,
+  conversationsFindByName,
+  PrivateChannelError,
+} from './slack/api';
 
-const UPDATE_TYPE_RANK: Record<UpdateType, number> = { patch: 0, minor: 1, major: 2 };
+const UPDATE_TYPE_RANK: Record<UpdateType, number> = {
+  patch: 0,
+  minor: 1,
+  major: 2,
+};
 
-function meetsThreshold(updateType: UpdateType, minUpdateType: UpdateType): boolean {
+function meetsThreshold(
+  updateType: UpdateType,
+  minUpdateType: UpdateType,
+): boolean {
   return UPDATE_TYPE_RANK[updateType] >= UPDATE_TYPE_RANK[minUpdateType];
 }
 
@@ -31,9 +42,15 @@ function getIntermediateVersions(
 ): string[] {
   return Object.keys(manifest.versions ?? {})
     .filter((v) => {
-      if (v.includes("-")) return false; // skip pre-releases (alpha, beta, rc)
-      const newerThanFrom = isVersionOutdated({ current: fromVersion, latest: v });
-      const notNewerThanTo = !isVersionOutdated({ current: toVersion, latest: v });
+      if (v.includes('-')) return false; // skip pre-releases (alpha, beta, rc)
+      const newerThanFrom = isVersionOutdated({
+        current: fromVersion,
+        latest: v,
+      });
+      const notNewerThanTo = !isVersionOutdated({
+        current: toVersion,
+        latest: v,
+      });
       return newerThanFrom && notNewerThanTo;
     })
     .sort((a, b) => (isVersionOutdated({ current: a, latest: b }) ? -1 : 1))
@@ -56,7 +73,7 @@ function formatUpdateLine(
       )
     : [];
 
-  const links = [...releaseLinks, `<${npmUrl}|npm>`].join(" · ");
+  const links = [...releaseLinks, `<${npmUrl}|npm>`].join(' · ');
 
   return (
     `• ${formatSlackPackageLink(name)} ${fromVersion} → ` +
@@ -73,16 +90,22 @@ export const checkForUpdates = internalAction({
     // Key format: "channel:<id>" | "dm:<userId>" | "default" (legacy fallback)
     type DestinationEntry = {
       lines: string[];
-      stamps: Array<{ subscriptionId: Id<"subscriptions">; newVersion: string }>;
+      stamps: Array<{
+        subscriptionId: Id<'subscriptions'>;
+        newVersion: string;
+      }>;
     };
-    const updatesBySubscriber = new Map<Id<"subscribers">, Map<string, DestinationEntry>>();
+    const updatesBySubscriber = new Map<
+      Id<'subscribers'>,
+      Map<string, DestinationEntry>
+    >();
 
     for (const pkg of packages) {
       let manifest: NpmPackageManifest | undefined;
 
       try {
         manifest = await fetchNpmPackageManifest(pkg.name, {
-          userAgent: "patch-pulse-notifier-bot",
+          userAgent: 'patch-pulse-notifier-bot',
         });
       } catch {
         console.error(`failed to fetch npm data for ${pkg.name}`);
@@ -92,7 +115,9 @@ export const checkForUpdates = internalAction({
       const version = getNpmLatestVersion(manifest);
       if (!version) continue;
 
-      await ctx.runMutation(internal.packages.touchLastChecked, { packageId: pkg._id });
+      await ctx.runMutation(internal.packages.touchLastChecked, {
+        packageId: pkg._id,
+      });
 
       const { status } = getDependencyStatus({
         packageName: pkg.name,
@@ -100,9 +125,18 @@ export const checkForUpdates = internalAction({
         latestVersion: version,
       });
 
-      if (status === "update-available") {
-        const updateType = getUpdateType({ current: pkg.currentVersion, latest: version });
-        const line = formatUpdateLine(pkg.name, pkg.currentVersion, version, updateType, manifest);
+      if (status === 'update-available') {
+        const updateType = getUpdateType({
+          current: pkg.currentVersion,
+          latest: version,
+        });
+        const line = formatUpdateLine(
+          pkg.name,
+          pkg.currentVersion,
+          version,
+          updateType,
+          manifest,
+        );
 
         await ctx.runMutation(internal.packages.upsertVersion, {
           name: pkg.name,
@@ -110,7 +144,9 @@ export const checkForUpdates = internalAction({
           githubRepoUrl: extractGitHubRepoUrl(manifest),
         });
 
-        console.log(`updated ${pkg.name} from ${pkg.currentVersion} to ${version}`);
+        console.log(
+          `updated ${pkg.name} from ${pkg.currentVersion} to ${version}`,
+        );
 
         const subscriptions = await ctx.runQuery(
           internal.subscriptions.getSubscribersOfPackage,
@@ -118,13 +154,17 @@ export const checkForUpdates = internalAction({
         );
 
         for (const sub of subscriptions) {
-          const threshold = sub.minUpdateType ?? "patch";
+          const threshold = sub.minUpdateType ?? 'patch';
           if (!meetsThreshold(updateType, threshold)) continue;
 
           if (!sub.channelId && !sub.userId) continue;
-          const key = sub.channelId ? `channel:${sub.channelId}` : `dm:${sub.userId}`;
+          const key = sub.channelId
+            ? `channel:${sub.channelId}`
+            : `dm:${sub.userId}`;
 
-          const channelMap = updatesBySubscriber.get(sub.subscriberId) ?? new Map<string, DestinationEntry>();
+          const channelMap =
+            updatesBySubscriber.get(sub.subscriberId) ??
+            new Map<string, DestinationEntry>();
           const entry = channelMap.get(key) ?? { lines: [], stamps: [] };
           entry.lines.push(line);
           entry.stamps.push({ subscriptionId: sub._id, newVersion: version });
@@ -138,7 +178,9 @@ export const checkForUpdates = internalAction({
 
     // Send one message per (subscriber, channel) pair
     for (const [subscriberId, channelMap] of updatesBySubscriber) {
-      const subscriber = await ctx.runQuery(internal.subscribers.getById, { subscriberId });
+      const subscriber = await ctx.runQuery(internal.subscribers.getById, {
+        subscriberId,
+      });
       if (!subscriber?.active) continue;
 
       const details = await ctx.runQuery(internal.subscribers.getSlackDetails, {
@@ -148,23 +190,31 @@ export const checkForUpdates = internalAction({
       if (!details) continue;
 
       for (const [key, { lines: updates, stamps }] of channelMap) {
-        const rawTarget = key.startsWith("channel:")
-          ? key.slice("channel:".length)
-          : key.slice("dm:".length);
+        const rawTarget = key.startsWith('channel:')
+          ? key.slice('channel:'.length)
+          : key.slice('dm:'.length);
 
         // If this is a channel key whose value doesn't look like a Slack channel ID
         // (e.g. it was stored as a name like "new-releases"), resolve it before sending.
         let targetChannel = rawTarget;
-        if (key.startsWith("channel:") && !/^[CGD][A-Z0-9_]+$/i.test(rawTarget)) {
+        if (
+          key.startsWith('channel:') &&
+          !/^[CGD][A-Z0-9_]+$/i.test(rawTarget)
+        ) {
           let resolved: { id: string; name: string } | null = null;
           try {
-            resolved = await conversationsFindByName(details.accessToken, rawTarget);
+            resolved = await conversationsFindByName(
+              details.accessToken,
+              rawTarget,
+            );
           } catch (err) {
             console.warn(`could not look up channel "${rawTarget}":`, err);
             continue;
           }
           if (!resolved) {
-            console.warn(`channel "${rawTarget}" not found in workspace — skipping`);
+            console.warn(
+              `channel "${rawTarget}" not found in workspace — skipping`,
+            );
             continue;
           }
           targetChannel = resolved.id;
@@ -183,7 +233,10 @@ export const checkForUpdates = internalAction({
         let batch: string[] = [];
         let batchLen = 0;
         for (const line of updates) {
-          if (batch.length > 0 && batchLen + line.length + 1 > SLACK_CHAR_LIMIT) {
+          if (
+            batch.length > 0 &&
+            batchLen + line.length + 1 > SLACK_CHAR_LIMIT
+          ) {
             batches.push(batch);
             batch = [];
             batchLen = 0;
@@ -196,14 +249,16 @@ export const checkForUpdates = internalAction({
         let sent = false;
         for (const batchLines of batches) {
           const text =
-            `📦 *${updates.length} npm package update${updates.length === 1 ? "" : "s"}*\n\n` +
-            batchLines.join("\n");
+            `📦 *${updates.length} npm package update${updates.length === 1 ? '' : 's'}*\n\n` +
+            batchLines.join('\n');
           try {
             await chatPostMessage(details.accessToken, targetChannel, text);
             sent = true;
           } catch (error) {
             if (error instanceof PrivateChannelError) {
-              console.warn(`skipping private channel ${targetChannel}: bot not invited`);
+              console.warn(
+                `skipping private channel ${targetChannel}: bot not invited`,
+              );
             } else {
               console.error(`error sending to ${targetChannel}:`, error);
             }
@@ -213,10 +268,13 @@ export const checkForUpdates = internalAction({
 
         if (sent) {
           for (const { subscriptionId, newVersion } of stamps) {
-            await ctx.runMutation(internal.subscriptions.updateLastNotifiedVersion, {
-              subscriptionId,
-              version: newVersion,
-            });
+            await ctx.runMutation(
+              internal.subscriptions.updateLastNotifiedVersion,
+              {
+                subscriptionId,
+                version: newVersion,
+              },
+            );
           }
         }
       }

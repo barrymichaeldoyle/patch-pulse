@@ -12,7 +12,7 @@ export interface PackageJsonLike {
   [key: string]: unknown;
 }
 
-export type UpdateType = "patch" | "minor" | "major";
+export type UpdateType = 'patch' | 'minor' | 'major';
 
 export interface VersionInfo {
   major: number;
@@ -30,10 +30,10 @@ export interface DependencyCheckResult {
 }
 
 export type DependencyStatusKind =
-  | "not-found"
-  | "latest-tag"
-  | "up-to-date"
-  | "update-available";
+  | 'not-found'
+  | 'latest-tag'
+  | 'up-to-date'
+  | 'update-available';
 
 export interface DependencyStatusResult extends DependencyCheckResult {
   status: DependencyStatusKind;
@@ -55,16 +55,18 @@ export interface NpmCheckBaseOptions<TMeta = undefined> {
   userAgent?: string;
 }
 
-export interface PrefetchNpmPackageVersionsOptions<TMeta = undefined>
-  extends NpmCheckBaseOptions<TMeta> {
+export interface PrefetchNpmPackageVersionsOptions<
+  TMeta = undefined,
+> extends NpmCheckBaseOptions<TMeta> {
   concurrency?: number;
   createMeta?: (packageName: string) => TMeta;
   onError?: (args: { error: unknown; packageName: string }) => void;
   onResolved?: (args: { latestVersion?: string; packageName: string }) => void;
 }
 
-export interface CheckNpmDependencyStatusesOptions<TMeta = undefined>
-  extends NpmCheckBaseOptions<TMeta> {
+export interface CheckNpmDependencyStatusesOptions<
+  TMeta = undefined,
+> extends NpmCheckBaseOptions<TMeta> {
   category?: string;
   concurrency?: number;
   onError?: (args: { error: unknown; packageName: string }) => void;
@@ -76,7 +78,7 @@ export interface CheckNpmDependencyStatusesOptions<TMeta = undefined>
 }
 
 export interface NpmPackageManifest {
-  "dist-tags"?: NpmDistTags;
+  'dist-tags'?: NpmDistTags;
   versions?: Record<string, object>;
   [key: string]: unknown;
 }
@@ -86,34 +88,40 @@ export interface FetchNpmPackageOptions {
   userAgent?: string;
 }
 
-const DEFAULT_NPM_REGISTRY_URL = "https://registry.npmjs.org";
+const DEFAULT_NPM_REGISTRY_URL = 'https://registry.npmjs.org';
 
 export const PACKAGE_JSON_DEPENDENCY_FIELDS = [
-  "dependencies",
-  "devDependencies",
-  "peerDependencies",
-  "optionalDependencies",
+  'dependencies',
+  'devDependencies',
+  'peerDependencies',
+  'optionalDependencies',
 ] as const;
 
 function createRegistryUrl(
   packageName: string,
   registryUrl = DEFAULT_NPM_REGISTRY_URL,
 ): string {
-  return `${registryUrl.replace(/\/$/, "")}/${encodeURIComponent(packageName)}`;
+  return `${registryUrl.replace(/\/$/, '')}/${encodeURIComponent(packageName)}`;
 }
 
 export function getDependencySections(
   packageJson: PackageJsonLike | null | undefined,
 ): Partial<
-  Record<(typeof PACKAGE_JSON_DEPENDENCY_FIELDS)[number], Record<string, string>>
+  Record<
+    (typeof PACKAGE_JSON_DEPENDENCY_FIELDS)[number],
+    Record<string, string>
+  >
 > {
   const sections: Partial<
-    Record<(typeof PACKAGE_JSON_DEPENDENCY_FIELDS)[number], Record<string, string>>
+    Record<
+      (typeof PACKAGE_JSON_DEPENDENCY_FIELDS)[number],
+      Record<string, string>
+    >
   > = {};
 
   for (const field of PACKAGE_JSON_DEPENDENCY_FIELDS) {
     const value = packageJson?.[field];
-    if (value && typeof value === "object") {
+    if (value && typeof value === 'object') {
       sections[field] = value as Record<string, string>;
     }
   }
@@ -128,7 +136,7 @@ export function getAllDependencyNames(
     PACKAGE_JSON_DEPENDENCY_FIELDS.reduce<Record<string, string>>(
       (allDependencies, field) => {
         const section = packageJson?.[field];
-        if (section && typeof section === "object") {
+        if (section && typeof section === 'object') {
           Object.assign(allDependencies, section);
         }
         return allDependencies;
@@ -150,11 +158,13 @@ export function getDependencyVersion(
 }
 
 export function parseVersion(version: string): VersionInfo {
-  const cleanVersion = version.replace(/^[\^~>=<]+/, "");
+  const cleanVersion = version.replace(/^[\^~>=<]+/, '');
   const match = cleanVersion.match(/^(\d+)\.(\d+)\.(\d+)/);
 
   if (!match) {
-    throw new Error(`Invalid version format: ${version}. Expected format: x.y.z`);
+    throw new Error(
+      `Invalid version format: ${version}. Expected format: x.y.z`,
+    );
   }
 
   return {
@@ -169,7 +179,7 @@ export function preserveWildcardPrefix(
   latestVersion: string,
 ): string {
   const wildcardMatch = currentVersion.match(/^([\^~>=<]+)/);
-  const wildcardPrefix = wildcardMatch ? wildcardMatch[1] : "";
+  const wildcardPrefix = wildcardMatch ? wildcardMatch[1] : '';
   return wildcardPrefix + latestVersion;
 }
 
@@ -209,12 +219,12 @@ export function getUpdateType({
     const currentVersion = parseVersion(current);
     const latestVersion = parseVersion(latest);
 
-    if (latestVersion.major > currentVersion.major) return "major";
-    if (latestVersion.minor > currentVersion.minor) return "minor";
-    if (latestVersion.patch > currentVersion.patch) return "patch";
-    return "patch";
+    if (latestVersion.major > currentVersion.major) return 'major';
+    if (latestVersion.minor > currentVersion.minor) return 'minor';
+    if (latestVersion.patch > currentVersion.patch) return 'patch';
+    return 'patch';
   } catch {
-    return "patch";
+    return 'patch';
   }
 }
 
@@ -265,14 +275,17 @@ export function getDependencyStatus({
   });
 
   if (!latestVersion) {
-    return { ...base, status: "not-found" };
+    return { ...base, status: 'not-found' };
   }
 
-  if (["latest", "*"].includes(currentVersion)) {
-    return { ...base, status: "latest-tag" };
+  if (['latest', '*'].includes(currentVersion)) {
+    return { ...base, status: 'latest-tag' };
   }
 
-  return { ...base, status: base.isOutdated ? "update-available" : "up-to-date" };
+  return {
+    ...base,
+    status: base.isOutdated ? 'update-available' : 'up-to-date',
+  };
 }
 
 export class PackageVersionCache<TMeta = undefined> {
@@ -280,7 +293,10 @@ export class PackageVersionCache<TMeta = undefined> {
   #defaultTtlMs: number;
   #ttlByPackageName: Record<string, number>;
 
-  constructor({ defaultTtlMs, ttlByPackageName = {} }: PackageVersionCacheOptions) {
+  constructor({
+    defaultTtlMs,
+    ttlByPackageName = {},
+  }: PackageVersionCacheOptions) {
     this.#defaultTtlMs = defaultTtlMs;
     this.#ttlByPackageName = ttlByPackageName;
   }
@@ -310,7 +326,7 @@ export class PackageVersionCache<TMeta = undefined> {
   }
 
   clear(packageName?: string): void {
-    if (typeof packageName === "undefined") {
+    if (typeof packageName === 'undefined') {
       this.#cache.clear();
       return;
     }
@@ -333,7 +349,7 @@ export class PackageVersionCache<TMeta = undefined> {
 export function getNpmLatestVersion(
   manifest: NpmPackageManifest | null | undefined,
 ): string | undefined {
-  return manifest?.["dist-tags"]?.latest;
+  return manifest?.['dist-tags']?.latest;
 }
 
 export async function fetchNpmPackageManifest(
@@ -343,8 +359,8 @@ export async function fetchNpmPackageManifest(
   const { registryUrl = DEFAULT_NPM_REGISTRY_URL, userAgent } = options;
   const response = await fetch(createRegistryUrl(packageName, registryUrl), {
     headers: {
-      Accept: "application/vnd.npm.install-v1+json",
-      ...(userAgent ? { "User-Agent": userAgent } : {}),
+      Accept: 'application/vnd.npm.install-v1+json',
+      ...(userAgent ? { 'User-Agent': userAgent } : {}),
     },
   });
 
@@ -356,7 +372,7 @@ export async function fetchNpmPackageManifest(
     throw error;
   }
 
-  return response.json();
+  return response.json() as Promise<NpmPackageManifest>;
 }
 
 export async function fetchNpmLatestVersion(
@@ -388,7 +404,14 @@ export async function prefetchNpmPackageVersions<TMeta = undefined>(
   packageNames: string[],
   options: PrefetchNpmPackageVersionsOptions<TMeta> = {},
 ): Promise<void> {
-  const { cache, concurrency = 10, createMeta, onError, onResolved, userAgent } = options;
+  const {
+    cache,
+    concurrency = 10,
+    createMeta,
+    onError,
+    onResolved,
+    userAgent,
+  } = options;
 
   for (let i = 0; i < packageNames.length; i += concurrency) {
     const batch = packageNames.slice(i, i + concurrency);
@@ -417,7 +440,14 @@ export async function checkNpmDependencyStatuses<TMeta = undefined>(
   dependencies: Record<string, string>,
   options: CheckNpmDependencyStatusesOptions<TMeta> = {},
 ): Promise<DependencyStatusResult[]> {
-  const { cache, category, concurrency = 10, onError, onResolved, userAgent } = options;
+  const {
+    cache,
+    category,
+    concurrency = 10,
+    onError,
+    onResolved,
+    userAgent,
+  } = options;
   const packageNames = Object.keys(dependencies);
   const results: DependencyStatusResult[] = [];
   let completedCount = 0;
@@ -438,7 +468,11 @@ export async function checkNpmDependencyStatuses<TMeta = undefined>(
             category,
           });
           completedCount += 1;
-          onResolved?.({ completedCount, result, totalCount: packageNames.length });
+          onResolved?.({
+            completedCount,
+            result,
+            totalCount: packageNames.length,
+          });
           return result;
         } catch (error) {
           onError?.({ error, packageName });
@@ -448,7 +482,11 @@ export async function checkNpmDependencyStatuses<TMeta = undefined>(
             category,
           });
           completedCount += 1;
-          onResolved?.({ completedCount, result, totalCount: packageNames.length });
+          onResolved?.({
+            completedCount,
+            result,
+            totalCount: packageNames.length,
+          });
           return result;
         }
       }),

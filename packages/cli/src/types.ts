@@ -17,7 +17,11 @@ export interface DependencySource {
   projectRelativePath: string;
   rawVersion: string;
   resolvedVersion: string;
-  section: 'dependencies' | 'devDependencies' | 'peerDependencies' | 'optionalDependencies';
+  section:
+    | 'dependencies'
+    | 'devDependencies'
+    | 'peerDependencies'
+    | 'optionalDependencies';
   sourceType: 'direct' | 'catalog';
   workspaceManifestPath?: string;
 }

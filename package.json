@@ -8,9 +8,13 @@
   },
   "packageManager": "pnpm@10.30.3",
   "devDependencies": {
+    "@types/node": "25.6.0",
     "knip": "6.3.1",
     "oxfmt": "0.44.0",
-    "oxlint": "1.59.0"
+    "oxlint": "1.59.0",
+    "tsx": "4.21.0",
+    "typescript": "6.0.2",
+    "vitest": "4.1.4"
   },
   "scripts": {
     "build:shared": "node -e \"console.log('@patch-pulse/shared does not require a build step')\"",
@@ -23,11 +27,12 @@
     "dev:vscode-extension": "pnpm --filter patch-pulse-vscode-extension watch",
     "format": "pnpm exec oxfmt --write .",
     "format:check": "pnpm exec oxfmt --check .",
+    "ci:check": "pnpm lint && pnpm format:check && pnpm knip && pnpm test:cli && pnpm build:cli && pnpm build:vscode-extension",
     "knip": "pnpm exec knip",
     "lint": "pnpm exec oxlint .",
     "lint:fix": "pnpm exec oxlint --fix .",
     "start:notifier": "pnpm --filter @patch-pulse/notifier-bot start",
-    "test:cli": "pnpm --filter patch-pulse test",
+    "test:cli": "pnpm --filter patch-pulse test:run",
     "test:vscode-extension": "pnpm --filter patch-pulse-vscode-extension test",
     "test": "pnpm run test:cli"
   }

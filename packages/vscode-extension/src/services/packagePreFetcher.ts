@@ -77,7 +77,11 @@ class PackagePreFetcher {
           onResolved: ({ latestVersion, packageName }) => {
             const filePath = batchFilePathByPackage.get(packageName);
             if (latestVersion) {
-              packageCache.setCachedVersion(packageName, latestVersion, filePath);
+              packageCache.setCachedVersion(
+                packageName,
+                latestVersion,
+                filePath,
+              );
               log(`Pre-fetched ${packageName}: ${latestVersion}`);
             }
             this.inProgress.delete(packageName);

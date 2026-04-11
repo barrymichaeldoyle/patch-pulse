@@ -1,73 +1,73 @@
-import { httpRouter } from "convex/server";
+import { httpRouter } from 'convex/server';
 import {
   slackBannerImage,
   slackInstall,
   slackOAuthCallback,
   slackOAuthPreview,
-} from "./slack/oauth";
-import { npmTrack, npmUntrack, listPackages, help } from "./slack/commands";
-import { slackEvents } from "./slack/events";
-import { slackInteractions } from "./slack/interactions";
+} from './slack/oauth';
+import { npmTrack, npmUntrack, listPackages, help } from './slack/commands';
+import { slackEvents } from './slack/events';
+import { slackInteractions } from './slack/interactions';
 
 const http = httpRouter();
 
 http.route({
-  path: "/slack/install",
-  method: "GET",
+  path: '/slack/install',
+  method: 'GET',
   handler: slackInstall,
 });
 
 http.route({
-  path: "/slack/oauth-callback",
-  method: "GET",
+  path: '/slack/oauth-callback',
+  method: 'GET',
   handler: slackOAuthCallback,
 });
 
 http.route({
-  path: "/slack/oauth-preview",
-  method: "GET",
+  path: '/slack/oauth-preview',
+  method: 'GET',
   handler: slackOAuthPreview,
 });
 
 http.route({
-  path: "/slack/banner.png",
-  method: "GET",
+  path: '/slack/banner.png',
+  method: 'GET',
   handler: slackBannerImage,
 });
 
 http.route({
-  path: "/slack/npmtrack",
-  method: "POST",
+  path: '/slack/npmtrack',
+  method: 'POST',
   handler: npmTrack,
 });
 
 http.route({
-  path: "/slack/npmuntrack",
-  method: "POST",
+  path: '/slack/npmuntrack',
+  method: 'POST',
   handler: npmUntrack,
 });
 
 http.route({
-  path: "/slack/list",
-  method: "POST",
+  path: '/slack/list',
+  method: 'POST',
   handler: listPackages,
 });
 
 http.route({
-  path: "/slack/help",
-  method: "POST",
+  path: '/slack/help',
+  method: 'POST',
   handler: help,
 });
 
 http.route({
-  path: "/slack/events",
-  method: "POST",
+  path: '/slack/events',
+  method: 'POST',
   handler: slackEvents,
 });
 
 http.route({
-  path: "/slack/interactions",
-  method: "POST",
+  path: '/slack/interactions',
+  method: 'POST',
   handler: slackInteractions,
 });
 

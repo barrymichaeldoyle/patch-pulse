@@ -61,7 +61,10 @@ export async function checkDependencyVersions(
           userAgent: 'patch-pulse-cli',
         })) as DependencyInfo[]);
 
-  const dependencyInfos: DependencyInfo[] = [...checkedResults, ...skippedResults];
+  const dependencyInfos: DependencyInfo[] = [
+    ...checkedResults,
+    ...skippedResults,
+  ];
 
   progress.stop();
   displayResults(dependencyInfos);

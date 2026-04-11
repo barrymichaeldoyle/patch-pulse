@@ -1,22 +1,22 @@
-import { convexTest } from "convex-test";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { internal } from "./_generated/api";
-import schema from "./schema";
+import { convexTest } from 'convex-test';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { internal } from './_generated/api';
+import schema from './schema';
 
-const modules = import.meta.glob("./**/*.ts");
+const modules = import.meta.glob('./**/*.ts');
 
-const TEAM_ID = "T_TEST";
+const TEAM_ID = 'T_TEST';
 
 async function seedWorkspace(t: ReturnType<typeof convexTest>) {
   return await t.mutation(internal.subscribers.upsertSlackWorkspace, {
-    accessToken: "xoxb-test-token",
-    botUserId: "B_TEST",
+    accessToken: 'xoxb-test-token',
+    botUserId: 'B_TEST',
     teamId: TEAM_ID,
-    teamName: "Test Workspace",
+    teamName: 'Test Workspace',
   });
 }
 
-describe("Slack events handler", () => {
+describe('Slack events handler', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     // No SLACK_SIGNING_SECRET set in tests — verification is skipped
@@ -26,12 +26,14 @@ describe("Slack events handler", () => {
     vi.restoreAllMocks();
   });
 
-  it("marks workspace inactive on app_uninstalled", async () => {
+  it('marks workspace inactive on app_uninstalled', async () => {
     const t = convexTest(schema, modules);
     const subscriberId = await seedWorkspace(t);
 
     // Confirm active before
-    const before = await t.query(internal.subscribers.getById, { subscriberId });
+    const before = await t.query(internal.subscribers.getById, {
+      subscriberId,
+    });
     expect(before?.active).toBe(true);
 
     await t.mutation(internal.subscribers.setInactive, { teamId: TEAM_ID });
@@ -40,17 +42,19 @@ describe("Slack events handler", () => {
     expect(after?.active).toBe(false);
   });
 
-  it("marks workspace inactive on tokens_revoked", async () => {
+  it('marks workspace inactive on tokens_revoked', async () => {
     const t = convexTest(schema, modules);
     const subscriberId = await seedWorkspace(t);
 
     await t.mutation(internal.subscribers.setInactive, { teamId: TEAM_ID });
 
-    const subscriber = await t.query(internal.subscribers.getById, { subscriberId });
+    const subscriber = await t.query(internal.subscribers.getById, {
+      subscriberId,
+    });
     expect(subscriber?.active).toBe(false);
   });
 
-  it("reinstalling reactivates a previously inactive workspace", async () => {
+  it('reinstalling reactivates a previously inactive workspace', async () => {
     const t = convexTest(schema, modules);
     const subscriberId = await seedWorkspace(t);
 
@@ -58,38 +62,45 @@ describe("Slack events handler", () => {
 
     // Reinstall
     await t.mutation(internal.subscribers.upsertSlackWorkspace, {
-      accessToken: "xoxb-new-token",
-      botUserId: "B_TEST",
+      accessToken: 'xoxb-new-token',
+      botUserId: 'B_TEST',
       teamId: TEAM_ID,
-      teamName: "Test Workspace",
+      teamName: 'Test Workspace',
     });
 
-    const subscriber = await t.query(internal.subscribers.getById, { subscriberId });
+    const subscriber = await t.query(internal.subscribers.getById, {
+      subscriberId,
+    });
     expect(subscriber?.active).toBe(true);
   });
 
-  it("polling skips inactive subscribers", async () => {
+  it('polling skips inactive subscribers', async () => {
     const sentTo: string[] = [];
     vi.stubGlobal(
-      "fetch",
+      'fetch',
       vi.fn(async (input: string | URL | Request) => {
-        const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+        const url =
+          typeof input === 'string'
+            ? input
+            : input instanceof URL
+              ? input.toString()
+              : input.url;
 
-        if (url.startsWith("https://registry.npmjs.org/")) {
+        if (url.startsWith('https://registry.npmjs.org/')) {
           return new Response(
             JSON.stringify({
-              "dist-tags": { latest: "2.0.0" },
-              repository: "github:test/pkg",
-              versions: { "1.0.0": {}, "2.0.0": {} },
+              'dist-tags': { latest: '2.0.0' },
+              repository: 'github:test/pkg',
+              versions: { '1.0.0': {}, '2.0.0': {} },
             }),
-            { headers: { "Content-Type": "application/json" } },
+            { headers: { 'Content-Type': 'application/json' } },
           );
         }
 
-        if (url === "https://slack.com/api/chat.postMessage") {
+        if (url === 'https://slack.com/api/chat.postMessage') {
           sentTo.push(url);
           return new Response(JSON.stringify({ ok: true }), {
-            headers: { "Content-Type": "application/json" },
+            headers: { 'Content-Type': 'application/json' },
           });
         }
 
@@ -101,17 +112,17 @@ describe("Slack events handler", () => {
     const subscriberId = await seedWorkspace(t);
 
     const packageId = await t.mutation(internal.packages.upsertVersion, {
-      name: "my-pkg",
-      version: "1.0.0",
-      ecosystem: "npm",
+      name: 'my-pkg',
+      version: '1.0.0',
+      ecosystem: 'npm',
     });
 
     await t.mutation(internal.subscriptions.create, {
       packageId,
       subscriberId,
-      lastNotifiedVersion: "1.0.0",
-      minUpdateType: "patch",
-      userId: "U_ALICE",
+      lastNotifiedVersion: '1.0.0',
+      minUpdateType: 'patch',
+      userId: 'U_ALICE',
     });
 
     // Mark workspace inactive

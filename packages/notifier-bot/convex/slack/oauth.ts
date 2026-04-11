@@ -1,15 +1,15 @@
-import { httpAction } from "../_generated/server";
-import { internal } from "../_generated/api";
-import { chatPostMessage, publishAppHome } from "./api";
-import { bannerPngBase64 } from "./bannerAsset";
+import { httpAction } from '../_generated/server';
+import { internal } from '../_generated/api';
+import { chatPostMessage, publishAppHome } from './api';
+import { bannerPngBase64 } from './bannerAsset';
 
 function escapeHtml(value: string) {
   return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 }
 
 function decodeBase64(base64: string) {
@@ -247,8 +247,8 @@ function renderOAuthPage({
 
 function renderConnectedPage(teamName: string) {
   return renderOAuthPage({
-    title: "Slack connected",
-    eyebrow: "Installation complete",
+    title: 'Slack connected',
+    eyebrow: 'Installation complete',
     message: `You’ve successfully linked <span class="brand">PatchPulse</span> to <span class="brand">${escapeHtml(teamName)}</span>.`,
   });
 }
@@ -258,13 +258,16 @@ export const slackInstall = httpAction(async (_ctx, _request) => {
   const redirectUri = process.env.SLACK_REDIRECT_URI;
 
   if (!clientId || !redirectUri) {
-    return new Response("Server misconfiguration", { status: 500 });
+    return new Response('Server misconfiguration', { status: 500 });
   }
 
-  const authorizeUrl = new URL("https://slack.com/oauth/v2/authorize");
-  authorizeUrl.searchParams.set("client_id", clientId);
-  authorizeUrl.searchParams.set("scope", "chat:write,commands,channels:join,channels:read,groups:read");
-  authorizeUrl.searchParams.set("redirect_uri", redirectUri);
+  const authorizeUrl = new URL('https://slack.com/oauth/v2/authorize');
+  authorizeUrl.searchParams.set('client_id', clientId);
+  authorizeUrl.searchParams.set(
+    'scope',
+    'chat:write,commands,channels:join,channels:read,groups:read',
+  );
+  authorizeUrl.searchParams.set('redirect_uri', redirectUri);
 
   return new Response(null, {
     status: 302,
@@ -277,27 +280,27 @@ export const slackBannerImage = httpAction(async () => {
 
   return new Response(bytes, {
     headers: {
-      "Content-Type": "image/png",
-      "Cache-Control": "public, max-age=3600",
+      'Content-Type': 'image/png',
+      'Cache-Control': 'public, max-age=3600',
     },
   });
 });
 
 export const slackOAuthPreview = httpAction(async (_ctx, request) => {
   const url = new URL(request.url);
-  const teamName = url.searchParams.get("team")?.trim() || "Acme Engineering";
+  const teamName = url.searchParams.get('team')?.trim() || 'Acme Engineering';
 
   return new Response(renderConnectedPage(teamName), {
-    headers: { "Content-Type": "text/html" },
+    headers: { 'Content-Type': 'text/html' },
   });
 });
 
 export const slackOAuthCallback = httpAction(async (ctx, request) => {
   const url = new URL(request.url);
-  const code = url.searchParams.get("code");
+  const code = url.searchParams.get('code');
 
   if (!code) {
-    return new Response("Missing code parameter", { status: 400 });
+    return new Response('Missing code parameter', { status: 400 });
   }
 
   const clientId = process.env.SLACK_CLIENT_ID;
@@ -305,22 +308,22 @@ export const slackOAuthCallback = httpAction(async (ctx, request) => {
   const redirectUri = process.env.SLACK_REDIRECT_URI;
 
   if (!clientId || !clientSecret || !redirectUri) {
-    return new Response("Server misconfiguration", { status: 500 });
+    return new Response('Server misconfiguration', { status: 500 });
   }
 
   try {
-    const tokenUrl = new URL("https://slack.com/api/oauth.v2.access");
-    tokenUrl.searchParams.set("client_id", clientId);
-    tokenUrl.searchParams.set("client_secret", clientSecret);
-    tokenUrl.searchParams.set("code", code);
-    tokenUrl.searchParams.set("redirect_uri", redirectUri);
+    const tokenUrl = new URL('https://slack.com/api/oauth.v2.access');
+    tokenUrl.searchParams.set('client_id', clientId);
+    tokenUrl.searchParams.set('client_secret', clientSecret);
+    tokenUrl.searchParams.set('code', code);
+    tokenUrl.searchParams.set('redirect_uri', redirectUri);
 
     const response = await fetch(tokenUrl.toString());
     const data = await response.json();
 
     if (!data.ok) {
-      console.error("Slack OAuth error:", data.error);
-      return new Response("Error during Slack OAuth", { status: 500 });
+      console.error('Slack OAuth error:', data.error);
+      return new Response('Error during Slack OAuth', { status: 500 });
     }
 
     await ctx.runMutation(internal.subscribers.upsertSlackWorkspace, {
@@ -333,7 +336,7 @@ export const slackOAuthCallback = httpAction(async (ctx, request) => {
     try {
       await publishAppHome(data.access_token, data.authed_user.id);
     } catch (error) {
-      console.warn("Could not publish App Home on install:", error);
+      console.warn('Could not publish App Home on install:', error);
     }
 
     try {
@@ -352,14 +355,14 @@ export const slackOAuthCallback = httpAction(async (ctx, request) => {
       );
     } catch (error) {
       // A failed welcome DM is non-fatal — the workspace is already connected.
-      console.warn("Could not send welcome DM to installing user:", error);
+      console.warn('Could not send welcome DM to installing user:', error);
     }
 
     return new Response(renderConnectedPage(data.team.name), {
-      headers: { "Content-Type": "text/html" },
+      headers: { 'Content-Type': 'text/html' },
     });
   } catch (error) {
-    console.error("Error during OAuth code exchange:", error);
-    return new Response("Error during code exchange", { status: 500 });
+    console.error('Error during OAuth code exchange:', error);
+    return new Response('Error during code exchange', { status: 500 });
   }
 });

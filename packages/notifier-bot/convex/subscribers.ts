@@ -1,29 +1,29 @@
-import { v } from "convex/values";
-import { internalMutation, internalQuery } from "./_generated/server";
+import { v } from 'convex/values';
+import { internalMutation, internalQuery } from './_generated/server';
 
 export const getByTeamId = internalQuery({
   args: { teamId: v.string() },
   handler: async (ctx, { teamId }) => {
     return await ctx.db
-      .query("subscribers")
-      .withIndex("by_identifier", (q) => q.eq("identifier", teamId))
+      .query('subscribers')
+      .withIndex('by_identifier', (q) => q.eq('identifier', teamId))
       .first();
   },
 });
 
 export const getById = internalQuery({
-  args: { subscriberId: v.id("subscribers") },
+  args: { subscriberId: v.id('subscribers') },
   handler: async (ctx, { subscriberId }) => {
     return await ctx.db.get(subscriberId);
   },
 });
 
 export const getSlackDetails = internalQuery({
-  args: { subscriberId: v.id("subscribers") },
+  args: { subscriberId: v.id('subscribers') },
   handler: async (ctx, { subscriberId }) => {
     return await ctx.db
-      .query("slackSubscriberDetails")
-      .withIndex("by_subscriber", (q) => q.eq("subscriberId", subscriberId))
+      .query('slackSubscriberDetails')
+      .withIndex('by_subscriber', (q) => q.eq('subscriberId', subscriberId))
       .first();
   },
 });
@@ -37,8 +37,8 @@ export const upsertSlackWorkspace = internalMutation({
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
-      .query("subscribers")
-      .withIndex("by_identifier", (q) => q.eq("identifier", args.teamId))
+      .query('subscribers')
+      .withIndex('by_identifier', (q) => q.eq('identifier', args.teamId))
       .first();
 
     if (existing) {
@@ -47,8 +47,8 @@ export const upsertSlackWorkspace = internalMutation({
       }
 
       const details = await ctx.db
-        .query("slackSubscriberDetails")
-        .withIndex("by_subscriber", (q) => q.eq("subscriberId", existing._id))
+        .query('slackSubscriberDetails')
+        .withIndex('by_subscriber', (q) => q.eq('subscriberId', existing._id))
         .first();
 
       if (details) {
@@ -58,7 +58,7 @@ export const upsertSlackWorkspace = internalMutation({
           teamName: args.teamName,
         });
       } else {
-        await ctx.db.insert("slackSubscriberDetails", {
+        await ctx.db.insert('slackSubscriberDetails', {
           subscriberId: existing._id,
           accessToken: args.accessToken,
           botUserId: args.botUserId,
@@ -70,13 +70,13 @@ export const upsertSlackWorkspace = internalMutation({
       return existing._id;
     }
 
-    const subscriberId = await ctx.db.insert("subscribers", {
-      type: "slack",
+    const subscriberId = await ctx.db.insert('subscribers', {
+      type: 'slack',
       identifier: args.teamId,
       active: true,
     });
 
-    await ctx.db.insert("slackSubscriberDetails", {
+    await ctx.db.insert('slackSubscriberDetails', {
       subscriberId,
       accessToken: args.accessToken,
       botUserId: args.botUserId,
@@ -92,8 +92,8 @@ export const setInactive = internalMutation({
   args: { teamId: v.string() },
   handler: async (ctx, { teamId }) => {
     const subscriber = await ctx.db
-      .query("subscribers")
-      .withIndex("by_identifier", (q) => q.eq("identifier", teamId))
+      .query('subscribers')
+      .withIndex('by_identifier', (q) => q.eq('identifier', teamId))
       .first();
 
     if (subscriber) {

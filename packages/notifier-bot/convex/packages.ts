@@ -1,10 +1,10 @@
-import { v } from "convex/values";
-import { internalMutation, internalQuery } from "./_generated/server";
+import { v } from 'convex/values';
+import { internalMutation, internalQuery } from './_generated/server';
 
 export const getAll = internalQuery({
   args: {},
   handler: async (ctx) => {
-    return await ctx.db.query("packages").collect();
+    return await ctx.db.query('packages').collect();
   },
 });
 
@@ -12,8 +12,8 @@ export const getByName = internalQuery({
   args: { name: v.string() },
   handler: async (ctx, { name }) => {
     return await ctx.db
-      .query("packages")
-      .withIndex("by_name", (q) => q.eq("name", name))
+      .query('packages')
+      .withIndex('by_name', (q) => q.eq('name', name))
       .first();
   },
 });
@@ -27,8 +27,8 @@ export const upsertVersion = internalMutation({
   },
   handler: async (ctx, { name, version, ecosystem, githubRepoUrl }) => {
     const existing = await ctx.db
-      .query("packages")
-      .withIndex("by_name", (q) => q.eq("name", name))
+      .query('packages')
+      .withIndex('by_name', (q) => q.eq('name', name))
       .first();
 
     if (existing) {
@@ -40,10 +40,10 @@ export const upsertVersion = internalMutation({
       return existing._id;
     }
 
-    return await ctx.db.insert("packages", {
+    return await ctx.db.insert('packages', {
       name,
       currentVersion: version,
-      ecosystem: ecosystem ?? "npm",
+      ecosystem: ecosystem ?? 'npm',
       lastChecked: Date.now(),
       githubRepoUrl,
     });
@@ -63,18 +63,18 @@ export const ensureExists = internalMutation({
   },
   handler: async (ctx, { name, version, ecosystem }) => {
     const existing = await ctx.db
-      .query("packages")
-      .withIndex("by_name", (q) => q.eq("name", name))
+      .query('packages')
+      .withIndex('by_name', (q) => q.eq('name', name))
       .first();
 
     if (existing) {
       return { packageId: existing._id, dbVersion: existing.currentVersion };
     }
 
-    const packageId = await ctx.db.insert("packages", {
+    const packageId = await ctx.db.insert('packages', {
       name,
       currentVersion: version,
-      ecosystem: ecosystem ?? "npm",
+      ecosystem: ecosystem ?? 'npm',
       lastChecked: Date.now(),
     });
 
@@ -83,14 +83,14 @@ export const ensureExists = internalMutation({
 });
 
 export const touchLastChecked = internalMutation({
-  args: { packageId: v.id("packages") },
+  args: { packageId: v.id('packages') },
   handler: async (ctx, { packageId }) => {
     await ctx.db.patch(packageId, { lastChecked: Date.now() });
   },
 });
 
 export const getByIds = internalQuery({
-  args: { ids: v.array(v.id("packages")) },
+  args: { ids: v.array(v.id('packages')) },
   handler: async (ctx, { ids }) => {
     return await Promise.all(ids.map((id) => ctx.db.get(id)));
   },

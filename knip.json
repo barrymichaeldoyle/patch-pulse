@@ -1,18 +1,13 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignoreBinaries": ["ngrok"],
-  "ignoreIssues": {
-    "packages/notifier-bot/src/services/supabase/gen/**": ["types"]
-  },
   "workspaces": {
     "packages/cli": {
       "entry": ["scripts/*.cjs"],
       "project": ["src/**/*.ts", "scripts/*.cjs"]
     },
     "packages/notifier-bot": {
-      "entry": ["src/main.ts"],
-      "project": ["src/**/*.ts"],
-      "ignoreDependencies": ["ts-loader"]
+      "entry": ["convex/http.ts", "convex/crons.ts"],
+      "project": ["convex/**/*.ts", "!convex/_generated/**"]
     },
     "packages/vscode-extension": {
       "entry": ["src/extension.ts", "src/test/**/*.ts", ".vscode-test.mjs"],

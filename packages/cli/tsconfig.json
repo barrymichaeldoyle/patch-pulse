@@ -1,22 +1,17 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "target": "ES2022",
     "module": "ES2022",
     "lib": ["ES2022"],
     "outDir": "./lib",
     "rootDir": "./src",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
     "resolveJsonModule": true,
-    "moduleResolution": "node",
-    "ignoreDeprecations": "6.0",
-    "types": ["node"],
-    "typeRoots": ["./node_modules/@types", "./src/types"]
+    "moduleResolution": "bundler",
+    "types": ["node"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "lib"]

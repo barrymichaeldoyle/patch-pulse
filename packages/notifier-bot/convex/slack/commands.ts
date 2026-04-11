@@ -1,23 +1,28 @@
-import { v } from "convex/values";
+import { v } from 'convex/values';
+import { fetchNpmLatestVersion, isVersionOutdated } from '@patch-pulse/shared';
+import { ActionCtx, httpAction, internalAction } from '../_generated/server';
+import { internal } from '../_generated/api';
+import { Id } from '../_generated/dataModel';
+import { formatSlackPackageLink, formatSlackVersionText } from './links';
 import {
-  fetchNpmLatestVersion,
-  isVersionOutdated,
-} from "@patch-pulse/shared";
-import { ActionCtx, httpAction, internalAction } from "../_generated/server";
-import { internal } from "../_generated/api";
-import { Id } from "../_generated/dataModel";
-import { formatSlackPackageLink, formatSlackVersionText } from "./links";
-import { chatPostMessage, conversationsFindByName, conversationsInfo, PrivateChannelError, publishAppHome, SlackMissingScopeError, type HomePackageEntry, openTrackModal, openMoveChannelModal } from "./api";
-import { verifySlackRequest } from "./verify";
+  chatPostMessage,
+  conversationsFindByName,
+  conversationsInfo,
+  PrivateChannelError,
+  publishAppHome,
+  SlackMissingScopeError,
+  type HomePackageEntry,
+} from './api';
+import { verifySlackRequest } from './verify';
 
-type MinUpdateType = "patch" | "minor" | "major";
+type MinUpdateType = 'patch' | 'minor' | 'major';
 
 function parseSlashBody(body: string): Record<string, string> {
   return Object.fromEntries(new URLSearchParams(body));
 }
 
 function cleanText(text: string): string {
-  return text.replace(/[*_<>]/g, "").trim();
+  return text.replace(/[*_<>]/g, '').trim();
 }
 
 function normalizeNpmPackageName(packageName: string): string {
@@ -34,8 +39,8 @@ function formatVersion(version: string): string {
 
 type TrackOutcome =
   | {
-      kind: "tracked";
-      packageId: Id<"packages">;
+      kind: 'tracked';
+      packageId: Id<'packages'>;
       packageName: string;
       version: string;
       displayVersion: string;
@@ -43,21 +48,21 @@ type TrackOutcome =
       pendingUpdate: boolean;
     }
   | {
-      kind: "updated";
+      kind: 'updated';
       packageName: string;
       version: string;
       filterLabel: string | null;
       channelName?: string;
     }
   | {
-      kind: "already";
+      kind: 'already';
       packageName: string;
       version: string;
       filterLabel: string | null;
       channelName?: string;
     }
   | {
-      kind: "not_found";
+      kind: 'not_found';
       packageName: string;
     };
 
@@ -71,7 +76,7 @@ async function trackPackage(
     channelName,
     userId,
   }: {
-    subscriberId: Id<"subscribers">;
+    subscriberId: Id<'subscribers'>;
     packageName: string;
     minUpdateType: MinUpdateType;
     channelId?: string;
@@ -82,20 +87,26 @@ async function trackPackage(
   packageName = normalizeNpmPackageName(packageName);
 
   const version = await fetchNpmLatestVersion(packageName, {
-    userAgent: "patch-pulse-notifier-bot",
+    userAgent: 'patch-pulse-notifier-bot',
   }).catch(() => null);
 
   if (!version) {
-    return { kind: "not_found", packageName };
+    return { kind: 'not_found', packageName };
   }
 
-  const { packageId, dbVersion } = await ctx.runMutation(internal.packages.ensureExists, {
-    name: packageName,
-    version,
-    ecosystem: "npm",
-  });
+  const { packageId, dbVersion } = await ctx.runMutation(
+    internal.packages.ensureExists,
+    {
+      name: packageName,
+      version,
+      ecosystem: 'npm',
+    },
+  );
 
-  const pendingUpdate = isVersionOutdated({ current: dbVersion, latest: version });
+  const pendingUpdate = isVersionOutdated({
+    current: dbVersion,
+    latest: version,
+  });
   const existing = await ctx.runQuery(internal.subscriptions.exists, {
     packageId,
     subscriberId,
@@ -110,7 +121,7 @@ async function trackPackage(
         minUpdateType,
       });
       return {
-        kind: "updated",
+        kind: 'updated',
         packageName,
         version,
         filterLabel: formatMinUpdateType(minUpdateType),
@@ -119,7 +130,7 @@ async function trackPackage(
     }
 
     return {
-      kind: "already",
+      kind: 'already',
       packageName,
       version,
       filterLabel: formatMinUpdateType(existing.minUpdateType as MinUpdateType),
@@ -138,7 +149,7 @@ async function trackPackage(
   });
 
   return {
-    kind: "tracked",
+    kind: 'tracked',
     packageId,
     packageName,
     version,
@@ -150,13 +161,13 @@ async function trackPackage(
 
 function formatTrackOutcomeLine(outcome: TrackOutcome): string {
   switch (outcome.kind) {
-    case "tracked":
-      return `• ${formatPackageName(outcome.packageName)} — current version ${formatVersion(outcome.displayVersion)}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ""}${outcome.pendingUpdate ? ` (update available: ${formatVersion(outcome.version)})` : ""}`;
-    case "updated":
-      return `• ${formatPackageName(outcome.packageName)} — updated threshold to ${outcome.filterLabel ?? "all"} notifications, current version ${formatVersion(outcome.version)}`;
-    case "already":
-      return `• ${formatPackageName(outcome.packageName)} — already tracked at ${formatVersion(outcome.version)}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ""}`;
-    case "not_found":
+    case 'tracked':
+      return `• ${formatPackageName(outcome.packageName)} — current version ${formatVersion(outcome.displayVersion)}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ''}${outcome.pendingUpdate ? ` (update available: ${formatVersion(outcome.version)})` : ''}`;
+    case 'updated':
+      return `• ${formatPackageName(outcome.packageName)} — updated threshold to ${outcome.filterLabel ?? 'all'} notifications, current version ${formatVersion(outcome.version)}`;
+    case 'already':
+      return `• ${formatPackageName(outcome.packageName)} — already tracked at ${formatVersion(outcome.version)}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ''}`;
+    case 'not_found':
       return `• ${formatPackageName(outcome.packageName)} — not found on npm`;
   }
 }
@@ -180,20 +191,20 @@ function parseTrackArgs(raw: string): {
 } {
   let text = raw.trim();
   let channel: { id?: string; name: string } | null = null;
-  let minUpdateType: MinUpdateType = "patch";
+  let minUpdateType: MinUpdateType = 'patch';
 
   // Extract Slack-escaped channel mention: <#C1234567|channel-name>
   const escapedMention = text.match(/<#([A-Za-z0-9]+)\|([^>]+)>/);
   if (escapedMention) {
     channel = { id: escapedMention[1], name: escapedMention[2] };
-    text = text.replace(escapedMention[0], "").trim();
+    text = text.replace(escapedMention[0], '').trim();
   } else {
     // Extract plain #channel-name
     const hashMention = text.match(/(^|\s)(#\S+)/);
     if (hashMention) {
       const name = hashMention[2].slice(1); // strip leading #
       channel = { name };
-      text = text.replace(hashMention[2], "").trim();
+      text = text.replace(hashMention[2], '').trim();
     }
   }
 
@@ -201,38 +212,62 @@ function parseTrackArgs(raw: string): {
   const filterMatch = text.match(/(^|\s)(minor|major)(\s|$)/);
   if (filterMatch) {
     minUpdateType = filterMatch[2] as MinUpdateType;
-    text = text.replace(filterMatch[0], " ").trim();
+    text = text.replace(filterMatch[0], ' ').trim();
   }
 
-  const packageNames = text.split(/\s+/).map(normalizeNpmPackageName).filter(Boolean);
+  const packageNames = text
+    .split(/\s+/)
+    .map(normalizeNpmPackageName)
+    .filter(Boolean);
 
   return { packageNames, channel, minUpdateType };
 }
 
-function formatMinUpdateType(minUpdateType: MinUpdateType | undefined): string | null {
-  if (!minUpdateType || minUpdateType === "patch") return null;
-  return minUpdateType === "major" ? "[major only]" : "[minor+]";
+function formatMinUpdateType(
+  minUpdateType: MinUpdateType | undefined,
+): string | null {
+  if (!minUpdateType || minUpdateType === 'patch') return null;
+  return minUpdateType === 'major' ? '[major only]' : '[minor+]';
 }
 
-function formatChannelPhrase(channelName: string | undefined, channelId?: string): string {
+function formatChannelPhrase(
+  channelName: string | undefined,
+  channelId?: string,
+): string {
   if (channelId) return ` in <#${channelId}>`;
-  return channelName ? ` in *#${channelName}*` : "";
+  return channelName ? ` in *#${channelName}*` : '';
 }
 
-function formatChannelDescriptor(channelName: string | undefined, channelId: string | undefined): string {
-  return channelId ? `<#${channelId}>` : channelName ? `*#${normalizeChannelName(channelName)}*` : "this channel";
+function formatChannelDescriptor(
+  channelName: string | undefined,
+  channelId: string | undefined,
+): string {
+  return channelId
+    ? `<#${channelId}>`
+    : channelName
+      ? `*#${normalizeChannelName(channelName)}*`
+      : 'this channel';
 }
 
-function formatTrackingTarget(channelName: string | undefined, channelId: string | undefined): string {
-  return channelId ? `<#${channelId}>` : channelName ? `*#${normalizeChannelName(channelName)}*` : "this channel";
+function formatTrackingTarget(
+  channelName: string | undefined,
+  channelId: string | undefined,
+): string {
+  return channelId
+    ? `<#${channelId}>`
+    : channelName
+      ? `*#${normalizeChannelName(channelName)}*`
+      : 'this channel';
 }
 
 function normalizeChannelName(channelName: string): string {
-  return channelName.replace(/^#/, "");
+  return channelName.replace(/^#/, '');
 }
 
-function looksLikeSlackChannelId(channelId: string | undefined): channelId is string {
-  return typeof channelId === "string" && /^[CGD][A-Z0-9_]+$/i.test(channelId);
+function looksLikeSlackChannelId(
+  channelId: string | undefined,
+): channelId is string {
+  return typeof channelId === 'string' && /^[CGD][A-Z0-9_]+$/i.test(channelId);
 }
 
 async function resolveChannelTarget(
@@ -241,7 +276,8 @@ async function resolveChannelTarget(
   channelName: string | undefined,
 ): Promise<{ channelId: string | undefined; channelName: string | undefined }> {
   if (looksLikeSlackChannelId(channelId)) {
-    const resolvedChannelName = channelName ?? (await conversationsInfo(token, channelId));
+    const resolvedChannelName =
+      channelName ?? (await conversationsInfo(token, channelId));
     return {
       channelId,
       channelName: resolvedChannelName ?? channelName,
@@ -267,8 +303,12 @@ async function resolveChannelTarget(
   };
 }
 
-function missingChannelLookupScopeMessage(channelName: string | undefined): string {
-  const target = channelName ? `*#${normalizeChannelName(channelName)}*` : "that channel";
+function missingChannelLookupScopeMessage(
+  channelName: string | undefined,
+): string {
+  const target = channelName
+    ? `*#${normalizeChannelName(channelName)}*`
+    : 'that channel';
   return (
     `⚠️ I couldn't resolve ${target} because this Slack app is missing the channel lookup scope required ` +
     `for typed channel names. Reinstall PatchPulse with channel read access, or pick the channel from the modal / Slack channel picker so Slack sends the channel ID directly.`
@@ -296,35 +336,40 @@ function getListChannelMetadata(
 /** Posts an ephemeral reply back to the slash command invoker via the response_url. */
 async function sendToSlack(url: string, text: string): Promise<void> {
   await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text }),
   });
 }
-
 
 // HTTP action handlers — return immediately, schedule async work
 
 export const npmTrack = httpAction(async (ctx, request) => {
   const rawBody = await verifySlackRequest(request);
-  if (rawBody === null) return new Response("Unauthorized", { status: 401 });
+  if (rawBody === null) return new Response('Unauthorized', { status: 401 });
 
   const body = parseSlashBody(rawBody);
-  const { packageNames, channel, minUpdateType } = parseTrackArgs(body.text ?? "");
+  const { packageNames, channel, minUpdateType } = parseTrackArgs(
+    body.text ?? '',
+  );
   const teamId = body.team_id;
   const responseUrl = body.response_url;
   const userId = body.user_id;
 
   if (packageNames.length > 1) {
-    await ctx.scheduler.runAfter(0, internal.slack.commands.processBulkNpmTrack, {
-      packageNames,
-      teamId,
-      responseUrl,
-      minUpdateType,
-      channelId: channel?.id,
-      channelName: channel?.name,
-      userId,
-    });
+    await ctx.scheduler.runAfter(
+      0,
+      internal.slack.commands.processBulkNpmTrack,
+      {
+        packageNames,
+        teamId,
+        responseUrl,
+        minUpdateType,
+        channelId: channel?.id,
+        channelName: channel?.name,
+        userId,
+      },
+    );
   } else {
     for (const packageName of packageNames) {
       await ctx.scheduler.runAfter(0, internal.slack.commands.processNpmTrack, {
@@ -339,28 +384,30 @@ export const npmTrack = httpAction(async (ctx, request) => {
     }
   }
 
-  const packageList = packageNames.map((p) => formatPackageName(p)).join(", ");
+  const packageList = packageNames.map((p) => formatPackageName(p)).join(', ');
   const ackText =
     packageNames.length === 0
       ? `⚠️ Please provide a package name, e.g. \`/npmtrack react\``
       : `⏳ Tracking ${packageList}${formatChannelPhrase(channel?.name, channel?.id)}…`;
 
   return new Response(JSON.stringify({ text: ackText }), {
-    headers: { "Content-Type": "application/json" },
+    headers: { 'Content-Type': 'application/json' },
   });
 });
 
 export const npmUntrack = httpAction(async (ctx, request) => {
   const rawBody = await verifySlackRequest(request);
-  if (rawBody === null) return new Response("Unauthorized", { status: 401 });
+  if (rawBody === null) return new Response('Unauthorized', { status: 401 });
 
   const body = parseSlashBody(rawBody);
-  const { packageNames, channel } = parseTrackArgs(body.text ?? "");
+  const { packageNames, channel } = parseTrackArgs(body.text ?? '');
 
   if (packageNames.length === 0) {
     return new Response(
-      JSON.stringify({ text: `⚠️ Please provide a package name, e.g. \`/npmuntrack react\`` }),
-      { headers: { "Content-Type": "application/json" } },
+      JSON.stringify({
+        text: `⚠️ Please provide a package name, e.g. \`/npmuntrack react\``,
+      }),
+      { headers: { 'Content-Type': 'application/json' } },
     );
   }
 
@@ -379,14 +426,16 @@ export const npmUntrack = httpAction(async (ctx, request) => {
   });
 
   return new Response(
-    JSON.stringify({ text: `⏳ Untracking ${formatPackageName(packageName)}${formatChannelPhrase(channel?.name, channel?.id)}…` }),
-    { headers: { "Content-Type": "application/json" } },
+    JSON.stringify({
+      text: `⏳ Untracking ${formatPackageName(packageName)}${formatChannelPhrase(channel?.name, channel?.id)}…`,
+    }),
+    { headers: { 'Content-Type': 'application/json' } },
   );
 });
 
 export const help = httpAction(async (_ctx, request) => {
   const rawBody = await verifySlackRequest(request);
-  if (rawBody === null) return new Response("Unauthorized", { status: 401 });
+  if (rawBody === null) return new Response('Unauthorized', { status: 401 });
   const text =
     `*PatchPulse — command reference*\n\n` +
     `*Tracking*\n` +
@@ -406,13 +455,13 @@ export const help = httpAction(async (_ctx, request) => {
     `🐛 Found a bug or have a feature request? <https://github.com/barrymichaeldoyle/patch-pulse/issues|Open an issue on GitHub>`;
 
   return new Response(JSON.stringify({ text }), {
-    headers: { "Content-Type": "application/json" },
+    headers: { 'Content-Type': 'application/json' },
   });
 });
 
 export const listPackages = httpAction(async (ctx, request) => {
   const rawBody = await verifySlackRequest(request);
-  if (rawBody === null) return new Response("Unauthorized", { status: 401 });
+  if (rawBody === null) return new Response('Unauthorized', { status: 401 });
 
   const body = parseSlashBody(rawBody);
   const teamId = body.team_id;
@@ -427,7 +476,7 @@ export const listPackages = httpAction(async (ctx, request) => {
 
   return new Response(
     JSON.stringify({ text: `⏳ Fetching your tracked packages…` }),
-    { headers: { "Content-Type": "application/json" } },
+    { headers: { 'Content-Type': 'application/json' } },
   );
 });
 
@@ -438,16 +487,34 @@ export const processNpmTrack = internalAction({
     packageName: v.string(),
     teamId: v.string(),
     responseUrl: v.optional(v.string()),
-    minUpdateType: v.union(v.literal("patch"), v.literal("minor"), v.literal("major")),
+    minUpdateType: v.union(
+      v.literal('patch'),
+      v.literal('minor'),
+      v.literal('major'),
+    ),
     channelId: v.optional(v.string()),
     channelName: v.optional(v.string()),
     userId: v.optional(v.string()),
   },
-  handler: async (ctx, { packageName, teamId, responseUrl, minUpdateType, channelId, channelName, userId }) => {
+  handler: async (
+    ctx,
+    {
+      packageName,
+      teamId,
+      responseUrl,
+      minUpdateType,
+      channelId,
+      channelName,
+      userId,
+    },
+  ) => {
     packageName = normalizeNpmPackageName(packageName);
 
     // When invoked from a modal there is no responseUrl — fall back to DMing the user
-    async function sendFeedback(details: { accessToken: string } | null, text: string) {
+    async function sendFeedback(
+      details: { accessToken: string } | null,
+      text: string,
+    ) {
       if (responseUrl) {
         await sendToSlack(responseUrl, text);
       } else if (details && userId) {
@@ -455,20 +522,34 @@ export const processNpmTrack = internalAction({
       }
     }
 
-    const subscriber = await ctx.runQuery(internal.subscribers.getByTeamId, { teamId });
+    const subscriber = await ctx.runQuery(internal.subscribers.getByTeamId, {
+      teamId,
+    });
     if (!subscriber) {
-      await sendFeedback(null, `❌ Workspace not found. Please reinstall PatchPulse.`);
+      await sendFeedback(
+        null,
+        `❌ Workspace not found. Please reinstall PatchPulse.`,
+      );
       return;
     }
 
-    const details = await ctx.runQuery(internal.subscribers.getSlackDetails, { subscriberId: subscriber._id });
+    const details = await ctx.runQuery(internal.subscribers.getSlackDetails, {
+      subscriberId: subscriber._id,
+    });
 
     if (details && (channelId || channelName)) {
       try {
-        ({ channelId, channelName } = await resolveChannelTarget(details.accessToken, channelId, channelName));
+        ({ channelId, channelName } = await resolveChannelTarget(
+          details.accessToken,
+          channelId,
+          channelName,
+        ));
       } catch (error) {
         if (error instanceof SlackMissingScopeError) {
-          await sendFeedback(details, missingChannelLookupScopeMessage(channelName));
+          await sendFeedback(
+            details,
+            missingChannelLookupScopeMessage(channelName),
+          );
           return;
         }
         throw error;
@@ -484,31 +565,39 @@ export const processNpmTrack = internalAction({
       userId,
     });
 
-    if (outcome.kind === "not_found") {
+    if (outcome.kind === 'not_found') {
       await sendFeedback(details, `❌ Could not find *${packageName}* on npm.`);
       return;
     }
 
-    if (outcome.kind === "updated") {
+    if (outcome.kind === 'updated') {
       const channelLabel = formatChannelPhrase(outcome.channelName);
       await sendFeedback(
         details,
-        `Updated: now tracking ${formatPackageName(packageName)}${channelLabel} with ${outcome.filterLabel ?? "all"} notifications — currently at ${formatVersion(outcome.version)}`,
+        `Updated: now tracking ${formatPackageName(packageName)}${channelLabel} with ${outcome.filterLabel ?? 'all'} notifications — currently at ${formatVersion(outcome.version)}`,
       );
       if (!responseUrl && userId) {
-        await ctx.scheduler.runAfter(0, internal.slack.commands.refreshAppHome, { teamId, userId });
+        await ctx.scheduler.runAfter(
+          0,
+          internal.slack.commands.refreshAppHome,
+          { teamId, userId },
+        );
       }
       return;
     }
 
-    if (outcome.kind === "already") {
+    if (outcome.kind === 'already') {
       const channelLabel = formatChannelPhrase(outcome.channelName);
       await sendFeedback(
         details,
-        `Already tracking ${formatPackageName(packageName)} — currently at ${formatVersion(outcome.version)}${channelLabel}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ""}`,
+        `Already tracking ${formatPackageName(packageName)} — currently at ${formatVersion(outcome.version)}${channelLabel}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ''}`,
       );
       if (!responseUrl && userId) {
-        await ctx.scheduler.runAfter(0, internal.slack.commands.refreshAppHome, { teamId, userId });
+        await ctx.scheduler.runAfter(
+          0,
+          internal.slack.commands.refreshAppHome,
+          { teamId, userId },
+        );
       }
       return;
     }
@@ -516,7 +605,7 @@ export const processNpmTrack = internalAction({
     if (details) {
       const updateSuffix = outcome.pendingUpdate
         ? ` There's already an update available (${formatVersion(outcome.displayVersion)} → ${formatVersion(outcome.version)}) — I'll notify you about it shortly.`
-        : "";
+        : '';
 
       if (channelId) {
         const channelLabel = formatTrackingTarget(channelName, channelId);
@@ -524,7 +613,7 @@ export const processNpmTrack = internalAction({
           await chatPostMessage(
             details.accessToken,
             channelId,
-            `<@${userId}> is now tracking ${formatPackageName(packageName)} in this channel — current version ${formatVersion(outcome.displayVersion)}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ""}${updateSuffix}`,
+            `<@${userId}> is now tracking ${formatPackageName(packageName)} in this channel — current version ${formatVersion(outcome.displayVersion)}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ''}${updateSuffix}`,
           );
         } catch (error) {
           if (error instanceof PrivateChannelError) {
@@ -546,14 +635,17 @@ export const processNpmTrack = internalAction({
         await chatPostMessage(
           details.accessToken,
           userId,
-          `You're now tracking ${formatPackageName(packageName)} — current version ${formatVersion(outcome.displayVersion)}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ""}.${updateSuffix || " I'll DM you when updates are available."}`,
+          `You're now tracking ${formatPackageName(packageName)} — current version ${formatVersion(outcome.displayVersion)}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ''}.${updateSuffix || " I'll DM you when updates are available."}`,
         );
       }
     }
 
     // Refresh home tab when invoked from modal
     if (!responseUrl && userId) {
-      await ctx.scheduler.runAfter(0, internal.slack.commands.refreshAppHome, { teamId, userId });
+      await ctx.scheduler.runAfter(0, internal.slack.commands.refreshAppHome, {
+        teamId,
+        userId,
+      });
     }
   },
 });
@@ -563,31 +655,66 @@ export const processBulkNpmTrack = internalAction({
     packageNames: v.array(v.string()),
     teamId: v.string(),
     responseUrl: v.optional(v.string()),
-    minUpdateType: v.union(v.literal("patch"), v.literal("minor"), v.literal("major")),
+    minUpdateType: v.union(
+      v.literal('patch'),
+      v.literal('minor'),
+      v.literal('major'),
+    ),
     channelId: v.optional(v.string()),
     channelName: v.optional(v.string()),
     userId: v.optional(v.string()),
   },
-  handler: async (ctx, { packageNames, teamId, responseUrl, minUpdateType, channelId, channelName, userId }) => {
-    const normalizedPackageNames = [...new Set(packageNames.map(normalizeNpmPackageName).filter(Boolean))];
-    const subscriber = await ctx.runQuery(internal.subscribers.getByTeamId, { teamId });
+  handler: async (
+    ctx,
+    {
+      packageNames,
+      teamId,
+      responseUrl,
+      minUpdateType,
+      channelId,
+      channelName,
+      userId,
+    },
+  ) => {
+    const normalizedPackageNames = [
+      ...new Set(packageNames.map(normalizeNpmPackageName).filter(Boolean)),
+    ];
+    const subscriber = await ctx.runQuery(internal.subscribers.getByTeamId, {
+      teamId,
+    });
     if (!subscriber) {
       if (responseUrl) {
-        await sendToSlack(responseUrl, `❌ Workspace not found. Please reinstall PatchPulse.`);
+        await sendToSlack(
+          responseUrl,
+          `❌ Workspace not found. Please reinstall PatchPulse.`,
+        );
       }
       return;
     }
 
-    const details = await ctx.runQuery(internal.subscribers.getSlackDetails, { subscriberId: subscriber._id });
+    const details = await ctx.runQuery(internal.subscribers.getSlackDetails, {
+      subscriberId: subscriber._id,
+    });
     if (details && (channelId || channelName)) {
       try {
-        ({ channelId, channelName } = await resolveChannelTarget(details.accessToken, channelId, channelName));
+        ({ channelId, channelName } = await resolveChannelTarget(
+          details.accessToken,
+          channelId,
+          channelName,
+        ));
       } catch (error) {
         if (error instanceof SlackMissingScopeError) {
           if (responseUrl) {
-            await sendToSlack(responseUrl, missingChannelLookupScopeMessage(channelName));
+            await sendToSlack(
+              responseUrl,
+              missingChannelLookupScopeMessage(channelName),
+            );
           } else if (details && userId) {
-            await chatPostMessage(details.accessToken, userId, missingChannelLookupScopeMessage(channelName));
+            await chatPostMessage(
+              details.accessToken,
+              userId,
+              missingChannelLookupScopeMessage(channelName),
+            );
           }
           return;
         }
@@ -596,7 +723,7 @@ export const processBulkNpmTrack = internalAction({
     }
 
     const outcomes: TrackOutcome[] = [];
-    const createdPackageIds: Id<"packages">[] = [];
+    const createdPackageIds: Id<'packages'>[] = [];
 
     for (const packageName of normalizedPackageNames) {
       const outcome = await trackPackage(ctx, {
@@ -608,15 +735,15 @@ export const processBulkNpmTrack = internalAction({
         userId,
       });
       outcomes.push(outcome);
-      if (outcome.kind === "tracked") {
+      if (outcome.kind === 'tracked') {
         createdPackageIds.push(outcome.packageId);
       }
     }
 
-    const targetLabel = channelId ? "this channel" : "your DMs";
+    const targetLabel = channelId ? 'this channel' : 'your DMs';
     const summary =
-      `${channelId ? `<@${userId}>` : "You"} processed *${normalizedPackageNames.length}* package request${normalizedPackageNames.length === 1 ? "" : "s"} in ${targetLabel}:\n` +
-      outcomes.map(formatTrackOutcomeLine).join("\n");
+      `${channelId ? `<@${userId}>` : 'You'} processed *${normalizedPackageNames.length}* package request${normalizedPackageNames.length === 1 ? '' : 's'} in ${targetLabel}:\n` +
+      outcomes.map(formatTrackOutcomeLine).join('\n');
 
     if (details) {
       if (channelId) {
@@ -665,18 +792,31 @@ export const processNpmUntrack = internalAction({
     channelName: v.optional(v.string()),
     userId: v.optional(v.string()),
   },
-  handler: async (ctx, { packageName, teamId, responseUrl, channelId, channelName, userId }) => {
+  handler: async (
+    ctx,
+    { packageName, teamId, responseUrl, channelId, channelName, userId },
+  ) => {
     packageName = normalizeNpmPackageName(packageName);
 
-    const pkg = await ctx.runQuery(internal.packages.getByName, { name: packageName });
+    const pkg = await ctx.runQuery(internal.packages.getByName, {
+      name: packageName,
+    });
     if (!pkg) {
-      await sendToSlack(responseUrl, `${formatPackageName(packageName)} is not in your tracked packages.`);
+      await sendToSlack(
+        responseUrl,
+        `${formatPackageName(packageName)} is not in your tracked packages.`,
+      );
       return;
     }
 
-    const subscriber = await ctx.runQuery(internal.subscribers.getByTeamId, { teamId });
+    const subscriber = await ctx.runQuery(internal.subscribers.getByTeamId, {
+      teamId,
+    });
     if (!subscriber) {
-      await sendToSlack(responseUrl, `❌ Workspace not found. Please reinstall PatchPulse.`);
+      await sendToSlack(
+        responseUrl,
+        `❌ Workspace not found. Please reinstall PatchPulse.`,
+      );
       return;
     }
 
@@ -686,10 +826,17 @@ export const processNpmUntrack = internalAction({
 
     if (details && (channelId || channelName)) {
       try {
-        ({ channelId, channelName } = await resolveChannelTarget(details.accessToken, channelId, channelName));
+        ({ channelId, channelName } = await resolveChannelTarget(
+          details.accessToken,
+          channelId,
+          channelName,
+        ));
       } catch (error) {
         if (error instanceof SlackMissingScopeError) {
-          await sendToSlack(responseUrl, missingChannelLookupScopeMessage(channelName));
+          await sendToSlack(
+            responseUrl,
+            missingChannelLookupScopeMessage(channelName),
+          );
           return;
         }
         throw error;
@@ -734,7 +881,10 @@ export const processNpmUntrack = internalAction({
       });
 
       if (!existing) {
-        await sendToSlack(responseUrl, `You're not tracking ${formatPackageName(packageName)} via DMs.`);
+        await sendToSlack(
+          responseUrl,
+          `You're not tracking ${formatPackageName(packageName)} via DMs.`,
+        );
         return;
       }
 
@@ -745,17 +895,20 @@ export const processNpmUntrack = internalAction({
       });
 
       // Warn if channel subscriptions for this package still exist in the workspace
-      const remainingSubs = await ctx.runQuery(internal.subscriptions.getByPackageAndSubscriber, {
-        packageId: pkg._id,
-        subscriberId: subscriber._id,
-      });
+      const remainingSubs = await ctx.runQuery(
+        internal.subscriptions.getByPackageAndSubscriber,
+        {
+          packageId: pkg._id,
+          subscriberId: subscriber._id,
+        },
+      );
       const channelSubs = remainingSubs.filter((s) => s.channelId);
       const channelNote =
         channelSubs.length > 0
           ? ` Note: *${packageName}* is still tracked in ${channelSubs
               .map((s) => formatChannelDescriptor(s.channelName, s.channelId))
-              .join(", ")} by your workspace.`
-          : "";
+              .join(', ')} by your workspace.`
+          : '';
 
       if (details && userId) {
         await chatPostMessage(
@@ -775,19 +928,23 @@ export const processList = internalAction({
     userId: v.optional(v.string()),
   },
   handler: async (ctx, { teamId, responseUrl, userId }) => {
-    const subscriber = await ctx.runQuery(internal.subscribers.getByTeamId, { teamId });
+    const subscriber = await ctx.runQuery(internal.subscribers.getByTeamId, {
+      teamId,
+    });
     if (!subscriber) {
-      await sendToSlack(responseUrl, `❌ Workspace not found. Please reinstall PatchPulse.`);
+      await sendToSlack(
+        responseUrl,
+        `❌ Workspace not found. Please reinstall PatchPulse.`,
+      );
       return;
     }
 
-    const details = await ctx.runQuery(internal.subscribers.getSlackDetails, {
-      subscriberId: subscriber._id,
-    });
-
-    const allSubscriptions = await ctx.runQuery(internal.subscriptions.getBySubscriber, {
-      subscriberId: subscriber._id,
-    });
+    const allSubscriptions = await ctx.runQuery(
+      internal.subscriptions.getBySubscriber,
+      {
+        subscriberId: subscriber._id,
+      },
+    );
 
     // Show all channel subscriptions (workspace-wide) but only the invoking
     // user's own DM subscriptions — other users' DMs are private to them.
@@ -804,7 +961,9 @@ export const processList = internalAction({
     }
 
     const packageIds = [...new Set(subscriptions.map((s) => s.packageId))];
-    const packages = await ctx.runQuery(internal.packages.getByIds, { ids: packageIds });
+    const packages = await ctx.runQuery(internal.packages.getByIds, {
+      ids: packageIds,
+    });
 
     const groupedLines = subscriptions
       .map((sub) => {
@@ -813,22 +972,28 @@ export const processList = internalAction({
         const channel = getListChannelMetadata(sub.channelName, sub.userId);
         return { sub, pkg, channel };
       })
-      .filter((entry): entry is {
-        sub: (typeof subscriptions)[number];
-        pkg: NonNullable<(typeof packages)[number]>;
-        channel: { key: string; heading: string };
-      } => entry !== null)
+      .filter(
+        (
+          entry,
+        ): entry is {
+          sub: (typeof subscriptions)[number];
+          pkg: NonNullable<(typeof packages)[number]>;
+          channel: { key: string; heading: string };
+        } => entry !== null,
+      )
       .sort((a, b) => {
         const channelCompare = a.channel.key.localeCompare(b.channel.key);
         if (channelCompare !== 0) return channelCompare;
         return a.pkg.name.localeCompare(b.pkg.name);
       })
       .reduce((groups, { sub, pkg, channel }) => {
-        const filterLabel = formatMinUpdateType(sub.minUpdateType as MinUpdateType);
+        const filterLabel = formatMinUpdateType(
+          sub.minUpdateType as MinUpdateType,
+        );
         const line =
           `    • ${formatSlackPackageLink(pkg.name)} — ` +
           `${formatSlackVersionText(pkg.name, pkg.currentVersion, null, pkg.githubRepoUrl)}` +
-          `${filterLabel ? ` ${filterLabel}` : ""}`;
+          `${filterLabel ? ` ${filterLabel}` : ''}`;
         const existing = groups.get(channel.key);
         if (existing) {
           existing.lines.push(line);
@@ -841,11 +1006,11 @@ export const processList = internalAction({
     const uniquePackages = packageIds.length;
     const header =
       uniquePackages === subscriptions.length
-        ? `📦 Tracking *${subscriptions.length}* package${subscriptions.length === 1 ? "" : "s"}:`
-        : `📦 Tracking *${uniquePackages}* package${uniquePackages === 1 ? "" : "s"} across *${subscriptions.length}* subscriptions:`;
+        ? `📦 Tracking *${subscriptions.length}* package${subscriptions.length === 1 ? '' : 's'}:`
+        : `📦 Tracking *${uniquePackages}* package${uniquePackages === 1 ? '' : 's'} across *${subscriptions.length}* subscriptions:`;
 
     const sections = Array.from(groupedLines.values()).map(
-      ({ heading, lines }) => `${heading}\n${lines.join("\n")}`,
+      ({ heading, lines }) => `${heading}\n${lines.join('\n')}`,
     );
 
     // Chunk sections into messages under ~3500 chars to stay within Slack's limits
@@ -855,7 +1020,10 @@ export const processList = internalAction({
     let currentLen = header.length + 3;
 
     for (const section of sections) {
-      if (current.length > 0 && currentLen + section.length + 3 > SLACK_CHAR_LIMIT) {
+      if (
+        current.length > 0 &&
+        currentLen + section.length + 3 > SLACK_CHAR_LIMIT
+      ) {
         chunks.push(current);
         current = [];
         currentLen = 0;
@@ -866,9 +1034,9 @@ export const processList = internalAction({
     if (current.length > 0) chunks.push(current);
 
     const [first, ...rest] = chunks;
-    await sendToSlack(responseUrl, `${header}\n\n\n${first.join("\n\n\n")}`);
+    await sendToSlack(responseUrl, `${header}\n\n\n${first.join('\n\n\n')}`);
     for (const chunk of rest) {
-      await sendToSlack(responseUrl, chunk.join("\n\n\n"));
+      await sendToSlack(responseUrl, chunk.join('\n\n\n'));
     }
   },
 });
@@ -877,10 +1045,12 @@ export const processUntrackAction = internalAction({
   args: {
     teamId: v.string(),
     viewingUserId: v.string(),
-    subscriptionId: v.id("subscriptions"),
+    subscriptionId: v.id('subscriptions'),
   },
   handler: async (ctx, { teamId, viewingUserId, subscriptionId }) => {
-    const sub = await ctx.runQuery(internal.subscriptions.getById, { subscriptionId });
+    const sub = await ctx.runQuery(internal.subscriptions.getById, {
+      subscriptionId,
+    });
     if (!sub) return;
 
     await ctx.runMutation(internal.subscriptions.remove, {
@@ -902,10 +1072,17 @@ export const processThresholdChange = internalAction({
   args: {
     teamId: v.string(),
     viewingUserId: v.string(),
-    subscriptionId: v.id("subscriptions"),
-    minUpdateType: v.union(v.literal("patch"), v.literal("minor"), v.literal("major")),
+    subscriptionId: v.id('subscriptions'),
+    minUpdateType: v.union(
+      v.literal('patch'),
+      v.literal('minor'),
+      v.literal('major'),
+    ),
   },
-  handler: async (ctx, { teamId, viewingUserId, subscriptionId, minUpdateType }) => {
+  handler: async (
+    ctx,
+    { teamId, viewingUserId, subscriptionId, minUpdateType },
+  ) => {
     await ctx.runMutation(internal.subscriptions.updateMinUpdateType, {
       subscriptionId,
       minUpdateType,
@@ -922,11 +1099,16 @@ export const processMoveAction = internalAction({
   args: {
     teamId: v.string(),
     viewingUserId: v.string(),
-    subscriptionId: v.id("subscriptions"),
+    subscriptionId: v.id('subscriptions'),
     newChannelId: v.string(),
   },
-  handler: async (ctx, { teamId, viewingUserId, subscriptionId, newChannelId }) => {
-    const subscriber = await ctx.runQuery(internal.subscribers.getByTeamId, { teamId });
+  handler: async (
+    ctx,
+    { teamId, viewingUserId, subscriptionId, newChannelId },
+  ) => {
+    const subscriber = await ctx.runQuery(internal.subscribers.getByTeamId, {
+      teamId,
+    });
     if (!subscriber) return;
 
     const details = await ctx.runQuery(internal.subscribers.getSlackDetails, {
@@ -934,10 +1116,15 @@ export const processMoveAction = internalAction({
     });
     if (!details) return;
 
-    const sub = await ctx.runQuery(internal.subscriptions.getById, { subscriptionId });
+    const sub = await ctx.runQuery(internal.subscriptions.getById, {
+      subscriptionId,
+    });
     if (!sub) return;
 
-    const newChannelName = await conversationsInfo(details.accessToken, newChannelId);
+    const newChannelName = await conversationsInfo(
+      details.accessToken,
+      newChannelId,
+    );
 
     // Remove old subscription and create a new one for the new channel
     await ctx.runMutation(internal.subscriptions.remove, {
@@ -969,7 +1156,9 @@ export const refreshAppHome = internalAction({
     userId: v.string(),
   },
   handler: async (ctx, { teamId, userId }) => {
-    const subscriber = await ctx.runQuery(internal.subscribers.getByTeamId, { teamId });
+    const subscriber = await ctx.runQuery(internal.subscribers.getByTeamId, {
+      teamId,
+    });
     if (!subscriber?.active) return;
 
     const details = await ctx.runQuery(internal.subscribers.getSlackDetails, {
@@ -977,9 +1166,12 @@ export const refreshAppHome = internalAction({
     });
     if (!details) return;
 
-    const allSubscriptions = await ctx.runQuery(internal.subscriptions.getBySubscriber, {
-      subscriberId: subscriber._id,
-    });
+    const allSubscriptions = await ctx.runQuery(
+      internal.subscriptions.getBySubscriber,
+      {
+        subscriberId: subscriber._id,
+      },
+    );
 
     // Show channel subs (workspace-wide) + this user's own DM subs
     const subscriptions = allSubscriptions.filter(
@@ -991,7 +1183,10 @@ export const refreshAppHome = internalAction({
         if (!sub.channelId || sub.channelName) return sub;
 
         try {
-          const channelName = await conversationsInfo(details.accessToken, sub.channelId);
+          const channelName = await conversationsInfo(
+            details.accessToken,
+            sub.channelId,
+          );
           if (!channelName) return sub;
 
           await ctx.runMutation(internal.subscriptions.updateChannelName, {
@@ -1001,14 +1196,18 @@ export const refreshAppHome = internalAction({
 
           return { ...sub, channelName };
         } catch (error) {
-          console.error("Failed to resolve Slack channel name:", error);
+          console.error('Failed to resolve Slack channel name:', error);
           return sub;
         }
       }),
     );
 
-    const packageIds = [...new Set(hydratedSubscriptions.map((s) => s.packageId))];
-    const packages = await ctx.runQuery(internal.packages.getByIds, { ids: packageIds });
+    const packageIds = [
+      ...new Set(hydratedSubscriptions.map((s) => s.packageId)),
+    ];
+    const packages = await ctx.runQuery(internal.packages.getByIds, {
+      ids: packageIds,
+    });
 
     const entries = hydratedSubscriptions
       .map((sub): HomePackageEntry | null => {
@@ -1031,7 +1230,7 @@ export const refreshAppHome = internalAction({
     try {
       await publishAppHome(details.accessToken, userId, entries);
     } catch (error) {
-      console.error("Failed to publish App Home:", error);
+      console.error('Failed to publish App Home:', error);
     }
   },
 });

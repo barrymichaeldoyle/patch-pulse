@@ -24,7 +24,9 @@ describe('displayUnknownArguments', () => {
       expect.stringContaining('--unknown --flag'),
     );
     expect(logSpy).toHaveBeenCalled();
-    const output = logSpy.mock.calls.map((call: unknown[]) => call[0]).join('\n');
+    const output = logSpy.mock.calls
+      .map((call: unknown[]) => call[0])
+      .join('\n');
     expect(output).toContain('Available commands:');
     expect(output).toContain('npx patch-pulse');
     expect(output).toContain('npx patch-pulse --help');
