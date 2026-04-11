@@ -57,7 +57,11 @@ export async function checkDependencyVersions(
           category,
           concurrency: 10,
           onError: ({ error, packageName }) => {
-            if (!(error instanceof Error) || !('status' in error) || error.status !== 404) {
+            if (
+              !(error instanceof Error) ||
+              !('status' in error) ||
+              error.status !== 404
+            ) {
               debugLog(
                 `Dependency lookup failed for ${packageName} in ${category}: ${describeLookupError(error)}`,
               );

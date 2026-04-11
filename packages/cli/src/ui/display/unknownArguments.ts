@@ -2,7 +2,8 @@ import { ansi } from '../ansi';
 
 export function displayUnknownArguments(unknownArgs: string[]): void {
   console.error(
-    ansi.redBold('❌ Unknown command:') + ` ${ansi.white(unknownArgs.join(' '))}`,
+    ansi.redBold('❌ Unknown command:') +
+      ` ${ansi.white(unknownArgs.join(' '))}`,
   );
   console.log();
   console.log(ansi.blueBold(' Available commands:'));
@@ -17,10 +18,12 @@ export function displayUnknownArguments(unknownArgs: string[]): void {
     ansi.white('  npx patch-pulse --version') + ansi.gray(' # Show version'),
   );
   console.log(
-    ansi.white('  npx patch-pulse --about') + ansi.gray('   # Show project links'),
+    ansi.white('  npx patch-pulse --about') +
+      ansi.gray('   # Show project links'),
   );
   console.log(
-    ansi.white('  npx patch-pulse --json') + ansi.gray('    # Print JSON output'),
+    ansi.white('  npx patch-pulse --json') +
+      ansi.gray('    # Print JSON output'),
   );
   console.log(
     ansi.white('  npx patch-pulse --license') + ansi.gray(' # Show license'),

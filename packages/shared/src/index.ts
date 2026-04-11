@@ -484,9 +484,7 @@ export async function checkNpmDependencyStatuses<TMeta = undefined>(
         } catch (error) {
           onError?.({ error, packageName });
           const result =
-            error instanceof Error &&
-            'status' in error &&
-            error.status === 404
+            error instanceof Error && 'status' in error && error.status === 404
               ? getDependencyStatus({
                   packageName,
                   currentVersion: dependencies[packageName],

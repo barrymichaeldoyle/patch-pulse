@@ -41,9 +41,9 @@ function supportsHyperlinks(): boolean {
 
   return Boolean(
     env.KITTY_WINDOW_ID ||
-      env.TERM_PROGRAM ||
-      env.VTE_VERSION ||
-      env.WT_SESSION,
+    env.TERM_PROGRAM ||
+    env.VTE_VERSION ||
+    env.WT_SESSION,
   );
 }
 

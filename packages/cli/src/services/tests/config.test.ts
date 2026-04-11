@@ -257,18 +257,16 @@ describe('Configuration Service', () => {
         ignorePaths: ['packages/cli/e2e'],
       };
 
-      expect(
-        shouldIgnorePath({ path: 'packages/cli/e2e', config }),
-      ).toBe(true);
+      expect(shouldIgnorePath({ path: 'packages/cli/e2e', config })).toBe(true);
       expect(
         shouldIgnorePath({
           path: 'packages/cli/e2e/monorepo/fixtures',
           config,
         }),
       ).toBe(true);
-      expect(
-        shouldIgnorePath({ path: 'packages/cli/src/tests', config }),
-      ).toBe(false);
+      expect(shouldIgnorePath({ path: 'packages/cli/src/tests', config })).toBe(
+        false,
+      );
     });
 
     it('should normalize leading ./ in ignore paths', () => {
@@ -276,9 +274,7 @@ describe('Configuration Service', () => {
         ignorePaths: ['./packages/cli/e2e/'],
       };
 
-      expect(
-        shouldIgnorePath({ path: 'packages/cli/e2e', config }),
-      ).toBe(true);
+      expect(shouldIgnorePath({ path: 'packages/cli/e2e', config })).toBe(true);
     });
   });
 });

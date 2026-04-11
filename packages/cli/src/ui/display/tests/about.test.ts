@@ -14,7 +14,9 @@ describe('displayAbout', () => {
 
   it('prints project links and support info', () => {
     displayAbout();
-    const output = logSpy.mock.calls.map((call: unknown[]) => call[0]).join('\n');
+    const output = logSpy.mock.calls
+      .map((call: unknown[]) => call[0])
+      .join('\n');
     expect(output).toContain('About Patch Pulse');
     expect(output).toContain('zero runtime dependencies');
     expect(output).toContain('--json');

@@ -1,4 +1,4 @@
-export function isDebugEnabled(): boolean {
+function isDebugEnabled(): boolean {
   return process.env.PATCH_PULSE_DEBUG === '1';
 }
 

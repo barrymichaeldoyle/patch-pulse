@@ -103,14 +103,18 @@ export function displayUpdatePrompt(
           '⚠️  Running in non-interactive environment. Skipping update prompt.',
         ),
       );
-      console.log(ansi.gray('Use --update-prompt flag to force interactive mode.'));
+      console.log(
+        ansi.gray('Use --update-prompt flag to force interactive mode.'),
+      );
       resolve(null);
       return;
     }
 
     const updateOptions = categorizeUpdates(outdatedDeps);
     const affectedProjects = new Set(
-      outdatedDeps.map((dependency) => dependency.source?.projectRelativePath ?? '.'),
+      outdatedDeps.map(
+        (dependency) => dependency.source?.projectRelativePath ?? '.',
+      ),
     ).size;
 
     function showOptions() {

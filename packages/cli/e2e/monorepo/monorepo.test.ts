@@ -117,10 +117,10 @@ describe('monorepo project', () => {
           ([packageName, currentVersion]) => ({
             packageName,
             currentVersion,
-            latestVersion:
-              packageName === 'react' ? '19.0.0' : currentVersion,
+            latestVersion: packageName === 'react' ? '19.0.0' : currentVersion,
             isOutdated: packageName === 'react',
-            updateType: packageName === 'react' ? ('major' as const) : undefined,
+            updateType:
+              packageName === 'react' ? ('major' as const) : undefined,
             category: options?.category,
             status:
               packageName === 'react'
@@ -148,7 +148,9 @@ describe('monorepo project', () => {
     const output = stripAnsi(logSpy.mock.calls.flat().join('\n'));
     expect(output).not.toContain('@fixture/admin (packages/admin)');
     expect(output).toContain('@fixture/app (packages/app)');
-    expect(output).toContain('!  Attention: 1 package needs review (1 outdated)');
+    expect(output).toContain(
+      '!  Attention: 1 package needs review (1 outdated)',
+    );
   });
 
   it('filters to one project with --project', async () => {
@@ -177,10 +179,10 @@ describe('monorepo project', () => {
           ([packageName, currentVersion]) => ({
             packageName,
             currentVersion,
-            latestVersion:
-              packageName === 'react' ? '19.0.0' : currentVersion,
+            latestVersion: packageName === 'react' ? '19.0.0' : currentVersion,
             isOutdated: packageName === 'react',
-            updateType: packageName === 'react' ? ('major' as const) : undefined,
+            updateType:
+              packageName === 'react' ? ('major' as const) : undefined,
             category: options?.category,
             status:
               packageName === 'react'

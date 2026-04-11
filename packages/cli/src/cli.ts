@@ -176,9 +176,9 @@ export async function runCli({
               { silent: true },
             );
             const enrichedDependencies = dependencies.map((dependency) => ({
-                ...dependency,
-                source: sourceMap.get(dependency.packageName),
-              }));
+              ...dependency,
+              source: sourceMap.get(dependency.packageName),
+            }));
             projectDependencies.push(...enrichedDependencies);
             sectionResults.push({
               category: dependencyTypeLabels[key],
@@ -379,13 +379,9 @@ function getFlagValue(args: string[], flag: string): string | undefined {
   return value.startsWith('-') ? undefined : value;
 }
 
-function filterProjects<T extends { displayName: string; relativePath: string }>({
-  projectFilter,
-  projects,
-}: {
-  projectFilter?: string;
-  projects: T[];
-}): T[] {
+function filterProjects<
+  T extends { displayName: string; relativePath: string },
+>({ projectFilter, projects }: { projectFilter?: string; projects: T[] }): T[] {
   if (!projectFilter) {
     return projects;
   }
@@ -485,7 +481,9 @@ function summarizeDependencies(allDependencies: DependencyInfo[]) {
   const outdated = allDependencies.filter(
     (dependency) => dependency.isOutdated && !dependency.isSkipped,
   ).length;
-  const skipped = allDependencies.filter((dependency) => dependency.isSkipped).length;
+  const skipped = allDependencies.filter(
+    (dependency) => dependency.isSkipped,
+  ).length;
 
   return {
     total: allDependencies.length,
@@ -494,18 +492,23 @@ function summarizeDependencies(allDependencies: DependencyInfo[]) {
     unknown,
     skipped,
     majorUpdates: allDependencies.filter(
-      (dependency) => dependency.updateType === 'major' && !dependency.isSkipped,
+      (dependency) =>
+        dependency.updateType === 'major' && !dependency.isSkipped,
     ).length,
     minorUpdates: allDependencies.filter(
-      (dependency) => dependency.updateType === 'minor' && !dependency.isSkipped,
+      (dependency) =>
+        dependency.updateType === 'minor' && !dependency.isSkipped,
     ).length,
     patchUpdates: allDependencies.filter(
-      (dependency) => dependency.updateType === 'patch' && !dependency.isSkipped,
+      (dependency) =>
+        dependency.updateType === 'patch' && !dependency.isSkipped,
     ).length,
   };
 }
 
-function displayCompactProjectStatus(projectDependencies: DependencyInfo[]): void {
+function displayCompactProjectStatus(
+  projectDependencies: DependencyInfo[],
+): void {
   const upToDateCount = projectDependencies.filter(
     (dependency) =>
       !dependency.isSkipped &&
@@ -565,7 +568,8 @@ function displayAttentionProjectStatus(
       outdatedCount > 0 && `${outdatedCount} outdated`,
       unknownCount > 0 && `${unknownCount} unknown`,
     ].filter(Boolean);
-    const detailText = parts.length > 0 ? ` ${ansi.gray(`(${parts.join(', ')})`)}` : '';
+    const detailText =
+      parts.length > 0 ? ` ${ansi.gray(`(${parts.join(', ')})`)}` : '';
     console.log(
       `${ansi.yellow('!  Attention:')} ${attentionDependencies.length} ${packageWord} ${reviewWord} review${detailText}`,
     );
