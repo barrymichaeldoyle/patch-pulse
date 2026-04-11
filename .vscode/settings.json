@@ -44,6 +44,7 @@
     "npmtrack",
     "npmuntrack",
     "oxfmt",
-    "oxlint"
+    "oxlint",
+    "patchpulse"
   ]
 }
