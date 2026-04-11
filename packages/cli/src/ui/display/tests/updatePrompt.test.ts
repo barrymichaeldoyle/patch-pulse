@@ -18,6 +18,9 @@ const mockStdin = {
 // Stub the global process.stdin
 vi.stubGlobal('process', {
   stdin: mockStdin,
+  once: vi.fn(),
+  removeListener: vi.fn(),
+  exit: vi.fn(),
 });
 
 describe('updatePrompt', () => {

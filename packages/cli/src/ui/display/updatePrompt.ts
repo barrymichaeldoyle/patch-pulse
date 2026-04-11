@@ -155,15 +155,9 @@ export function displayUpdatePrompt(
 
     showOptions();
 
-    // Set up raw mode for single key press detection
     const stdin = process.stdin;
-
-    // Save current terminal settings
     const wasRaw = stdin.isRaw;
     const wasPaused = stdin.isPaused();
-
-    // Set up raw mode
-    setupRawMode(stdin);
 
     function handleKeyPress(key: string) {
       const choice = key.toLowerCase();
@@ -201,21 +195,15 @@ export function displayUpdatePrompt(
           cleanup();
           displayHelp();
           console.log();
-          // Re-display the options and continue
           showOptions();
-          // Re-setup the key listener
-          setupRawMode(stdin);
-          stdin.on('data', handleKeyPress);
+          setupListeners();
           break;
         case OTHER_OPTION_CHARS.version:
           cleanup();
           displayVersion();
           console.log();
-          // Re-display the options and continue
           showOptions();
-          // Re-setup the key listener
-          setupRawMode(stdin);
-          stdin.on('data', handleKeyPress);
+          setupListeners();
           break;
         case '\u0003': // Ctrl+C
           cleanup();
@@ -230,9 +218,23 @@ export function displayUpdatePrompt(
     function cleanup() {
       restoreTerminalSettings({ stdin, wasRaw, wasPaused });
       stdin.removeListener('data', handleKeyPress);
+      process.removeListener('exit', cleanup);
+      process.removeListener('SIGTERM', handleSignal);
     }
 
-    stdin.on('data', handleKeyPress);
+    function handleSignal() {
+      cleanup();
+      process.exit(130);
+    }
+
+    function setupListeners() {
+      setupRawMode(stdin);
+      process.once('exit', cleanup);
+      process.once('SIGTERM', handleSignal);
+      stdin.on('data', handleKeyPress);
+    }
+
+    setupListeners();
   });
 }
 

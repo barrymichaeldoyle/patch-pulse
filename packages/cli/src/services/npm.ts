@@ -30,11 +30,11 @@ export async function checkForCliUpdate(): Promise<void> {
     if (error instanceof Error && 'status' in error && error.status === 429) {
       return;
     }
-    // Only log network errors, not other issues
     if (error instanceof TypeError && error.message.includes('fetch')) {
-      // Network error - silently fail
+      // Network error (offline, firewall, etc.) — expected, fail silently
       return;
     }
-    // Other errors - silently fail
+    // Any other unexpected error: already debug-logged above, fail silently.
+    // This is a non-critical background check and must not surface to the user.
   }
 }

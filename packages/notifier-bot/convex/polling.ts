@@ -246,15 +246,15 @@ export const checkForUpdates = internalAction({
         }
         if (batch.length > 0) batches.push(batch);
 
-        let sent = false;
+        let allBatchesSent = true;
         for (const batchLines of batches) {
           const text =
             `📦 *${updates.length} npm package update${updates.length === 1 ? '' : 's'}*\n\n` +
             batchLines.join('\n');
           try {
             await chatPostMessage(details.accessToken, targetChannel, text);
-            sent = true;
           } catch (error) {
+            allBatchesSent = false;
             if (error instanceof PrivateChannelError) {
               console.warn(
                 `skipping private channel ${targetChannel}: bot not invited`,
@@ -266,7 +266,7 @@ export const checkForUpdates = internalAction({
           }
         }
 
-        if (sent) {
+        if (allBatchesSent && batches.length > 0) {
           for (const { subscriptionId, newVersion } of stamps) {
             await ctx.runMutation(
               internal.subscriptions.updateLastNotifiedVersion,

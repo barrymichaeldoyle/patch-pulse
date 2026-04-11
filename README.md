@@ -16,6 +16,8 @@ PatchPulse helps you stay on top of npm dependency updates across your projects.
 
 <a href="https://grand-yak-92.convex.site/slack/install"><img alt="Add to Slack" height="40" src="https://platform.slack-edge.com/img/add_to_slack.png" srcset="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x"></a>
 
+> **Help us reach the Slack Marketplace!** We need at least 5 active workspace installs before Slack will approve PatchPulse for the official Marketplace. If the bot looks useful to you, installing it now is a huge help — it's free and takes about 30 seconds.
+
 Once installed, run `/npmhelp` in any channel or DM to see the full command reference.
 
 ### Commands

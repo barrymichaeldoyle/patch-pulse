@@ -196,7 +196,7 @@ describe('Configuration Service', () => {
       expect(shouldSkipPackage({ packageName: 'chalk', config })).toBe(false);
     });
 
-    it('should handle invalid regex patterns gracefully', () => {
+    it('should not match patterns containing special characters as substrings', () => {
       const config: PatchPulseConfig = {
         skip: ['[invalid-regex'],
       };

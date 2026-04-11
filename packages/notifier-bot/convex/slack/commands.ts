@@ -335,11 +335,22 @@ function getListChannelMetadata(
 
 /** Posts an ephemeral reply back to the slash command invoker via the response_url. */
 async function sendToSlack(url: string, text: string): Promise<void> {
-  await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text }),
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+  } catch (error) {
+    console.error('sendToSlack: network error posting to response_url:', error);
+    return;
+  }
+  if (!response.ok) {
+    console.error(
+      `sendToSlack: Slack returned ${response.status} from response_url`,
+    );
+  }
 }
 
 // HTTP action handlers — return immediately, schedule async work
@@ -510,15 +521,20 @@ export const processNpmTrack = internalAction({
   ) => {
     packageName = normalizeNpmPackageName(packageName);
 
-    // When invoked from a modal there is no responseUrl — fall back to DMing the user
+    // When invoked from a modal there is no responseUrl — fall back to DMing the user.
+    // Best-effort: log failures but don't let delivery errors crash the handler.
     async function sendFeedback(
       details: { accessToken: string } | null,
       text: string,
     ) {
-      if (responseUrl) {
-        await sendToSlack(responseUrl, text);
-      } else if (details && userId) {
-        await chatPostMessage(details.accessToken, userId, text);
+      try {
+        if (responseUrl) {
+          await sendToSlack(responseUrl, text);
+        } else if (details && userId) {
+          await chatPostMessage(details.accessToken, userId, text);
+        }
+      } catch (error) {
+        console.error('sendFeedback: failed to deliver feedback to user:', error);
       }
     }
 
@@ -1034,9 +1050,13 @@ export const processList = internalAction({
     if (current.length > 0) chunks.push(current);
 
     const [first, ...rest] = chunks;
-    await sendToSlack(responseUrl, `${header}\n\n\n${first.join('\n\n\n')}`);
-    for (const chunk of rest) {
-      await sendToSlack(responseUrl, chunk.join('\n\n\n'));
+    try {
+      await sendToSlack(responseUrl, `${header}\n\n\n${first.join('\n\n\n')}`);
+      for (const chunk of rest) {
+        await sendToSlack(responseUrl, chunk.join('\n\n\n'));
+      }
+    } catch (error) {
+      console.error('processList: failed to send list response:', error);
     }
   },
 });

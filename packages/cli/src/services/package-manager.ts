@@ -104,7 +104,6 @@ function runPackageManagerCommand({
     const child = spawn(command, installArgs, {
       cwd,
       stdio: 'inherit',
-      shell: true,
     });
 
     child.on('close', (code) => {
@@ -306,9 +305,16 @@ function updatePackageJsonFiles(updates: DirectDependencyUpdate[]): void {
   );
 
   for (const [packageJsonPath, fileUpdates] of Object.entries(updatesByFile)) {
-    const packageJson = JSON.parse(
-      readFileSync(packageJsonPath, 'utf-8'),
-    ) as Record<string, unknown>;
+    let packageJson: Record<string, unknown>;
+    try {
+      packageJson = JSON.parse(
+        readFileSync(packageJsonPath, 'utf-8'),
+      ) as Record<string, unknown>;
+    } catch (error) {
+      throw new Error(
+        `Failed to parse ${packageJsonPath}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
 
     for (const update of fileUpdates) {
       const section = packageJson[update.section];

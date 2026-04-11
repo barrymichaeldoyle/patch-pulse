@@ -256,16 +256,6 @@ function matchesPattern({
   value: string;
   pattern: string;
 }): boolean {
-  // If the pattern contains regex special characters (other than * and ?), treat as regex
-  if (/[. +?^${}()|[\]]/.test(pattern.replace(/[*?]/g, ''))) {
-    try {
-      const regex = new RegExp(pattern);
-      return regex.test(value);
-    } catch {
-      return value.includes(pattern);
-    }
-  }
-
   if (pattern.includes('*') || pattern.includes('?')) {
     const regexPattern =
       '^' +

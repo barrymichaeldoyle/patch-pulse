@@ -47,19 +47,17 @@ Patch Pulse supports configuration files for persistent settings. Create one of 
 
 ### Skip Patterns
 
-The `skip` array supports multiple pattern types:
+The `skip` array supports exact names and glob wildcards:
 
 - **Exact names**: `"lodash"`, `"chalk"`
 - **Glob patterns**: `"@types/*"`, `"test-*"`, `"*-dev"`
-- **Regex patterns**: `".*-dev"`, `"^@angular/.*"`, `"zone\\.js"`
 
 ### Ignore Paths
 
-The `ignorePaths` array excludes matching directories or `package.json` paths from workspace scanning.
+The `ignorePaths` array excludes matching directories or `package.json` paths from workspace scanning:
 
 - **Exact paths**: `"packages/cli/e2e"`
 - **Glob patterns**: `"**/fixtures"`, `"packages/*/dist"`
-- **Regex patterns**: `"^packages/.*/__generated__"`
 
 ### Package Manager
 
@@ -122,11 +120,19 @@ When run from a repository root, Patch Pulse scans every `package.json` under th
 - pnpm `catalog:` dependencies are resolved from `pnpm-workspace.yaml`
 - interactive dependency updates can update both direct dependency ranges and pnpm catalog entries
 
+## Slack Bot
+
+Get notified in Slack whenever a package you depend on releases a new version.
+
+<a href="https://grand-yak-92.convex.site/slack/install"><img alt="Add to Slack" height="40" src="https://platform.slack-edge.com/img/add_to_slack.png" srcset="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x"></a>
+
+> **Help us reach the Slack Marketplace!** We need at least 5 active workspace installs before Slack will approve PatchPulse for the official Marketplace. If the bot looks useful to you, installing it now is a huge help — it's free and takes about 30 seconds.
+
 ## Ecosystem
 
 - **🔧 CLI Tool** (this repo) - Check dependencies from terminal
 - **⚡ VSCode Extension** ([@PatchPulse/vscode-extension](https://github.com/PatchPulse/vscode-extension)) - Get updates in your editor _(Coming soon)_
-- **🤖 Slack Bot** ([Add to Workspace](https://slack.com/oauth/v2/authorize?client_id=180374136631.6017466448468&scope=chat:write,commands,incoming-webhook)) - Get notified in Slack
+- **🤖 Slack Bot** ([Add to Workspace](https://grand-yak-92.convex.site/slack/install)) - Get notified in Slack
 
 ## Troubleshooting
 

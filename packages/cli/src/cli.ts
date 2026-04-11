@@ -22,6 +22,7 @@ import { displayUnknownArguments } from './ui/display/unknownArguments';
 import { displayUpdatePrompt } from './ui/display/updatePrompt';
 import { displayVersion } from './ui/display/version';
 import { ansi } from './ui/ansi';
+import { ProgressSpinner } from './ui/progress';
 import { debugLog } from './utils/debug';
 import { getUnknownArgs } from './utils/getUnknownArgs';
 import { hasAnyFlag } from './utils/hasAnyFlag';
@@ -146,15 +147,63 @@ export async function runCli({
     };
 
     if (filteredProjects.length > 0) {
+      // --only-outdated monorepo: buffer all results then display only outdated projects.
+      // All other modes stream output per-project as data arrives.
+      const bufferAll = onlyOutdated && workspace.isMonorepo;
+
+      // Top-level scan spinner for the buffer-all case so the user sees progress.
+      let scanSpinner: ProgressSpinner | null = null;
+      if (bufferAll && !jsonOutput) {
+        const projectWord = pluralize({
+          count: filteredProjects.length,
+          singular: 'project',
+          plural: 'projects',
+        });
+        scanSpinner = new ProgressSpinner();
+        scanSpinner.start(
+          `Scanning ${filteredProjects.length} ${projectWord}... (0/${filteredProjects.length})`,
+        );
+      }
+
+      let scannedCount = 0;
+
       for (const project of filteredProjects) {
         const projectDependencies: DependencyInfo[] = [];
         const sectionResults: SectionResult[] = [];
+
+        // Sections stream inline (with their own spinner + results) when:
+        //   - single project (non-monorepo), OR
+        //   - verbose monorepo
+        // In both cases silent: false lets checkDependencyVersions handle display.
+        const streamInline =
+          (!workspace.isMonorepo || verboseProjects) && !jsonOutput && !bufferAll;
+
+        // Show a per-project spinner for non-verbose monorepo (non-buffered).
+        const useProjectSpinner =
+          workspace.isMonorepo && !verboseProjects && !bufferAll && !jsonOutput;
+
+        let projectSpinner: ProgressSpinner | null = null;
+
+        if (!jsonOutput && !bufferAll) {
+          if (workspace.isMonorepo) {
+            console.log(ansi.whiteBold(project.displayName));
+            console.log(ansi.gray(`Location: ${project.relativePath}`));
+            console.log(ansi.gray('─'.repeat(60)));
+          }
+          if (useProjectSpinner) {
+            projectSpinner = new ProgressSpinner();
+          }
+        }
 
         for (const key of PACKAGE_JSON_DEPENDENCY_FIELDS) {
           const value = project.sections[key];
           if (!value) {
             continue;
           }
+
+          const sectionLabel = dependencyTypeLabels[key];
+
+          projectSpinner?.start(`Checking ${sectionLabel.toLowerCase()}...`);
 
           try {
             const dependencyMap = Object.fromEntries(
@@ -171,20 +220,24 @@ export async function runCli({
             );
             const dependencies = await checkDependencyVersions(
               dependencyMap,
-              dependencyTypeLabels[key],
+              sectionLabel,
               config,
-              { silent: true },
+              { silent: !streamInline },
             );
+
+            projectSpinner?.stop();
+
             const enrichedDependencies = dependencies.map((dependency) => ({
               ...dependency,
               source: sourceMap.get(dependency.packageName),
             }));
             projectDependencies.push(...enrichedDependencies);
             sectionResults.push({
-              category: dependencyTypeLabels[key],
+              category: sectionLabel,
               dependencyInfos: enrichedDependencies,
             });
           } catch (error) {
+            projectSpinner?.stop();
             console.error(
               ansi.red(
                 `Error checking ${key.toLowerCase()} in ${project.relativePath}: ${error}`,
@@ -194,6 +247,15 @@ export async function runCli({
         }
 
         allDependencies.push(...projectDependencies);
+
+        scannedCount++;
+        scanSpinner?.updateMessage(
+          `Scanning ${filteredProjects.length} ${pluralize({
+            count: filteredProjects.length,
+            singular: 'project',
+            plural: 'projects',
+          })}... (${scannedCount}/${filteredProjects.length})`,
+        );
 
         if (projectDependencies.length === 0) {
           continue;
@@ -205,6 +267,21 @@ export async function runCli({
             (dependency.isOutdated || !dependency.latestVersion),
         );
 
+        // Display this project's results immediately (non-buffered cases).
+        if (!jsonOutput && !bufferAll) {
+          if (workspace.isMonorepo) {
+            // Verbose: sections were already streamed inline by checkDependencyVersions.
+            if (!verboseProjects) {
+              if (projectNeedsAttention) {
+                displayAttentionProjectStatus(sectionResults);
+              } else {
+                displayCompactProjectStatus(projectDependencies);
+              }
+            }
+          }
+          // Non-monorepo: sections already streamed inline.
+        }
+
         projectReports.push({
           displayName: project.displayName,
           relativePath: project.relativePath,
@@ -214,12 +291,13 @@ export async function runCli({
         });
       }
 
-      const visibleProjectReports =
-        onlyOutdated && workspace.isMonorepo
+      scanSpinner?.stop();
+
+      // JSON output always uses the fully buffered data.
+      if (jsonOutput) {
+        const visibleProjectReports = bufferAll
           ? projectReports.filter((project) => project.projectNeedsAttention)
           : projectReports;
-
-      if (jsonOutput) {
         console.log(
           JSON.stringify(
             createJsonOutput({
@@ -237,24 +315,20 @@ export async function runCli({
         return 0;
       }
 
-      for (const project of visibleProjectReports) {
-        if (workspace.isMonorepo) {
+      // Buffer-all display: show only outdated projects after the full scan.
+      if (bufferAll) {
+        for (const project of projectReports.filter(
+          (p) => p.projectNeedsAttention,
+        )) {
           console.log(ansi.whiteBold(project.displayName));
           console.log(ansi.gray(`Location: ${project.relativePath}`));
           console.log(ansi.gray('─'.repeat(60)));
-
           if (verboseProjects) {
             for (const section of project.sectionResults) {
               displayDependencyResults(section);
             }
-          } else if (project.projectNeedsAttention) {
-            displayAttentionProjectStatus(project.sectionResults);
           } else {
-            displayCompactProjectStatus(project.projectDependencies);
-          }
-        } else {
-          for (const section of project.sectionResults) {
-            displayDependencyResults(section);
+            displayAttentionProjectStatus(project.sectionResults);
           }
         }
       }

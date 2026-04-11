@@ -154,10 +154,15 @@ export const slackInteractions = httpAction(async (ctx, request) => {
       const values = payload.view.state.values;
       const newChannelId: string | undefined =
         values.channel_block?.channel_input?.selected_conversation ?? undefined;
-      const metadata = JSON.parse(payload.view.private_metadata ?? '{}') as {
-        subscriptionId?: string;
-        packageName?: string;
-      };
+      let metadata: { subscriptionId?: string; packageName?: string } = {};
+      try {
+        metadata = JSON.parse(payload.view.private_metadata ?? '{}');
+      } catch {
+        console.error(
+          'slackInteractions: failed to parse view private_metadata:',
+          payload.view.private_metadata,
+        );
+      }
 
       if (newChannelId && metadata.subscriptionId) {
         await ctx.scheduler.runAfter(

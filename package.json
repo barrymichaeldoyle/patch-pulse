@@ -11,6 +11,7 @@
   },
   "packageManager": "pnpm@10.30.3",
   "devDependencies": {
+    "@changesets/cli": "^2.30.0",
     "@types/node": "25.6.0",
     "knip": "6.4.0",
     "oxfmt": "0.44.0",
@@ -39,6 +40,9 @@
     "test:shared": "pnpm --filter @patch-pulse/shared test",
     "test:vscode-extension": "pnpm --filter patch-pulse-vscode-extension test",
     "test": "pnpm run test:shared && pnpm run test:cli && pnpm run test:notifier",
-    "typecheck": "pnpm --filter patch-pulse typecheck && pnpm --filter @patch-pulse/notifier-bot typecheck"
+    "typecheck": "pnpm --filter patch-pulse typecheck && pnpm --filter @patch-pulse/notifier-bot typecheck",
+    "changeset": "changeset",
+    "changeset:version": "changeset version",
+    "changeset:publish": "pnpm build:cli && changeset publish"
   }
 }

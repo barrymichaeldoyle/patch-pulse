@@ -19,9 +19,7 @@ export function displayLicense(): void {
     console.log(`${createCenteredBox('License', 60)}
 
 ${ansi.white(licenseContent)}`);
-  } catch (error) {
-    console.error(ansi.red('Error reading LICENSE file:'), error);
+  } catch {
     console.log(ansi.yellow('License: MIT'));
-    process.exit(1);
   }
 }
