@@ -57,6 +57,14 @@ export const upsertSlackWorkspace = internalMutation({
           botUserId: args.botUserId,
           teamName: args.teamName,
         });
+      } else {
+        await ctx.db.insert("slackSubscriberDetails", {
+          subscriberId: existing._id,
+          accessToken: args.accessToken,
+          botUserId: args.botUserId,
+          teamId: args.teamId,
+          teamName: args.teamName,
+        });
       }
 
       return existing._id;

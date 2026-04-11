@@ -166,3 +166,27 @@ export const updateChannelName = internalMutation({
     await ctx.db.patch(subscriptionId, { channelName });
   },
 });
+
+/** Fixes subscriptions where channelId was stored as a channel name instead of a Slack channel ID. */
+export const fixChannelIds = internalMutation({
+  args: {
+    subscriberId: v.id("subscribers"),
+    oldChannelId: v.string(),
+    newChannelId: v.string(),
+    newChannelName: v.optional(v.string()),
+  },
+  handler: async (ctx, { subscriberId, oldChannelId, newChannelId, newChannelName }) => {
+    const subs = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_subscriber", (q) => q.eq("subscriberId", subscriberId))
+      .collect();
+    for (const sub of subs) {
+      if (sub.channelId === oldChannelId) {
+        await ctx.db.patch(sub._id, {
+          channelId: newChannelId,
+          ...(newChannelName !== undefined ? { channelName: newChannelName } : {}),
+        });
+      }
+    }
+  },
+});

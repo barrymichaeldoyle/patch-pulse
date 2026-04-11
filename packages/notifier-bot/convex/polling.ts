@@ -16,7 +16,7 @@ import {
   formatSlackPackageLink,
   formatSlackVersionLink,
 } from "./slack/links";
-import { chatPostMessage, PrivateChannelError } from "./slack/api";
+import { chatPostMessage, conversationsFindByName, PrivateChannelError } from "./slack/api";
 
 const UPDATE_TYPE_RANK: Record<UpdateType, number> = { patch: 0, minor: 1, major: 2 };
 
@@ -148,9 +148,34 @@ export const checkForUpdates = internalAction({
       if (!details) continue;
 
       for (const [key, { lines: updates, stamps }] of channelMap) {
-        const targetChannel = key.startsWith("channel:")
+        const rawTarget = key.startsWith("channel:")
           ? key.slice("channel:".length)
           : key.slice("dm:".length);
+
+        // If this is a channel key whose value doesn't look like a Slack channel ID
+        // (e.g. it was stored as a name like "new-releases"), resolve it before sending.
+        let targetChannel = rawTarget;
+        if (key.startsWith("channel:") && !/^[CGD][A-Z0-9_]+$/i.test(rawTarget)) {
+          let resolved: { id: string; name: string } | null = null;
+          try {
+            resolved = await conversationsFindByName(details.accessToken, rawTarget);
+          } catch (err) {
+            console.warn(`could not look up channel "${rawTarget}":`, err);
+            continue;
+          }
+          if (!resolved) {
+            console.warn(`channel "${rawTarget}" not found in workspace — skipping`);
+            continue;
+          }
+          targetChannel = resolved.id;
+          // Fix all subscriptions for this subscriber that have the bad channel ID
+          await ctx.runMutation(internal.subscriptions.fixChannelIds, {
+            subscriberId,
+            oldChannelId: rawTarget,
+            newChannelId: resolved.id,
+            newChannelName: resolved.name,
+          });
+        }
 
         // Chunk updates into messages under ~3500 chars to stay within Slack's limits
         const SLACK_CHAR_LIMIT = 3500;
