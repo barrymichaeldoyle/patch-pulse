@@ -7,36 +7,51 @@
 export function getUnknownArgs({
   args,
   validFlags,
+  singleValueFlags = [],
+  variadicValueFlags = ['-s', '--skip'],
 }: {
   args: string[];
   validFlags: string[];
+  singleValueFlags?: string[];
+  variadicValueFlags?: string[];
 }): string[] {
   const unknownArgs: string[] = [];
-  let skipMode = false;
+  let variadicValueMode = false;
+  let waitingForSingleValue = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
 
-    // Check if this is a skip flag
-    if (arg === '-s' || arg === '--skip') {
-      skipMode = true;
+    if (waitingForSingleValue) {
+      if (!arg.startsWith('-')) {
+        waitingForSingleValue = false;
+        continue;
+      }
+
+      waitingForSingleValue = false;
+    }
+
+    if (variadicValueFlags.includes(arg)) {
+      variadicValueMode = true;
       continue;
     }
 
-    // If we're in skip mode and this is not a valid flag, skip it
-    if (skipMode && !validFlags.includes(arg)) {
+    if (singleValueFlags.includes(arg)) {
+      waitingForSingleValue = true;
+      variadicValueMode = false;
       continue;
     }
 
-    // Reset skip mode when we encounter a valid flag
+    if (variadicValueMode && !validFlags.includes(arg)) {
+      continue;
+    }
+
     if (validFlags.includes(arg)) {
-      skipMode = false;
+      variadicValueMode = false;
+      continue;
     }
 
-    // Add unknown args that are not in skip mode
-    if (!validFlags.includes(arg) && !skipMode) {
-      unknownArgs.push(arg);
-    }
+    unknownArgs.push(arg);
   }
 
   return unknownArgs;

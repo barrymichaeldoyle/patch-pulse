@@ -1,6 +1,9 @@
-import chalk from 'chalk';
 import { PACKAGE_JSON_DEPENDENCY_FIELDS } from '@patch-pulse/shared';
-import { checkDependencyVersions } from './core/dependency-checker';
+import {
+  checkDependencyVersions,
+  displayDependencyResults,
+  formatDependencyResult,
+} from './core/dependency-checker';
 import { getConfig } from './services/config';
 import { checkForCliUpdate } from './services/npm';
 import {
@@ -12,13 +15,30 @@ import { type DependencyInfo, type UpdateableDependency } from './types';
 import { scanWorkspace } from './services/workspace';
 import { displayHelp } from './ui/display/help';
 import { displayLicense } from './ui/display/license';
+import { displayAbout } from './ui/display/about';
 import { displaySummary } from './ui/display/summary';
 import { displayThankYouMessage } from './ui/display/thankYouMessage';
 import { displayUnknownArguments } from './ui/display/unknownArguments';
 import { displayUpdatePrompt } from './ui/display/updatePrompt';
 import { displayVersion } from './ui/display/version';
+import { ansi } from './ui/ansi';
+import { debugLog } from './utils/debug';
 import { getUnknownArgs } from './utils/getUnknownArgs';
 import { hasAnyFlag } from './utils/hasAnyFlag';
+import { pluralize } from './utils/pluralize';
+
+type SectionResult = {
+  category: string;
+  dependencyInfos: DependencyInfo[];
+};
+
+type ProjectReport = {
+  displayName: string;
+  relativePath: string;
+  sectionResults: SectionResult[];
+  projectDependencies: DependencyInfo[];
+  projectNeedsAttention: boolean;
+};
 
 const VALID_FLAGS = [
   '-h',
@@ -27,13 +47,18 @@ const VALID_FLAGS = [
   '--info',
   '-v',
   '--version',
+  '--about',
+  '--json',
   '-l',
   '--license',
   '-s',
   '--skip',
   '--package-manager',
+  '--project',
   '--update-prompt',
   '--no-update-prompt',
+  '--only-outdated',
+  '--verbose-projects',
 ];
 
 export async function runCli({
@@ -43,9 +68,17 @@ export async function runCli({
   argv?: string[];
   cwd?: string;
 } = {}): Promise<number> {
-  process.env.FORCE_COLOR = '1';
+  argv = argv.filter((arg) => arg !== '--');
+  const jsonOutput = argv.includes('--json');
+  const onlyOutdated = argv.includes('--only-outdated');
+  const projectFilter = getFlagValue(argv, '--project');
+  const verboseProjects = argv.includes('--verbose-projects');
 
-  const unknownArgs = getUnknownArgs({ args: argv, validFlags: VALID_FLAGS });
+  const unknownArgs = getUnknownArgs({
+    args: argv,
+    validFlags: VALID_FLAGS,
+    singleValueFlags: ['--package-manager', '--project'],
+  });
   if (unknownArgs.length > 0) {
     displayUnknownArguments(unknownArgs);
     return 1;
@@ -61,15 +94,49 @@ export async function runCli({
     return 0;
   }
 
+  if (argv.includes('--about')) {
+    displayAbout();
+    return 0;
+  }
+
   if (hasAnyFlag({ args: argv, flags: ['--license', '-l'] })) {
     displayLicense();
     return 0;
   }
 
+  if (argv.includes('--project') && !projectFilter) {
+    console.error(ansi.red('Error: --project requires a project name or path'));
+    return 1;
+  }
+
   try {
     const allDependencies: DependencyInfo[] = [];
     const config = getConfig({ argv, cwd });
-    const workspace = await scanWorkspace(cwd);
+    const workspace = await scanWorkspace(cwd, config);
+    const filteredProjects = filterProjects({
+      projectFilter,
+      projects: workspace.projects,
+    });
+
+    if (projectFilter && filteredProjects.length === 0) {
+      const message = createProjectNotFoundMessage({
+        projectFilter,
+        availableProjects: workspace.projects.map((project) => ({
+          displayName: project.displayName,
+          relativePath: project.relativePath,
+        })),
+      });
+
+      if (jsonOutput) {
+        console.log(JSON.stringify({ error: message }, null, 2));
+      } else {
+        console.error(ansi.red(`Error: ${message}`));
+      }
+
+      return 1;
+    }
+
+    const projectReports: ProjectReport[] = [];
 
     const dependencyTypeLabels: Record<string, string> = {
       dependencies: 'Dependencies',
@@ -78,13 +145,10 @@ export async function runCli({
       optionalDependencies: 'Optional Dependencies',
     };
 
-    if (workspace.projects.length > 0) {
-      for (const project of workspace.projects) {
-        if (workspace.isMonorepo) {
-          console.log(chalk.white.bold(project.displayName));
-          console.log(chalk.gray(`Location: ${project.relativePath}`));
-          console.log(chalk.gray('─'.repeat(60)));
-        }
+    if (filteredProjects.length > 0) {
+      for (const project of filteredProjects) {
+        const projectDependencies: DependencyInfo[] = [];
+        const sectionResults: SectionResult[] = [];
 
         for (const key of PACKAGE_JSON_DEPENDENCY_FIELDS) {
           const value = project.sections[key];
@@ -109,24 +173,98 @@ export async function runCli({
               dependencyMap,
               dependencyTypeLabels[key],
               config,
+              { silent: true },
             );
-            allDependencies.push(
-              ...dependencies.map((dependency) => ({
+            const enrichedDependencies = dependencies.map((dependency) => ({
                 ...dependency,
                 source: sourceMap.get(dependency.packageName),
-              })),
-            );
+              }));
+            projectDependencies.push(...enrichedDependencies);
+            sectionResults.push({
+              category: dependencyTypeLabels[key],
+              dependencyInfos: enrichedDependencies,
+            });
           } catch (error) {
             console.error(
-              chalk.red(
+              ansi.red(
                 `Error checking ${key.toLowerCase()} in ${project.relativePath}: ${error}`,
               ),
             );
           }
         }
+
+        allDependencies.push(...projectDependencies);
+
+        if (projectDependencies.length === 0) {
+          continue;
+        }
+
+        const projectNeedsAttention = projectDependencies.some(
+          (dependency) =>
+            !dependency.isSkipped &&
+            (dependency.isOutdated || !dependency.latestVersion),
+        );
+
+        projectReports.push({
+          displayName: project.displayName,
+          relativePath: project.relativePath,
+          sectionResults,
+          projectDependencies,
+          projectNeedsAttention,
+        });
       }
 
-      displaySummary(allDependencies);
+      const visibleProjectReports =
+        onlyOutdated && workspace.isMonorepo
+          ? projectReports.filter((project) => project.projectNeedsAttention)
+          : projectReports;
+
+      if (jsonOutput) {
+        console.log(
+          JSON.stringify(
+            createJsonOutput({
+              cwd,
+              hasCatalogDependencies: workspace.hasCatalogDependencies,
+              isMonorepo: workspace.isMonorepo,
+              allProjectReports: projectReports,
+              projectFilter,
+              visibleProjectReports,
+            }),
+            null,
+            2,
+          ),
+        );
+        return 0;
+      }
+
+      for (const project of visibleProjectReports) {
+        if (workspace.isMonorepo) {
+          console.log(ansi.whiteBold(project.displayName));
+          console.log(ansi.gray(`Location: ${project.relativePath}`));
+          console.log(ansi.gray('─'.repeat(60)));
+
+          if (verboseProjects) {
+            for (const section of project.sectionResults) {
+              displayDependencyResults(section);
+            }
+          } else if (project.projectNeedsAttention) {
+            displayAttentionProjectStatus(project.sectionResults);
+          } else {
+            displayCompactProjectStatus(project.projectDependencies);
+          }
+        } else {
+          for (const section of project.sectionResults) {
+            displayDependencyResults(section);
+          }
+        }
+      }
+
+      displaySummary(allDependencies, {
+        projectCount: projectReports.length,
+        projectsWithAttention: projectReports.filter(
+          (project) => project.projectNeedsAttention,
+        ).length,
+      });
 
       if (!config.noUpdatePrompt) {
         const packageManager = config.packageManager
@@ -193,18 +331,265 @@ export async function runCli({
 
       displayThankYouMessage();
     } else {
-      console.log(chalk.yellow('⚠️  No dependencies found to check'));
+      if (jsonOutput) {
+        console.log(
+          JSON.stringify(
+            createJsonOutput({
+              cwd,
+              hasCatalogDependencies: workspace.hasCatalogDependencies,
+              isMonorepo: workspace.isMonorepo,
+              allProjectReports: [],
+              projectFilter,
+              visibleProjectReports: [],
+            }),
+            null,
+            2,
+          ),
+        );
+        return 0;
+      }
+
+      console.log(ansi.yellow('⚠️  No dependencies found to check'));
     }
 
-    try {
-      await checkForCliUpdate();
-    } catch {
-      // Silently fail for CLI updates, i.e. don't let CLI update errors stop the main flow
+    if (!jsonOutput) {
+      try {
+        await checkForCliUpdate();
+      } catch (error) {
+        debugLog(`CLI update check failed: ${String(error)}`);
+        // Silently fail for CLI updates, i.e. don't let CLI update errors stop the main flow
+      }
     }
 
     return 0;
   } catch (error) {
-    console.error(chalk.red(`Error: ${error}`));
+    console.error(ansi.red(`Error: ${error}`));
     return 1;
+  }
+}
+
+function getFlagValue(args: string[], flag: string): string | undefined {
+  const index = args.indexOf(flag);
+
+  if (index === -1 || index + 1 >= args.length) {
+    return undefined;
+  }
+
+  const value = args[index + 1];
+  return value.startsWith('-') ? undefined : value;
+}
+
+function filterProjects<T extends { displayName: string; relativePath: string }>({
+  projectFilter,
+  projects,
+}: {
+  projectFilter?: string;
+  projects: T[];
+}): T[] {
+  if (!projectFilter) {
+    return projects;
+  }
+
+  const normalizedFilter = normalizeProjectFilter(projectFilter);
+
+  return projects.filter((project) => {
+    const normalizedRelativePath = normalizeProjectFilter(project.relativePath);
+    const normalizedDisplayName = normalizeProjectFilter(project.displayName);
+    const basename = normalizeProjectFilter(
+      normalizedRelativePath.split('/').at(-1) ?? normalizedRelativePath,
+    );
+
+    return (
+      normalizedFilter === normalizedRelativePath ||
+      normalizedFilter === normalizedDisplayName ||
+      normalizedFilter === basename
+    );
+  });
+}
+
+function normalizeProjectFilter(value: string): string {
+  return value.replace(/\\/g, '/').replace(/\/$/, '').replace(/^\.\//, '');
+}
+
+function createProjectNotFoundMessage({
+  projectFilter,
+  availableProjects,
+}: {
+  projectFilter: string;
+  availableProjects: Array<{ displayName: string; relativePath: string }>;
+}): string {
+  const projectList = availableProjects
+    .map((project) => `${project.displayName} (${project.relativePath})`)
+    .join(', ');
+
+  return `No project matched "${projectFilter}". Available projects: ${projectList}`;
+}
+
+function createJsonOutput({
+  allProjectReports,
+  cwd,
+  hasCatalogDependencies,
+  isMonorepo,
+  projectFilter,
+  visibleProjectReports,
+}: {
+  allProjectReports: ProjectReport[];
+  cwd: string;
+  hasCatalogDependencies: boolean;
+  isMonorepo: boolean;
+  projectFilter?: string;
+  visibleProjectReports: ProjectReport[];
+}) {
+  const allDependencies = allProjectReports.flatMap(
+    (project) => project.projectDependencies,
+  );
+  const summary = summarizeDependencies(allDependencies);
+
+  return {
+    cwd,
+    generatedAt: new Date().toISOString(),
+    hasCatalogDependencies,
+    isMonorepo,
+    projectFilter: projectFilter ?? null,
+    visibleProjectCount: visibleProjectReports.length,
+    projects: visibleProjectReports.map((project) => ({
+      displayName: project.displayName,
+      relativePath: project.relativePath,
+      needsAttention: project.projectNeedsAttention,
+      summary: summarizeDependencies(project.projectDependencies),
+      sections: project.sectionResults.map((section) => ({
+        category: section.category,
+        dependencies: section.dependencyInfos,
+      })),
+    })),
+    summary: {
+      ...summary,
+      projectCount: allProjectReports.length,
+      projectsWithAttention: allProjectReports.filter(
+        (project) => project.projectNeedsAttention,
+      ).length,
+    },
+  };
+}
+
+function summarizeDependencies(allDependencies: DependencyInfo[]) {
+  const upToDate = allDependencies.filter(
+    (dependency) =>
+      !dependency.isOutdated &&
+      !dependency.isSkipped &&
+      Boolean(dependency.latestVersion),
+  ).length;
+  const unknown = allDependencies.filter(
+    (dependency) => !dependency.latestVersion && !dependency.isSkipped,
+  ).length;
+  const outdated = allDependencies.filter(
+    (dependency) => dependency.isOutdated && !dependency.isSkipped,
+  ).length;
+  const skipped = allDependencies.filter((dependency) => dependency.isSkipped).length;
+
+  return {
+    total: allDependencies.length,
+    upToDate,
+    outdated,
+    unknown,
+    skipped,
+    majorUpdates: allDependencies.filter(
+      (dependency) => dependency.updateType === 'major' && !dependency.isSkipped,
+    ).length,
+    minorUpdates: allDependencies.filter(
+      (dependency) => dependency.updateType === 'minor' && !dependency.isSkipped,
+    ).length,
+    patchUpdates: allDependencies.filter(
+      (dependency) => dependency.updateType === 'patch' && !dependency.isSkipped,
+    ).length,
+  };
+}
+
+function displayCompactProjectStatus(projectDependencies: DependencyInfo[]): void {
+  const upToDateCount = projectDependencies.filter(
+    (dependency) =>
+      !dependency.isSkipped &&
+      !dependency.isOutdated &&
+      Boolean(dependency.latestVersion),
+  ).length;
+  const skippedCount = projectDependencies.filter(
+    (dependency) => dependency.isSkipped,
+  ).length;
+
+  if (upToDateCount > 0) {
+    const packageWord = pluralize({
+      count: upToDateCount,
+      singular: 'package',
+      plural: 'packages',
+    });
+    console.log(
+      `${ansi.green('✓  Up to date:')} ${upToDateCount} ${packageWord}`,
+    );
+  }
+
+  if (skippedCount > 0) {
+    console.log(`  ${ansi.gray('⏭  Skipped:')} ${skippedCount}`);
+  }
+
+  console.log();
+}
+
+function displayAttentionProjectStatus(
+  sectionResults: Array<{
+    category: string;
+    dependencyInfos: DependencyInfo[];
+  }>,
+): void {
+  const attentionDependencies = sectionResults.flatMap((section) =>
+    section.dependencyInfos.filter(
+      (dependency) =>
+        !dependency.isSkipped &&
+        (dependency.isOutdated || !dependency.latestVersion),
+    ),
+  );
+  const outdatedCount = attentionDependencies.filter(
+    (dependency) => dependency.isOutdated,
+  ).length;
+  const unknownCount = attentionDependencies.filter(
+    (dependency) => !dependency.latestVersion,
+  ).length;
+
+  if (attentionDependencies.length > 0) {
+    const packageWord = pluralize({
+      count: attentionDependencies.length,
+      singular: 'package',
+      plural: 'packages',
+    });
+    const reviewWord = attentionDependencies.length === 1 ? 'needs' : 'need';
+    const parts = [
+      outdatedCount > 0 && `${outdatedCount} outdated`,
+      unknownCount > 0 && `${unknownCount} unknown`,
+    ].filter(Boolean);
+    const detailText = parts.length > 0 ? ` ${ansi.gray(`(${parts.join(', ')})`)}` : '';
+    console.log(
+      `${ansi.yellow('!  Attention:')} ${attentionDependencies.length} ${packageWord} ${reviewWord} review${detailText}`,
+    );
+    console.log();
+  }
+
+  for (const section of sectionResults) {
+    const relevantDependencies = section.dependencyInfos.filter(
+      (dependency) =>
+        !dependency.isSkipped &&
+        (dependency.isOutdated || !dependency.latestVersion),
+    );
+
+    if (relevantDependencies.length === 0) {
+      continue;
+    }
+
+    console.log(ansi.cyanBold(`${section.category}:`));
+    console.log(ansi.cyan('─'.repeat(section.category.length + 1)));
+
+    for (const dependency of relevantDependencies) {
+      console.log(formatDependencyResult(dependency));
+    }
+
+    console.log();
   }
 }

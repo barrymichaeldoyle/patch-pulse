@@ -1,15 +1,11 @@
-import chalk from 'chalk';
+import { ansi } from '../ansi';
 
 /**
- * Displays the thank you message
+ * Displays the CLI closeout message
  */
 export function displayThankYouMessage(): void {
   console.log();
   console.log(
-    chalk.magentaBright.bold('🎉 Thank you for using Patch Pulse CLI!'),
-  );
-  console.log(
-    chalk.cyan.bold('💡 For more info:') +
-      ` ${chalk.white.bold('npx patch-pulse --help')}`,
+    `${ansi.cyanBold('Done.')} Re-run with ${ansi.whiteBold('--help')} for options or ${ansi.whiteBold('--about')} for project links.`,
   );
 }

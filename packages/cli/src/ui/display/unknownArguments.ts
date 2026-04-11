@@ -1,34 +1,39 @@
-import chalk from 'chalk';
+import { ansi } from '../ansi';
 
 export function displayUnknownArguments(unknownArgs: string[]): void {
   console.error(
-    chalk.red.bold('❌ Unknown command:') +
-      ` ${chalk.white(unknownArgs.join(' '))}`,
+    ansi.redBold('❌ Unknown command:') + ` ${ansi.white(unknownArgs.join(' '))}`,
   );
   console.log();
-  console.log(chalk.blue.bold(' Available commands:'));
+  console.log(ansi.blueBold(' Available commands:'));
   console.log(
-    chalk.white('  npx patch-pulse') +
-      chalk.gray('           # Check dependencies'),
+    ansi.white('  npx patch-pulse') +
+      ansi.gray('           # Check dependencies'),
   );
   console.log(
-    chalk.white('  npx patch-pulse --help') + chalk.gray('    # Show help'),
+    ansi.white('  npx patch-pulse --help') + ansi.gray('    # Show help'),
   );
   console.log(
-    chalk.white('  npx patch-pulse --version') + chalk.gray(' # Show version'),
+    ansi.white('  npx patch-pulse --version') + ansi.gray(' # Show version'),
   );
   console.log(
-    chalk.white('  npx patch-pulse --license') + chalk.gray(' # Show license'),
+    ansi.white('  npx patch-pulse --about') + ansi.gray('   # Show project links'),
+  );
+  console.log(
+    ansi.white('  npx patch-pulse --json') + ansi.gray('    # Print JSON output'),
+  );
+  console.log(
+    ansi.white('  npx patch-pulse --license') + ansi.gray(' # Show license'),
   );
   console.log();
-  console.log(chalk.blue.bold(' Configuration options:'));
+  console.log(ansi.blueBold(' Configuration options:'));
   console.log(
-    chalk.white('  npx patch-pulse -s <packages>') +
-      chalk.gray('     # Skip packages (supports exact names and patterns)'),
+    ansi.white('  npx patch-pulse -s <packages>') +
+      ansi.gray('     # Skip packages (supports exact names and patterns)'),
   );
   console.log();
   console.log(
-    chalk.cyan.bold('For more information:') +
-      ` ${chalk.white.bold('npx patch-pulse --help')}`,
+    ansi.cyanBold('For more information:') +
+      ` ${ansi.whiteBold('npx patch-pulse --help')}`,
   );
 }

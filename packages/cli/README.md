@@ -20,6 +20,10 @@ npx patch-pulse
 
 That's it! Patch Pulse scans the current project for `package.json` files and shows which dependencies are outdated.
 
+- Zero runtime dependencies
+- Monorepo-aware, including pnpm `catalog:` support
+- Interactive terminal updates for patch, minor, or all outdated packages
+
 ![Example Screenshot](assets/example.png)
 
 ## Configuration
@@ -35,6 +39,7 @@ Patch Pulse supports configuration files for persistent settings. Create one of 
 ```json
 {
   "skip": ["lodash", "@types/*", "test-*"],
+  "ignorePaths": ["packages/cli/e2e"],
   "packageManager": "npm",
   "noUpdatePrompt": false
 }
@@ -47,6 +52,14 @@ The `skip` array supports multiple pattern types:
 - **Exact names**: `"lodash"`, `"chalk"`
 - **Glob patterns**: `"@types/*"`, `"test-*"`, `"*-dev"`
 - **Regex patterns**: `".*-dev"`, `"^@angular/.*"`, `"zone\\.js"`
+
+### Ignore Paths
+
+The `ignorePaths` array excludes matching directories or `package.json` paths from workspace scanning.
+
+- **Exact paths**: `"packages/cli/e2e"`
+- **Glob patterns**: `"**/fixtures"`, `"packages/*/dist"`
+- **Regex patterns**: `"^packages/.*/__generated__"`
 
 ### Package Manager
 
@@ -70,6 +83,37 @@ CLI arguments override file configuration:
 npx patch-pulse --skip "react,react-dom" --package-manager pnpm --no-update-prompt
 ```
 
+For monorepos, use `--verbose-projects` to print full dependency sections for clean workspaces too.
+
+```bash
+npx patch-pulse --verbose-projects
+```
+
+Use `--only-outdated` to hide clean workspaces entirely.
+
+```bash
+npx patch-pulse --only-outdated
+```
+
+Focus one project by workspace path or package name:
+
+```bash
+npx patch-pulse --project packages/app
+```
+
+Use `--json` for scripts, CI, or editor integrations:
+
+```bash
+npx patch-pulse --json
+```
+
+When dogfooding the local workspace CLI through the root script, use `pnpm -s`
+to suppress pnpm's script banner before JSON output:
+
+```bash
+pnpm -s pp -- --json
+```
+
 ## Monorepos
 
 When run from a repository root, Patch Pulse scans every `package.json` under the current directory except anything inside `node_modules`.
@@ -89,6 +133,8 @@ When run from a repository root, Patch Pulse scans every `package.json` under th
 - **"No dependencies found"** - Run from a project directory that contains dependency-bearing `package.json` files
 - **"Error reading package.json"** - Check JSON syntax and file permissions
 - **Network errors** - Verify internet connection and npm registry access
+- **Debug registry lookups** - Run `PATCH_PULSE_DEBUG=1 npx patch-pulse` to log npm lookup failures and HTTP/network errors
+- **Machine-readable output** - Run `npx patch-pulse --json` for scripts or CI
 
 ## Contributing
 
@@ -102,8 +148,8 @@ When run from a repository root, Patch Pulse scans every `package.json` under th
 ## Support
 
 - ⭐ **Star** the repo
-- 🐛 **Report bugs** via [Issues](https://github.com/PatchPulse/cli/issues)
-- 💬 **Join discussions** in [Discussions](https://github.com/PatchPulse/cli/discussions)
+- 🐛 **Report bugs** via [Issues](https://github.com/barrymichaeldoyle/patch-pulse/issues)
+- 💬 **Join discussions** in [Discussions](https://github.com/barrymichaeldoyle/patch-pulse/discussions)
 
 ## License
 

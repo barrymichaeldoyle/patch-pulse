@@ -5,6 +5,7 @@ import { type PackageManager } from '../types';
 
 export interface PatchPulseConfig {
   skip?: string[];
+  ignorePaths?: string[];
   packageManager?: PackageManager;
   noUpdatePrompt?: boolean;
 }
@@ -109,6 +110,7 @@ export function mergeConfigs(
 ): PatchPulseConfig {
   const merged: PatchPulseConfig = {
     skip: [],
+    ignorePaths: [],
   };
 
   // Add file config values
@@ -116,13 +118,22 @@ export function mergeConfigs(
     merged.skip!.push(...fileConfig.skip);
   }
 
+  if (fileConfig?.ignorePaths) {
+    merged.ignorePaths!.push(...fileConfig.ignorePaths);
+  }
+
   // Add CLI config values (merge instead of override)
   if (cliConfig.skip) {
     merged.skip!.push(...cliConfig.skip);
   }
 
+  if (cliConfig.ignorePaths) {
+    merged.ignorePaths!.push(...cliConfig.ignorePaths);
+  }
+
   // Remove duplicates while preserving order
   merged.skip = [...new Set(merged.skip!)];
+  merged.ignorePaths = [...new Set(merged.ignorePaths!)];
 
   // Handle packageManager (CLI takes precedence)
   if (cliConfig.packageManager) {
@@ -151,6 +162,12 @@ function validateConfig(config: any): PatchPulseConfig {
 
   if (config.skip && Array.isArray(config.skip)) {
     validated.skip = config.skip.filter(
+      (item: any) => typeof item === 'string',
+    );
+  }
+
+  if (config.ignorePaths && Array.isArray(config.ignorePaths)) {
+    validated.ignorePaths = config.ignorePaths.filter(
       (item: any) => typeof item === 'string',
     );
   }
@@ -185,27 +202,81 @@ export function shouldSkipPackage({
   }
 
   return config.skip.some((pattern) => {
-    // If the pattern contains regex special characters (other than * and ?), treat as regex
-    if (/[. +?^${}()|[\]]/.test(pattern.replace(['*', '?'].join('|'), ''))) {
-      try {
-        const regex = new RegExp(pattern);
-        return regex.test(packageName);
-      } catch {
-        return packageName.includes(pattern);
-      }
-    } else if (pattern.includes('*') || pattern.includes('?')) {
-      // Convert glob to regex
-      const regexPattern =
-        '^' +
-        pattern
-          .replace(/([.+^${}()|[\\]])/g, '\\$1') // Escape regex special chars
-          .replace(/\*/g, '.*') // * => .*
-          .replace(/\?/g, '.') + // ? => .
-        '$';
-      const regex = new RegExp(regexPattern);
-      return regex.test(packageName);
-    } else {
-      return packageName === pattern;
-    }
+    return matchesPattern({ value: packageName, pattern });
   });
+}
+
+export function shouldIgnorePath({
+  path,
+  config = {},
+}: {
+  path: string;
+  config: PatchPulseConfig | undefined;
+}): boolean {
+  if (!config.ignorePaths) {
+    return false;
+  }
+
+  const normalizedPath = normalizeConfigPath(path);
+
+  return config.ignorePaths.some((pattern) => {
+    const normalizedPattern = normalizeConfigPath(pattern);
+
+    if (
+      !hasPatternSyntax(normalizedPattern) &&
+      (normalizedPath === normalizedPattern ||
+        normalizedPath.startsWith(`${normalizedPattern}/`))
+    ) {
+      return true;
+    }
+
+    return matchesPattern({
+      value: normalizedPath,
+      pattern: normalizedPattern,
+    });
+  });
+}
+
+function normalizeConfigPath(path: string): string {
+  return path.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '');
+}
+
+function hasPatternSyntax(pattern: string): boolean {
+  return (
+    pattern.includes('*') ||
+    pattern.includes('?') ||
+    /[. +^${}()|[\]]/.test(pattern)
+  );
+}
+
+function matchesPattern({
+  value,
+  pattern,
+}: {
+  value: string;
+  pattern: string;
+}): boolean {
+  // If the pattern contains regex special characters (other than * and ?), treat as regex
+  if (/[. +?^${}()|[\]]/.test(pattern.replace(/[*?]/g, ''))) {
+    try {
+      const regex = new RegExp(pattern);
+      return regex.test(value);
+    } catch {
+      return value.includes(pattern);
+    }
+  }
+
+  if (pattern.includes('*') || pattern.includes('?')) {
+    const regexPattern =
+      '^' +
+      pattern
+        .replace(/([.+^${}()|[\\]])/g, '\\$1')
+        .replace(/\*/g, '.*')
+        .replace(/\?/g, '.') +
+      '$';
+    const regex = new RegExp(regexPattern);
+    return regex.test(value);
+  }
+
+  return value === pattern;
 }

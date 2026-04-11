@@ -1,6 +1,6 @@
-import chalk from 'chalk';
 import { type PatchPulseConfig } from '../../services/config';
 import { type DependencyInfo } from '../../types';
+import { ansi } from '../ansi';
 import { displayHelp } from './help';
 import { displayVersion } from './version';
 
@@ -99,44 +99,54 @@ export function displayUpdatePrompt(
     // Check if we're in a non-interactive environment (CI/CD)
     if (!process.stdin.isTTY) {
       console.log(
-        chalk.yellow(
+        ansi.yellow(
           '⚠️  Running in non-interactive environment. Skipping update prompt.',
         ),
       );
-      console.log(
-        chalk.gray('Use --update-prompt flag to force interactive mode.'),
-      );
+      console.log(ansi.gray('Use --update-prompt flag to force interactive mode.'));
       resolve(null);
       return;
     }
 
     const updateOptions = categorizeUpdates(outdatedDeps);
+    const affectedProjects = new Set(
+      outdatedDeps.map((dependency) => dependency.source?.projectRelativePath ?? '.'),
+    ).size;
 
     function showOptions() {
+      console.log();
+      console.log(ansi.gray('═'.repeat(60)));
+      console.log(
+        ansi.cyanBold(
+          `Update Options (${outdatedDeps.length} outdated package${outdatedDeps.length === 1 ? '' : 's'} across ${affectedProjects} project${affectedProjects === 1 ? '' : 's'})`,
+        ),
+      );
+      console.log(ansi.gray('═'.repeat(60)));
+
       if (updateOptions.patch.length > 0) {
         console.log(
-          `  ${chalk.cyan(UPDATE_OPTION_CHARS.patch)} - Update outdated patch dependencies`,
+          `  ${ansi.cyan(UPDATE_OPTION_CHARS.patch)} - Update outdated patch dependencies`,
         );
       }
       if (updateOptions.minor.length > 0) {
         console.log(
-          `  ${chalk.cyan(UPDATE_OPTION_CHARS.minor)} - Update outdated minor & patch dependencies`,
+          `  ${ansi.cyan(UPDATE_OPTION_CHARS.minor)} - Update outdated minor & patch dependencies`,
         );
       }
       if (updateOptions.all.length > 0) {
         console.log(
-          `  ${chalk.cyan(UPDATE_OPTION_CHARS.all)} - Update all outdated dependencies`,
+          `  ${ansi.cyan(UPDATE_OPTION_CHARS.all)} - Update all outdated dependencies`,
         );
       }
 
       console.log();
       console.log(
-        `  ${chalk.gray(OTHER_OPTION_CHARS.help)} - Show help | ${chalk.gray(
+        `  ${ansi.gray(OTHER_OPTION_CHARS.help)} - Show help | ${ansi.gray(
           OTHER_OPTION_CHARS.version,
-        )} - Show version | ${chalk.gray(OTHER_OPTION_CHARS.quit)} - Quit`,
+        )} - Show version | ${ansi.gray(OTHER_OPTION_CHARS.quit)} - Quit`,
       );
       console.log();
-      console.log(chalk.white('Press a key to select an option...'));
+      console.log(ansi.white('Press a key to select an option...'));
     }
 
     showOptions();
@@ -160,7 +170,7 @@ export function displayUpdatePrompt(
             cleanup();
             resolve('patch');
           } else {
-            console.log(chalk.red('\nNo patch updates available'));
+            console.log(ansi.red('\nNo patch updates available'));
           }
           break;
         case UPDATE_OPTION_CHARS.minor:
@@ -168,7 +178,7 @@ export function displayUpdatePrompt(
             cleanup();
             resolve('minor');
           } else {
-            console.log(chalk.red('\nNo minor updates available'));
+            console.log(ansi.red('\nNo minor updates available'));
           }
           break;
         case UPDATE_OPTION_CHARS.all:
@@ -176,7 +186,7 @@ export function displayUpdatePrompt(
             cleanup();
             resolve('all');
           } else {
-            console.log(chalk.red('\nNo updates available'));
+            console.log(ansi.red('\nNo updates available'));
           }
           break;
         case OTHER_OPTION_CHARS.quit:

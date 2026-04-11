@@ -1,6 +1,6 @@
-import chalk from 'chalk';
-
 import { VERSION } from '../../gen/version.gen';
+import { CLI_REPO_URL } from '../../constant';
+import { ansi } from '../ansi';
 import { createCenteredBox } from '../createCenteredBox';
 import { displayMadeWithLove } from './madeWithLove';
 
@@ -10,10 +10,10 @@ import { displayMadeWithLove } from './madeWithLove';
 export function displayVersion(): void {
   console.log(`${createCenteredBox('Patch Pulse CLI', 40)}
 
-${chalk.cyan.bold('Version:')} ${chalk.white(VERSION)}
-${chalk.cyan.bold('Author:')}  ${chalk.underline('<https://github.com/barrymichaeldoyle>')}
-${chalk.cyan.bold('Repo:')}    ${chalk.white('https://github.com/PatchPulse/cli')}
-${chalk.cyan.bold('License:')} ${chalk.white('MIT')}`);
+${ansi.cyanBold('Version:')} ${ansi.white(VERSION)}
+${ansi.cyanBold('Author:')}  ${ansi.underline('<https://github.com/barrymichaeldoyle>')}
+${ansi.cyanBold('Repo:')}    ${ansi.white(CLI_REPO_URL)}
+${ansi.cyanBold('License:')} ${ansi.white('MIT')}`);
 
   displayMadeWithLove();
 }

@@ -5,6 +5,7 @@ import {
   getDependencySections,
 } from '@patch-pulse/shared';
 import { type DependencySource, type PackageJson } from '../types';
+import { type PatchPulseConfig, shouldIgnorePath } from './config';
 import { readPackageJson } from './package';
 
 type DependencySectionName = (typeof PACKAGE_JSON_DEPENDENCY_FIELDS)[number];
@@ -39,8 +40,9 @@ interface ResolvedDependencySpec {
 
 export async function scanWorkspace(
   rootCwd: string,
+  config?: PatchPulseConfig,
 ): Promise<WorkspaceScanResult> {
-  const packageJsonPaths = findPackageJsonPaths(rootCwd);
+  const packageJsonPaths = findPackageJsonPaths(rootCwd, config);
   const catalogs = readPnpmCatalogs(rootCwd);
   const workspaceManifestPath = join(rootCwd, 'pnpm-workspace.yaml');
   const projects: WorkspaceProject[] = [];
@@ -89,10 +91,22 @@ export async function scanWorkspace(
   };
 }
 
-function findPackageJsonPaths(rootCwd: string): string[] {
+function findPackageJsonPaths(
+  rootCwd: string,
+  config?: PatchPulseConfig,
+): string[] {
   const packageJsonPaths: string[] = [];
 
   function visitDirectory(directory: string): void {
+    const relativeDirectory = relative(rootCwd, directory) || '.';
+
+    if (
+      relativeDirectory !== '.' &&
+      shouldIgnorePath({ path: relativeDirectory, config })
+    ) {
+      return;
+    }
+
     const entries = readdirSync(directory, { withFileTypes: true });
 
     for (const entry of entries) {
@@ -106,7 +120,14 @@ function findPackageJsonPaths(rootCwd: string): string[] {
       }
 
       if (entry.isFile() && entry.name === 'package.json') {
-        packageJsonPaths.push(join(directory, entry.name));
+        const packageJsonPath = join(directory, entry.name);
+        const relativePackageJsonPath = relative(rootCwd, packageJsonPath);
+
+        if (shouldIgnorePath({ path: relativePackageJsonPath, config })) {
+          continue;
+        }
+
+        packageJsonPaths.push(packageJsonPath);
       }
     }
   }

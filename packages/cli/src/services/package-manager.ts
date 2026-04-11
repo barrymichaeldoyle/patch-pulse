@@ -1,8 +1,8 @@
-import chalk from 'chalk';
 import { spawn } from 'child_process';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { type PackageManager, type UpdateableDependency } from '../types';
+import { ansi } from '../ui/ansi';
 import { preserveWildcardPrefix } from '../utils/parseVersion';
 import { pluralize } from '../utils/pluralize';
 
@@ -139,7 +139,7 @@ export async function updateDependencies({
   runInstallCommand?: RunInstallCommand;
 }): Promise<void> {
   if (dependencies.length === 0) {
-    console.log(chalk.yellow('No dependencies to update'));
+    console.log(ansi.yellow('No dependencies to update'));
     return;
   }
 
@@ -150,7 +150,7 @@ export async function updateDependencies({
   });
 
   console.log(
-    chalk.cyan(
+    ansi.cyan(
       `\n🔄 Updating ${dependencies.length} ${dependencyWord} using ${packageManager.name}...`,
     ),
   );
@@ -176,12 +176,12 @@ export async function updateDependencies({
     });
 
     console.log(
-      chalk.green(
+      ansi.green(
         `\n✅ Successfully updated ${dependencies.length} ${dependencyWord}!`,
       ),
     );
   } catch (error) {
-    console.error(chalk.red(`Failed to update dependencies: ${error}`));
+    console.error(ansi.red(`Failed to update dependencies: ${error}`));
     throw error;
   }
 }
@@ -204,13 +204,13 @@ function logDependencyChanges(dependencies: UpdateableDependency[]): void {
       continue;
     }
 
-    console.log(chalk.gray(`${category}:`));
+    console.log(ansi.gray(`${category}:`));
 
     for (const dep of deps) {
       const updateTypeColor = {
-        major: chalk.yellow,
-        minor: chalk.magenta,
-        patch: chalk.blue,
+        major: ansi.yellow,
+        minor: ansi.magenta,
+        patch: ansi.blue,
       }[dep.updateType];
       const updateTypeLabel = updateTypeColor(`[${dep.updateType}]`);
       const locationLabel =
@@ -219,7 +219,7 @@ function logDependencyChanges(dependencies: UpdateableDependency[]): void {
           : dep.source.projectRelativePath;
 
       console.log(
-        chalk.gray(
+        ansi.gray(
           `   ${dep.packageName}: ${dep.currentVersion} → ${dep.latestVersion} ${updateTypeLabel} (${locationLabel})`,
         ),
       );

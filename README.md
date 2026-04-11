@@ -87,6 +87,8 @@ pnpm ci:check         # lint, format, knip, typecheck, test, build — mirrors C
 
 pnpm dev:notifier     # run Slack bot locally (requires Convex setup)
 pnpm dev:cli          # run CLI in dev mode
+pnpm pp               # dogfood the local CLI from the repo root
+pnpm -s pp -- --json  # same, but without pnpm's script banner for pipe-safe JSON
 pnpm dev:vscode-extension  # watch VS Code extension
 
 pnpm test             # run all tests

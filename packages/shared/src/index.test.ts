@@ -303,6 +303,15 @@ describe('getDependencyStatus', () => {
     expect(result.status).toBe('not-found');
   });
 
+  it('returns lookup-failed when lookup failure is explicit', () => {
+    const result = getDependencyStatus({
+      packageName: 'react',
+      currentVersion: '18.0.0',
+      status: 'lookup-failed',
+    });
+    expect(result.status).toBe('lookup-failed');
+  });
+
   it('returns latest-tag for "latest" current version', () => {
     const result = getDependencyStatus({
       packageName: 'react',
@@ -557,7 +566,7 @@ describe('checkNpmDependencyStatuses', () => {
     );
   });
 
-  it('calls onError and still returns a result on fetch failure', async () => {
+  it('calls onError and returns lookup-failed on fetch failure', async () => {
     vi.spyOn(global, 'fetch').mockRejectedValue(new Error('network error'));
     const onError = vi.fn();
     const results = await checkNpmDependencyStatuses(
@@ -565,6 +574,17 @@ describe('checkNpmDependencyStatuses', () => {
       { onError },
     );
     expect(onError).toHaveBeenCalledOnce();
+    expect(results).toHaveLength(1);
+    expect(results[0].status).toBe('lookup-failed');
+  });
+
+  it('returns not-found on HTTP 404', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response('Not Found', { status: 404, statusText: 'Not Found' }),
+    );
+
+    const results = await checkNpmDependencyStatuses({ react: '17.0.0' });
+
     expect(results).toHaveLength(1);
     expect(results[0].status).toBe('not-found');
   });

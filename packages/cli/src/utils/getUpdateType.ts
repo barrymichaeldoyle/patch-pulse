@@ -1,6 +1,6 @@
-import chalk from 'chalk';
 import { getUpdateType as getSharedUpdateType } from '@patch-pulse/shared';
 import { UpdateType } from '../types';
+import { ansi } from '../ui/ansi';
 
 /**
  * Determines the type of update required based on the current and latest versions
@@ -22,7 +22,7 @@ export function getUpdateType({
 
     if (hasInvalidVersion) {
       console.warn(
-        chalk.yellow(
+        ansi.yellow(
           `⚠️  Invalid version format: ${current} or ${latest}. Defaulting to patch update.`,
         ),
       );

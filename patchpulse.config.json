@@ -1,0 +1,3 @@
+{
+  "ignorePaths": ["packages/cli/e2e"]
+}

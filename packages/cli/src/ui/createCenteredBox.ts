@@ -1,4 +1,4 @@
-import chalk from 'chalk';
+import { ansi } from './ansi';
 
 /**
  * Creates a centered bordered box with a title
@@ -11,7 +11,7 @@ export function createCenteredBox(title: string, width: number): string {
   const leftPadding = Math.floor((width - titleLength) / 2);
   const rightPadding = width - titleLength - leftPadding;
 
-  return `${chalk.cyan.bold('╔' + '═'.repeat(width) + '╗')}
-${chalk.cyan.bold('║')}${' '.repeat(leftPadding)}${chalk.white.bold(title)}${' '.repeat(rightPadding)}${chalk.cyan.bold('║')}
-${chalk.cyan.bold('╚' + '═'.repeat(width) + '╝')}`;
+  return `${ansi.cyanBold('╔' + '═'.repeat(width) + '╗')}
+${ansi.cyanBold('║')}${' '.repeat(leftPadding)}${ansi.whiteBold(title)}${' '.repeat(rightPadding)}${ansi.cyanBold('║')}
+${ansi.cyanBold('╚' + '═'.repeat(width) + '╝')}`;
 }

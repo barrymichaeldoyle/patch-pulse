@@ -1,7 +1,14 @@
-import chalk from 'chalk';
 import { type DependencyInfo } from '../../types';
+import { ansi } from '../ansi';
 
-export function displaySummary(allDependencies: DependencyInfo[]): void {
+export function displaySummary(
+  allDependencies: DependencyInfo[],
+  options: {
+    projectCount?: number;
+    projectsWithAttention?: number;
+  } = {},
+): void {
+  const { projectCount, projectsWithAttention } = options;
   const total = allDependencies.length;
   const upToDate = allDependencies.filter(
     (d) => !d.isOutdated && !d.isSkipped && d.latestVersion,
@@ -25,12 +32,12 @@ export function displaySummary(allDependencies: DependencyInfo[]): void {
     (d) => d.updateType === 'patch' && !d.isSkipped,
   ).length;
 
-  console.log(chalk.gray('═'.repeat(60)));
-  console.log(chalk.cyan.bold(`📊 Summary (${total} packages)`));
-  console.log(chalk.gray('═'.repeat(60)));
+  console.log(ansi.gray('═'.repeat(60)));
+  console.log(ansi.cyanBold(`📊 Summary (${total} packages)`));
+  console.log(ansi.gray('═'.repeat(60)));
 
   if (upToDate > 0) {
-    console.log(`  ${chalk.green('✓  Up to date:')} ${upToDate}`);
+    console.log(`  ${ansi.green('✓  Up to date:')} ${upToDate}`);
   }
 
   if (outdated > 0) {
@@ -41,17 +48,27 @@ export function displaySummary(allDependencies: DependencyInfo[]): void {
     ].filter(Boolean);
 
     const breakdownText =
-      breakdown.length > 0 ? ` ${chalk.gray(`(${breakdown.join(', ')})`)}` : '';
-    console.log(`  ${chalk.blue('⚠  Outdated:')} ${outdated}${breakdownText}`);
+      breakdown.length > 0 ? ` ${ansi.gray(`(${breakdown.join(', ')})`)}` : '';
+    console.log(`  ${ansi.blue('⚠  Outdated:')} ${outdated}${breakdownText}`);
   }
 
   if (unknown > 0) {
-    console.log(`  ${chalk.magenta('?  Unknown:')} ${unknown}`);
+    console.log(`  ${ansi.magenta('?  Unknown:')} ${unknown}`);
+  }
+
+  if (
+    typeof projectCount === 'number' &&
+    projectCount > 1 &&
+    typeof projectsWithAttention === 'number'
+  ) {
+    console.log(
+      `  ${ansi.white('📦 Projects flagged:')} ${projectsWithAttention}/${projectCount}`,
+    );
   }
 
   if (skipped > 0) {
-    console.log(`  ${chalk.gray('⏭  Skipped:')} ${skipped}`);
+    console.log(`  ${ansi.gray('⏭  Skipped:')} ${skipped}`);
   }
 
-  console.log(chalk.gray('═'.repeat(60)));
+  console.log(ansi.gray('═'.repeat(60)));
 }

@@ -1,4 +1,4 @@
-import chalk from 'chalk';
+import { ansi } from './ansi';
 
 export class ProgressSpinner {
   private interval: ReturnType<typeof setInterval> | null = null;
@@ -22,7 +22,7 @@ export class ProgressSpinner {
     this.currentIndex = 0;
     this.interval = setInterval(() => {
       process.stdout.write(
-        `\r${chalk.cyan(this.spinners[this.currentIndex])} ${this.message}`,
+        `\r\x1B[2K${ansi.cyan(this.spinners[this.currentIndex])} ${this.message}`,
       );
       this.currentIndex = (this.currentIndex + 1) % this.spinners.length;
     }, 80);
@@ -37,6 +37,6 @@ export class ProgressSpinner {
       clearInterval(this.interval);
       this.interval = null;
     }
-    process.stdout.write('\r' + ' '.repeat(50) + '\r');
+    process.stdout.write('\r\x1B[2K');
   }
 }

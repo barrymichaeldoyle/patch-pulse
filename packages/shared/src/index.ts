@@ -30,6 +30,7 @@ export interface DependencyCheckResult {
 }
 
 export type DependencyStatusKind =
+  | 'lookup-failed'
   | 'not-found'
   | 'latest-tag'
   | 'up-to-date'
@@ -261,11 +262,13 @@ export function getDependencyStatus({
   currentVersion,
   latestVersion,
   category,
+  status,
 }: {
   packageName: string;
   currentVersion: string;
   latestVersion?: string;
   category?: string;
+  status?: DependencyStatusKind;
 }): DependencyStatusResult {
   const base = createDependencyCheckResult({
     packageName,
@@ -273,6 +276,10 @@ export function getDependencyStatus({
     latestVersion,
     category,
   });
+
+  if (status === 'lookup-failed') {
+    return { ...base, status };
+  }
 
   if (!latestVersion) {
     return { ...base, status: 'not-found' };
@@ -476,11 +483,21 @@ export async function checkNpmDependencyStatuses<TMeta = undefined>(
           return result;
         } catch (error) {
           onError?.({ error, packageName });
-          const result = getDependencyStatus({
-            packageName,
-            currentVersion: dependencies[packageName],
-            category,
-          });
+          const result =
+            error instanceof Error &&
+            'status' in error &&
+            error.status === 404
+              ? getDependencyStatus({
+                  packageName,
+                  currentVersion: dependencies[packageName],
+                  category,
+                })
+              : getDependencyStatus({
+                  packageName,
+                  currentVersion: dependencies[packageName],
+                  category,
+                  status: 'lookup-failed',
+                });
           completedCount += 1;
           onResolved?.({
             completedCount,

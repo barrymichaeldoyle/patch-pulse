@@ -1,0 +1,19 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`monorepo project > prints a full monorepo summary 1`] = `
+"@fixture/admin (packages/admin)
+Location: packages/admin
+────────────────────────────────────────────────────────────
+✓  Up to date: 1 package
+@fixture/app (packages/app)
+Location: packages/app
+────────────────────────────────────────────────────────────
+✓  Up to date: 2 packages
+════════════════════════════════════════════════════════════
+📊 Summary (3 packages)
+════════════════════════════════════════════════════════════
+  ✓  Up to date: 3
+  📦 Projects flagged: 0/2
+════════════════════════════════════════════════════════════
+Done. Re-run with --help for options or --about for project links."
+`;

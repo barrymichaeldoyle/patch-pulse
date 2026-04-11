@@ -1,11 +1,11 @@
-import chalk from 'chalk';
+import { ansi } from '../ansi';
 
 /**
  * Displays the "Made with love" message
  */
 export function displayMadeWithLove(): void {
-  console.log(chalk.gray('─'.repeat(40)));
+  console.log(ansi.gray('─'.repeat(40)));
   console.log(
-    `${chalk.gray('Made with ❤️  by ')}${chalk.underline('Barry Michael Doyle')}`,
+    `${ansi.gray('Made with ❤️  by ')}${ansi.underline('Barry Michael Doyle')}`,
   );
 }

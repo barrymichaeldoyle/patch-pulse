@@ -1,6 +1,6 @@
-import chalk from 'chalk';
-
+import { ansi } from '../ansi';
 import { createCenteredBox } from '../createCenteredBox';
+import { CLI_REPO_URL, ISSUES_URL, SLACK_BOT_URL } from '../../constant';
 import { displayMadeWithLove } from './madeWithLove';
 
 /**
@@ -11,54 +11,66 @@ export function displayHelp(): void {
 
   console.log(`${createCenteredBox('Patch Pulse CLI', boxWidth)}
 
-${chalk.white.bold('🔍 A CLI tool for checking npm package dependency versions')}
+${ansi.whiteBold('🔍 A CLI tool for checking npm package dependency versions')}
 
-${chalk.cyan.bold.underline('📖 Usage:')}
-  ${chalk.white('npx patch-pulse')} ${chalk.gray('[options]')}
+${ansi.cyanBoldUnderline('📖 Usage:')}
+  ${ansi.white('npx patch-pulse')} ${ansi.gray('[options]')}
 
-${chalk.cyan.bold.underline('⚙️  Options:')}
-  ${chalk.white('-i, -h, --info, --help')}   ${chalk.gray('Show current message')}
-  ${chalk.white('-v, --version')}            ${chalk.gray('Show version information')}
-  ${chalk.white('-l, --license')}            ${chalk.gray('Show license information')}
+${ansi.cyanBoldUnderline('⚙️  Options:')}
+  ${ansi.white('-i, -h, --info, --help')}   ${ansi.gray('Show current message')}
+  ${ansi.white('-v, --version')}            ${ansi.gray('Show version information')}
+  ${ansi.white('--about')}                  ${ansi.gray('Show project links and support info')}
+  ${ansi.white('--json')}                   ${ansi.gray('Print machine-readable JSON output')}
+  ${ansi.white('-l, --license')}            ${ansi.gray('Show license information')}
 
-${chalk.cyan.bold.underline('🔧 Configuration Options:')}
-  ${chalk.white('-s, --skip <packages>')}    ${chalk.gray('Skip packages (supports exact names and patterns)')}
-  ${chalk.white('--package-manager <pm>')}   ${chalk.gray('Override detected package manager (npm, pnpm, yarn, bun)')}
-  ${chalk.white('--no-update-prompt')}       ${chalk.gray('Skip update prompt after summary (exit immediately)')}
-  ${chalk.white('--update-prompt')}          ${chalk.gray('Force update prompt after summary (even if config disables it)')}
+${ansi.cyanBoldUnderline('🔧 Configuration Options:')}
+  ${ansi.white('-s, --skip <packages>')}    ${ansi.gray('Skip packages (supports exact names and patterns)')}
+  ${ansi.white('--package-manager <pm>')}   ${ansi.gray('Override detected package manager (npm, pnpm, yarn, bun)')}
+  ${ansi.white('--project <name|path>')}    ${ansi.gray('Limit the scan output to one project in a monorepo')}
+  ${ansi.white('--no-update-prompt')}       ${ansi.gray('Skip update prompt after summary (exit immediately)')}
+  ${ansi.white('--only-outdated')}          ${ansi.gray('Hide clean projects in monorepos')}
+  ${ansi.white('--verbose-projects')}       ${ansi.gray('Show full output for every project in monorepos')}
+  ${ansi.white('--update-prompt')}          ${ansi.gray('Force update prompt after summary (even if config disables it)')}
 
-${chalk.cyan.bold.underline('📁 Configuration File:')}
+${ansi.cyanBoldUnderline('📁 Configuration File:')}
   Create a \`patchpulse.config.json\` file in your project root:
-  ${chalk.gray('{')}
-    ${chalk.gray('"skip": ["lodash", "@types/*", "test-*"],')}
-    ${chalk.gray('"packageManager": "npm",')}
-    ${chalk.gray('"noUpdatePrompt": true')}
-  ${chalk.gray('}')}
+  ${ansi.gray('{')}
+    ${ansi.gray('"skip": ["lodash", "@types/*", "test-*"],')}
+    ${ansi.gray('"ignorePaths": ["packages/cli/e2e"],')}
+    ${ansi.gray('"packageManager": "npm",')}
+    ${ansi.gray('"noUpdatePrompt": true')}
+  ${ansi.gray('}')}
 
-${chalk.cyan.bold.underline('📝 Description:')}
+${ansi.cyanBoldUnderline('📝 Description:')}
   Scans the current project for \`package.json\` files outside
   \`node_modules\` and displays information about each package's
   dependencies, including version status and update availability.
   In pnpm workspaces, \`catalog:\` dependencies are resolved from
   \`pnpm-workspace.yaml\`, while \`workspace:*\` dependencies are ignored.
+  Use \`ignorePaths\` to exclude fixture or generated directories from scanning.
   After the summary, you can choose to update patch, minor, or all
   outdated dependencies across the scanned project, unless
   --no-update-prompt is set (in which case the CLI exits after summary).
 
-${chalk.cyan.bold.underline('💡 Examples:')}
-  ${chalk.white('npx patch-pulse')}                          ${chalk.gray('# Check dependencies across the current project')}
-  ${chalk.white('npx patch-pulse --version')}                ${chalk.gray('# Show version information')}
-  ${chalk.white('npx patch-pulse --license')}                ${chalk.gray('# Show license information')}
-  ${chalk.white('npx patch-pulse --skip "lodash,@types/*"')} ${chalk.gray('# Skip specific packages and patterns')}
-  ${chalk.white('npx patch-pulse --package-manager pnpm')}   ${chalk.gray('# Use pnpm for updates (overrides automatic package manager detection)')}
-  ${chalk.white('npx patch-pulse --no-update-prompt')}       ${chalk.gray('# Exit after summary (no update prompt)')}
-  ${chalk.white('npx patch-pulse --update-prompt')}          ${chalk.gray('# Force update prompt after summary (overrides patchpulse.config.json file)')}
+${ansi.cyanBoldUnderline('💡 Examples:')}
+  ${ansi.white('npx patch-pulse')}                          ${ansi.gray('# Check dependencies across the current project')}
+  ${ansi.white('npx patch-pulse --version')}                ${ansi.gray('# Show version information')}
+  ${ansi.white('npx patch-pulse --about')}                  ${ansi.gray('# Show project links, sponsors, and Slack bot')}
+  ${ansi.white('npx patch-pulse --json')}                   ${ansi.gray('# Emit machine-readable results')}
+  ${ansi.white('npx patch-pulse --license')}                ${ansi.gray('# Show license information')}
+  ${ansi.white('npx patch-pulse --skip "lodash,@types/*"')} ${ansi.gray('# Skip specific packages and patterns')}
+  ${ansi.white('npx patch-pulse --package-manager pnpm')}   ${ansi.gray('# Use pnpm for updates (overrides automatic package manager detection)')}
+  ${ansi.white('npx patch-pulse --project packages/app')}   ${ansi.gray('# Focus one project inside a monorepo')}
+  ${ansi.white('npx patch-pulse --no-update-prompt')}       ${ansi.gray('# Exit after summary (no update prompt)')}
+  ${ansi.white('npx patch-pulse --only-outdated')}          ${ansi.gray('# Show only projects that need attention')}
+  ${ansi.white('npx patch-pulse --verbose-projects')}       ${ansi.gray('# Show full monorepo output including clean projects')}
+  ${ansi.white('npx patch-pulse --update-prompt')}          ${ansi.gray('# Force update prompt after summary (overrides patchpulse.config.json file)')}
 
-${chalk.cyan.bold.underline('🔗 Links:')}
-  ${chalk.blue('📚 Docs:')}      ${chalk.white.underline('https://github.com/PatchPulse/cli')}
-  ${chalk.blue('🐛 Issues:')}    ${chalk.white.underline('https://github.com/PatchPulse/cli/issues')}
-  ${chalk.blue('👨‍ Author:')}    ${chalk.white.underline('https://github.com/barrymichaeldoyle')}
-  ${chalk.blue('🤖 Slack Bot:')} ${chalk.white.underline('https://slack.com/oauth/v2/authorize?client_id=180374136631.6017466448468&scope=chat:write,commands,incoming-webhook')}`);
+${ansi.cyanBoldUnderline('🔗 Links:')}
+  ${ansi.blue('📚 Docs:')}      ${ansi.white(ansi.link('barrymichaeldoyle/patch-pulse', CLI_REPO_URL))}
+  ${ansi.blue('🐛 Issues:')}    ${ansi.white(ansi.link('Open an issue', ISSUES_URL))}
+  ${ansi.blue('👨‍ Author:')}    ${ansi.white(ansi.link('github.com/barrymichaeldoyle', 'https://github.com/barrymichaeldoyle'))}
+  ${ansi.blue('🤖 Slack Bot:')} ${ansi.white(ansi.link('Add to Slack', SLACK_BOT_URL))}`);
 
   displayMadeWithLove();
 }

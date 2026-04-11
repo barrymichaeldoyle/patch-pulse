@@ -2,6 +2,7 @@ import { fetchNpmPackageManifest } from '@patch-pulse/shared';
 
 import { VERSION } from '../gen/version.gen';
 import { displayUpdateAvailable } from '../ui/display/updateAvailable';
+import { debugLog } from '../utils/debug';
 import { packageCache } from './cache';
 
 export async function checkForCliUpdate(): Promise<void> {
@@ -25,6 +26,7 @@ export async function checkForCliUpdate(): Promise<void> {
       }
     }
   } catch (error) {
+    debugLog(`CLI npm update lookup failed: ${String(error)}`);
     if (error instanceof Error && 'status' in error && error.status === 429) {
       return;
     }
