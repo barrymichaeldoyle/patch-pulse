@@ -1,16 +1,13 @@
 {
   "name": "patch-pulse",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Check for outdated npm dependencies",
   "type": "module",
   "bin": {
     "patch-pulse": "lib/index.js"
   },
-  "exports": {
-    "./utils": "./lib/utils/index.js"
-  },
   "files": [
-    "lib/**/*",
+    "lib/index.js",
     "README.md",
     "LICENSE"
   ],
@@ -39,18 +36,17 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build": "node scripts/generate-version.cjs && tsc && node scripts/fix-imports.cjs",
+    "build": "node scripts/generate-version.cjs && node scripts/build.cjs",
     "dev": "tsx src/index.ts",
     "test:build": "npm run build && node lib/index.js",
     "test:version": "npm run build && node lib/index.js --version",
     "test:help": "npm run build && node lib/index.js --help",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:ui": "vitest --ui",
-    "deploy": "npm run build && npm publish --tag beta",
-    "deploy:latest": "npm run build && npm publish"
+    "test:ui": "vitest --ui"
   },
-  "dependencies": {
-    "@patch-pulse/shared": "workspace:*"
+  "devDependencies": {
+    "@patch-pulse/shared": "workspace:*",
+    "esbuild": "0.25.6"
   }
 }

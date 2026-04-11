@@ -1,5 +1,11 @@
 # patch-pulse
 
+## 3.0.1
+
+### Patch Changes
+
+- Fix install failure caused by @patch-pulse/shared not being on npm - now bundled inline
+
 ## 3.0.0
 
 ### Major Changes
