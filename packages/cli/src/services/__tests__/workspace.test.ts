@@ -5,7 +5,7 @@ import { scanWorkspace } from '../workspace';
 describe('scanWorkspace', () => {
   it('discovers dependency-bearing package.json files in a monorepo', async () => {
     const workspacePath = fileURLToPath(
-      new URL('../../__fixtures__/projects/monorepo/', import.meta.url),
+      new URL('../../__tests__/monorepo/__fixtures__/', import.meta.url),
     );
 
     const result = await scanWorkspace(workspacePath);

@@ -1,0 +1,16 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`project with config skip > prints skipped packages alongside checked ones 1`] = `
+"Dependencies:
+─────────────
+PATCH lodash 4.17.20 → 4.17.21
+SKIPPED react ^18.2.0
+════════════════════════════════════════════════════════════
+📊 Summary (2 packages)
+════════════════════════════════════════════════════════════
+  ⚠  Outdated: 1 (1 patch)
+  ⏭  Skipped: 1
+════════════════════════════════════════════════════════════
+🎉 Thank you for using Patch Pulse CLI!
+💡 For more info: npx patch-pulse --help"
+`;

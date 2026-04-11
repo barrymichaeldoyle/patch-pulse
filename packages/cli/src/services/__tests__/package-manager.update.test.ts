@@ -17,7 +17,7 @@ describe('updateDependencies', () => {
 
   it('updates direct dependencies in package.json files', async () => {
     const fixturePath = fileURLToPath(
-      new URL('../../__fixtures__/projects/basic/', import.meta.url),
+      new URL('../../__tests__/basic/__fixtures__/', import.meta.url),
     );
     const testPath = createTempFixtureCopy({ fixturePath, tempDirs });
     const installSpy = vi.fn(async () => {});
@@ -60,7 +60,7 @@ describe('updateDependencies', () => {
 
   it('updates pnpm catalog entries in pnpm-workspace.yaml', async () => {
     const fixturePath = fileURLToPath(
-      new URL('../../__fixtures__/projects/monorepo/', import.meta.url),
+      new URL('../../__tests__/monorepo/__fixtures__/', import.meta.url),
     );
     const testPath = createTempFixtureCopy({ fixturePath, tempDirs });
     const installSpy = vi.fn(async () => {});
