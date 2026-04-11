@@ -13,7 +13,7 @@ More detailed docs live here:
 - [`docs/slack.md`](./docs/slack.md): Slack install flow, slash commands, list formatting, and channel behavior
 - [`docs/architecture.md`](./docs/architecture.md): schema, polling flow, metadata enrichment, and implementation notes
 - [`docs/deployment.md`](./docs/deployment.md): environment variables, Slack endpoint setup, and deployment checks
-- [`docs/runbook.md`](./docs/runbook.md): troubleshooting common Slack, polling, and `/list` issues
+- [`docs/runbook.md`](./docs/runbook.md): troubleshooting common Slack, polling, and `/npmlist` issues
 
 ## What This Package Does
 
@@ -33,7 +33,7 @@ Slack tracking is subscription-based:
 - A workspace has one default channel, chosen when the app is installed.
 - The same package can also be tracked in additional explicit channels.
 - A subscription is effectively scoped by `(workspace, package, channel)`.
-- `/list` groups subscriptions by channel.
+- `/npmlist` groups subscriptions by channel.
 
 Examples:
 
@@ -42,7 +42,7 @@ Examples:
 - `/npmtrack react #frontend minor`
 - `/npmuntrack react`
 - `/npmuntrack react #frontend`
-- `/list`
+- `/npmlist`
 
 ## Development
 
@@ -50,11 +50,10 @@ Useful commands from this package directory:
 
 - `pnpm dev`
 - `pnpm test`
-- `pnpm lint`
-- `pnpm exec tsc --noEmit`
+- `pnpm typecheck`
 
 ## Notes
 
-- `/list` does not perform live npm lookups. It uses stored package metadata so the response stays fast.
-- GitHub links in `/list` appear after polling has enriched a package with repo metadata.
+- `/npmlist` does not perform live npm lookups. It uses stored package metadata so the response stays fast.
+- GitHub links in `/npmlist` appear after polling has enriched a package with repo metadata.
 - Update notifications can include richer release links because polling already fetches npm manifests during the update check.

@@ -6,7 +6,7 @@ PatchPulse helps you stay on top of npm dependency updates across your projects.
 
 | Tool                                             | Status                          | Description                                              |
 | ------------------------------------------------ | ------------------------------- | -------------------------------------------------------- |
-| [Slack bot](#add-to-slack)                       | Live                            | Get notified in Slack when your packages release updates |
+| [Slack bot](#slack-bot)                          | Live                            | Get notified in Slack when your packages release updates |
 | [CLI](./packages/cli)                            | v2.x on npm · v3 in development | Check for outdated dependencies from the terminal        |
 | [VS Code extension](./packages/vscode-extension) | Early development               | In-editor dependency info (not yet released)             |
 
@@ -18,7 +18,7 @@ PatchPulse helps you stay on top of npm dependency updates across your projects.
 
 Once installed, run `/npmhelp` in any channel or DM to see the full command reference.
 
-## Commands
+### Commands
 
 | Command                          | Description                           |
 | -------------------------------- | ------------------------------------- |
@@ -32,7 +32,7 @@ Once installed, run `/npmhelp` in any channel or DM to see the full command refe
 | `/npmlist`                       | See all packages you're tracking      |
 | `/npmhelp`                       | Show command reference in Slack       |
 
-## Features
+### Features
 
 - **Per-user DM tracking** — each person tracks privately; everyone gets their own notifications
 - **Channel tracking** — post updates to a shared channel so the whole team stays in sync
@@ -64,26 +64,38 @@ PatchPulse is a `pnpm` monorepo.
 
 ### Docs
 
+Workspace docs:
+
+- [Contributing](./CONTRIBUTING.md)
+- [Support](./SUPPORT.md)
+
+Package docs:
+
+- [CLI](./packages/cli/README.md)
+- [VS Code extension](./packages/vscode-extension/README.md)
 - [Notifier overview](./packages/notifier-bot/README.md)
-- [Slack behavior](./packages/notifier-bot/docs/slack.md)
-- [Architecture](./packages/notifier-bot/docs/architecture.md)
-- [Deployment](./packages/notifier-bot/docs/deployment.md)
-- [Runbook](./packages/notifier-bot/docs/runbook.md)
+- [Notifier Slack behavior](./packages/notifier-bot/docs/slack.md)
+- [Notifier architecture](./packages/notifier-bot/docs/architecture.md)
+- [Notifier deployment](./packages/notifier-bot/docs/deployment.md)
+- [Notifier runbook](./packages/notifier-bot/docs/runbook.md)
 
 ### Workspace commands
 
 ```
-pnpm install
-pnpm build
-pnpm dev:notifier
-pnpm dev:cli
-pnpm dev:vscode-extension
-pnpm test:cli
-pnpm test:vscode-extension
-pnpm format
+pnpm install          # install all dependencies
+pnpm ci:check         # lint, format, knip, typecheck, test, build — mirrors CI
+
+pnpm dev:notifier     # run Slack bot locally (requires Convex setup)
+pnpm dev:cli          # run CLI in dev mode
+pnpm dev:vscode-extension  # watch VS Code extension
+
+pnpm test             # run all tests
+pnpm build            # build CLI + VS Code extension
+pnpm deploy:notifier  # deploy Slack bot to Convex
+
+pnpm lint             # lint entire repo
+pnpm lint:fix         # lint and auto-fix
+pnpm format           # format entire repo
+pnpm typecheck        # typecheck CLI + notifier
+pnpm knip             # check for unused exports and dependencies
 ```
-
-### Notes
-
-- Packages are intentionally self-contained — they use different toolchains and release targets.
-- Root config is limited to workspace standards: `pnpm`, formatting, ignore rules, and shared scripts.

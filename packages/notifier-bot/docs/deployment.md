@@ -32,12 +32,13 @@ Defined in [`convex/http.ts`](../convex/http.ts):
 - `POST /slack/npmtrack`
 - `POST /slack/npmuntrack`
 - `POST /slack/list`
+- `POST /slack/help`
 - `POST /slack/events`
 
 These routes are intended to be configured in Slack as:
 
 - OAuth redirect URL: `/slack/oauth-callback`
-- slash commands: `/slack/npmtrack`, `/slack/npmuntrack`, `/slack/list`
+- Slack slash command request URLs: `/slack/npmtrack`, `/slack/npmuntrack`, `/slack/list`, `/slack/help`
 - event subscriptions: `/slack/events`
 
 ## Polling
@@ -81,6 +82,6 @@ Tracked packages create:
 - Install the Slack app into a test workspace
 - Run `/npmtrack react`
 - Run `/npmtrack react #general`
-- Run `/list`
+- Run `/npmlist`
 - Verify the default channel and explicit channel grouping
 - Verify update notifications arrive in the expected channels

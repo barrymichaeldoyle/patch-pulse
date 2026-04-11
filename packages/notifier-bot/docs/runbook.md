@@ -23,7 +23,7 @@ Likely causes:
 - redirect URL mismatch
 - Slack OAuth token exchange failure
 
-## `/list` Hangs Or Appears Stuck
+## `/npmlist` Hangs Or Appears Stuck
 
 Symptoms:
 
@@ -39,10 +39,10 @@ Checks:
 
 Important note:
 
-- `/list` is intentionally designed to avoid live npm fetches
+- `/npmlist` is intentionally designed to avoid live npm fetches
 - if it feels slow, the issue is usually in scheduling, logging, or Slack delivery rather than npm lookups
 
-## GitHub Links Missing In `/list`
+## GitHub Links Missing In `/npmlist`
 
 Symptoms:
 
@@ -57,7 +57,7 @@ Checks:
 
 Explanation:
 
-- `/list` uses stored metadata only
+- `/npmlist` uses stored metadata only
 - GitHub links appear after polling enriches `packages.githubRepoUrl`
 
 ## Wrong Slack Channel Used

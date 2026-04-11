@@ -29,7 +29,7 @@ Important fields:
 - `lastChecked`
 - `githubRepoUrl` optional
 
-`githubRepoUrl` is stored so `/list` can render GitHub release links without doing live network fetches.
+`githubRepoUrl` is stored so `/npmlist` can render GitHub release links without doing live network fetches.
 
 ### `subscribers`
 
@@ -101,15 +101,15 @@ The notifier now stores GitHub repo metadata on `packages.githubRepoUrl`.
 
 Why:
 
-- `/list` should stay fast
-- `/list` should not depend on external requests
+- `/npmlist` should stay fast
+- `/npmlist` should not depend on external requests
 - version links in Slack should still be useful
 
 How it works:
 
 - polling fetches npm metadata anyway
 - if a GitHub repo URL can be derived from `repository`, it is normalized and stored
-- `/list` uses that stored URL to link versions to GitHub releases
+- `/npmlist` uses that stored URL to link versions to GitHub releases
 
 ## Link Strategy
 
@@ -121,8 +121,8 @@ Rules:
 
 - package name links to npm
 - update notification version links prefer GitHub releases when the manifest indicates GitHub
-- `/list` version links use stored `githubRepoUrl`
-- if no GitHub metadata is available, `/list` shows plain version text
+- `/npmlist` version links use stored `githubRepoUrl`
+- if no GitHub metadata is available, `/npmlist` shows plain version text
 
 ## Testing
 
@@ -134,7 +134,7 @@ Current coverage focuses on:
 
 - multi-channel tracking semantics
 - `/npmuntrack` all-channel behavior
-- `/list` formatting and link behavior
+- `/npmlist` formatting and link behavior
 - GitHub metadata persistence during polling
 
 Test stack:

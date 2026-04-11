@@ -28,6 +28,10 @@
     "name": "Barry Michael Doyle",
     "email": "barry@barrymichaeldoyle.com"
   },
+  "homepage": "https://github.com/barrymichaeldoyle/patch-pulse/tree/main/packages/cli#readme",
+  "bugs": {
+    "url": "https://github.com/barrymichaeldoyle/patch-pulse/issues"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/barrymichaeldoyle/patch-pulse.git",

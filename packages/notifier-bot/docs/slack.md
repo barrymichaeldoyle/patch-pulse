@@ -66,7 +66,7 @@ Behavior:
 
 This is intentional so the no-channel case is not ambiguous once multi-channel tracking exists.
 
-### `/list`
+### `/npmlist`
 
 Lists tracked subscriptions grouped by channel.
 
@@ -104,7 +104,7 @@ Package names link to npm:
 
 ### Version
 
-Versions in `/list` use stored package metadata:
+Versions in `/npmlist` use stored package metadata:
 
 - If `githubRepoUrl` is known, the version links to that repository's releases page
 - If not, the version is plain text
@@ -123,7 +123,7 @@ That means:
 
 ## Operational Notes
 
-- `/list` should stay fast and deterministic
-- `/list` should not make live npm requests per package
+- `/npmlist` should stay fast and deterministic
+- `/npmlist` should not make live npm requests per package
 - richer metadata should be stored ahead of time during polling
 - update notifications may include richer release links because the manifest is already being fetched during the update cycle

@@ -8,5 +8,9 @@
   "private": true,
   "exports": {
     ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
   }
 }

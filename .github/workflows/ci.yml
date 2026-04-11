@@ -35,6 +35,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Test (shared)
+        run: pnpm test:shared
+
       - name: Test (CLI)
         run: pnpm test:cli
 
