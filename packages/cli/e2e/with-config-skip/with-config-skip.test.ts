@@ -6,6 +6,7 @@ import {
 } from '@patch-pulse/shared';
 import { runCli } from '../../src/cli';
 import { stripAnsi } from '../test-utils';
+import { VERSION } from '../../src/gen/version.gen';
 
 vi.mock('@patch-pulse/shared', async () => {
   const actual = await vi.importActual<typeof import('@patch-pulse/shared')>(
@@ -24,7 +25,7 @@ describe('project with config skip', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(fetchNpmPackageManifest).mockResolvedValue({
-      'dist-tags': { latest: '3.0.0' },
+      'dist-tags': { latest: VERSION },
     });
     vi.mocked(checkNpmDependencyStatuses).mockResolvedValue([
       {

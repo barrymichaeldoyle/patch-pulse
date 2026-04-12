@@ -1,0 +1,150 @@
+---
+title: Commands & Flags
+description: All CLI flags supported by Patch Pulse.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Usage
+
+```bash
+npx patch-pulse [flags]
+```
+
+## Flags
+
+### `--help`, `-h`
+
+Print usage information and exit.
+
+```bash
+npx patch-pulse --help
+```
+
+---
+
+### `--version`, `-v`
+
+Print the current CLI version and exit.
+
+```bash
+npx patch-pulse --version
+```
+
+---
+
+### `--about`
+
+Print information about Patch Pulse and exit.
+
+```bash
+npx patch-pulse --about
+```
+
+---
+
+### `--license`, `-l`
+
+Print the license and exit.
+
+```bash
+npx patch-pulse --license
+```
+
+---
+
+### `--interactive`, `-i` / `--no-interactive`
+
+Show an interactive update prompt after the dependency summary.
+
+```bash
+npx patch-pulse --interactive
+npx patch-pulse --no-interactive
+```
+
+CLI flags override the [`interactive`](../configuration#interactive) setting in your config file.
+
+---
+
+### `--skip`, `-s`
+
+Comma-separated list of package names or glob patterns to skip.
+
+```bash
+npx patch-pulse --skip "lodash,@types/*"
+```
+
+Merged with any `skip` entries in your [config file](../configuration#skip).
+
+---
+
+### `--package-manager`
+
+Override auto-detected package manager. Accepted values: `npm`, `pnpm`, `yarn`, `bun`.
+
+```bash
+npx patch-pulse --package-manager pnpm
+```
+
+---
+
+### `--project`
+
+Focus on a single workspace project by path or package name.
+
+```bash
+npx patch-pulse --project packages/app
+npx patch-pulse --project my-app
+```
+
+---
+
+### `--expand`
+
+In a monorepo, print the full dependency list for every workspace — including those that are up to date.
+
+```bash
+npx patch-pulse --expand
+```
+
+---
+
+### `--hide-clean`
+
+Hide workspaces that have no outdated dependencies from the output.
+
+```bash
+npx patch-pulse --hide-clean
+```
+
+---
+
+### `--json`
+
+Output results as JSON instead of the human-readable terminal display. Useful for scripts, CI, or editor integrations.
+
+```bash
+npx patch-pulse --json
+```
+
+When running through the root pnpm script, use `pnpm -s` to suppress pnpm's banner before the JSON:
+
+```bash
+pnpm -s pp -- --json
+```
+
+---
+
+### `--fail`
+
+Exit with code `1` if any outdated packages are found. Use as a CI gate.
+
+```bash
+npx patch-pulse --fail
+npx patch-pulse --json --fail
+```
+
+<Aside type="tip">
+  Combine `--json` and `--fail` for machine-readable output with a non-zero exit
+  code when updates are available.
+</Aside>

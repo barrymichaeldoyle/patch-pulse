@@ -1,0 +1,36 @@
+---
+const { siteTitle, siteTitleHref } = Astro.locals.starlightRoute;
+const logoSrc = `${import.meta.env.BASE_URL}patch-pulse-logo.svg`;
+---
+
+<a href={siteTitleHref} class="site-title sl-flex">
+  <img
+    src={logoSrc}
+    alt="Patch Pulse"
+    width="1986"
+    height="456"
+    loading="eager"
+    decoding="async"
+    style="display: block; position: relative; top: 5px;"
+  />
+  <span class="sr-only" translate="no">{siteTitle}</span>
+</a>
+
+<style>
+  .site-title {
+    align-items: center;
+    gap: var(--sl-nav-gap);
+    color: var(--sl-color-text-accent);
+    text-decoration: none;
+    white-space: nowrap;
+    min-width: 0;
+  }
+
+  img {
+    height: calc(var(--sl-nav-height) - 2 * var(--sl-nav-pad-y));
+    width: auto;
+    max-width: 100%;
+    object-fit: contain;
+    object-position: 0 50%;
+  }
+  </style>

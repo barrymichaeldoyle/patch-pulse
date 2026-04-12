@@ -49,31 +49,37 @@ export async function checkDependencyVersions(
     }),
   );
 
-  const checkedResults =
-    Object.keys(dependenciesToCheck).length === 0
-      ? []
-      : ((await checkNpmDependencyStatuses(dependenciesToCheck, {
-          cache: packageCache,
-          category,
-          concurrency: 10,
-          onError: ({ error, packageName }) => {
-            if (
-              !(error instanceof Error) ||
-              !('status' in error) ||
-              error.status !== 404
-            ) {
-              debugLog(
-                `Dependency lookup failed for ${packageName} in ${category}: ${describeLookupError(error)}`,
+  let checkedResults: DependencyInfo[] = [];
+
+  try {
+    checkedResults =
+      Object.keys(dependenciesToCheck).length === 0
+        ? []
+        : ((await checkNpmDependencyStatuses(dependenciesToCheck, {
+            cache: packageCache,
+            category,
+            concurrency: 10,
+            onError: ({ error, packageName }) => {
+              if (
+                !(error instanceof Error) ||
+                !('status' in error) ||
+                error.status !== 404
+              ) {
+                debugLog(
+                  `Dependency lookup failed for ${packageName} in ${category}: ${describeLookupError(error)}`,
+                );
+              }
+            },
+            onResolved: ({ completedCount, totalCount }) => {
+              progress?.updateMessage(
+                `Checking ${packageNames.length} packages... (${completedCount + skippedResults.length}/${totalCount + skippedResults.length})`,
               );
-            }
-          },
-          onResolved: ({ completedCount, totalCount }) => {
-            progress?.updateMessage(
-              `Checking ${packageNames.length} packages... (${completedCount + skippedResults.length}/${totalCount + skippedResults.length})`,
-            );
-          },
-          userAgent: 'patch-pulse-cli',
-        })) as DependencyInfo[]);
+            },
+            userAgent: 'patch-pulse-cli',
+          })) as DependencyInfo[]);
+  } finally {
+    progress?.stop();
+  }
 
   const dependencyInfos: DependencyInfo[] = [
     ...checkedResults,

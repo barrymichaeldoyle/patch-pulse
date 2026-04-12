@@ -44,7 +44,7 @@ describe('updatePrompt', () => {
     expect(result).toBeNull();
   });
 
-  it('should return null when noUpdatePrompt config is true', async () => {
+  it('should return null when interactive config is false', async () => {
     const dependencies: DependencyInfo[] = [
       {
         packageName: 'test-package',
@@ -56,7 +56,7 @@ describe('updatePrompt', () => {
     ];
 
     const result = await displayUpdatePrompt(dependencies, {
-      noUpdatePrompt: true,
+      interactive: false,
     });
     expect(result).toBeNull();
   });
@@ -99,7 +99,7 @@ describe('updatePrompt', () => {
     });
 
     // Start the promise
-    const promise = displayUpdatePrompt(dependencies);
+    const promise = displayUpdatePrompt(dependencies, { interactive: true });
 
     // Wait a bit for the function to set up, then simulate pressing 'p' key
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -112,5 +112,39 @@ describe('updatePrompt', () => {
     expect(mockStdin.setRawMode).toHaveBeenCalledWith(true);
     expect(mockStdin.resume).toHaveBeenCalled();
     expect(mockStdin.setEncoding).toHaveBeenCalledWith('utf8');
+  });
+
+  it('should return interrupt when Ctrl+C is pressed', async () => {
+    const dependencies: DependencyInfo[] = [
+      {
+        packageName: 'test-package',
+        currentVersion: '1.0.0',
+        latestVersion: '1.0.1',
+        isOutdated: true,
+        updateType: 'patch',
+      },
+    ];
+
+    let keyPressCallback: ((key: string) => void) | undefined;
+    mockStdin.on.mockImplementation((event, callback) => {
+      if (event === 'data') {
+        keyPressCallback = callback;
+      }
+    });
+
+    const promise = displayUpdatePrompt(dependencies, { interactive: true });
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    if (keyPressCallback) {
+      keyPressCallback('\u0003');
+    }
+
+    const result = await promise;
+
+    expect(result).toBe('interrupt');
+    expect(mockStdin.removeListener).toHaveBeenCalledWith(
+      'data',
+      expect.any(Function),
+    );
   });
 });

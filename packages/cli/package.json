@@ -9,7 +9,8 @@
   "files": [
     "lib/index.js",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "llms.txt"
   ],
   "keywords": [
     "cli",

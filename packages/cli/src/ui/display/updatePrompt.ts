@@ -1,12 +1,9 @@
 import { type PatchPulseConfig } from '../../services/config';
 import { type DependencyInfo } from '../../types';
 import { ansi } from '../ansi';
-import { displayHelp } from './help';
-import { displayVersion } from './version';
 
 type UpdateType = 'patch' | 'minor' | 'all';
-
-type OtherOption = 'help' | 'version' | 'quit';
+type UpdatePromptResult = UpdateType | 'interrupt' | null;
 
 const UPDATE_OPTION_CHARS: Record<UpdateType, string> = {
   patch: 'p',
@@ -14,11 +11,7 @@ const UPDATE_OPTION_CHARS: Record<UpdateType, string> = {
   all: 'u',
 };
 
-const OTHER_OPTION_CHARS: Record<OtherOption, string> = {
-  help: 'h',
-  version: 'v',
-  quit: 'q',
-};
+const QUIT_CHAR = 'q';
 
 interface UpdateOption {
   packageName: string;
@@ -79,7 +72,7 @@ function restoreTerminalSettings({
 export function displayUpdatePrompt(
   dependencies: DependencyInfo[],
   config?: PatchPulseConfig,
-): Promise<UpdateType | null> {
+): Promise<UpdatePromptResult> {
   return new Promise((resolve) => {
     const outdatedDeps = dependencies.filter(
       (d) => d.isOutdated && !d.isSkipped,
@@ -90,8 +83,8 @@ export function displayUpdatePrompt(
       return;
     }
 
-    // Check if update prompt is disabled via config
-    if (config?.noUpdatePrompt) {
+    // Check if interactive mode is disabled via config
+    if (!config?.interactive) {
       resolve(null);
       return;
     }
@@ -102,9 +95,6 @@ export function displayUpdatePrompt(
         ansi.yellow(
           '⚠️  Running in non-interactive environment. Skipping update prompt.',
         ),
-      );
-      console.log(
-        ansi.gray('Use --update-prompt flag to force interactive mode.'),
       );
       resolve(null);
       return;
@@ -144,11 +134,7 @@ export function displayUpdatePrompt(
       }
 
       console.log();
-      console.log(
-        `  ${ansi.gray(OTHER_OPTION_CHARS.help)} - Show help | ${ansi.gray(
-          OTHER_OPTION_CHARS.version,
-        )} - Show version | ${ansi.gray(OTHER_OPTION_CHARS.quit)} - Quit`,
-      );
+      console.log(`  ${ansi.gray(QUIT_CHAR)} - Quit`);
       console.log();
       console.log(ansi.white('Press a key to select an option...'));
     }
@@ -158,6 +144,17 @@ export function displayUpdatePrompt(
     const stdin = process.stdin;
     const wasRaw = stdin.isRaw;
     const wasPaused = stdin.isPaused();
+    let isSettled = false;
+
+    function settle(result: UpdatePromptResult) {
+      if (isSettled) {
+        return;
+      }
+
+      isSettled = true;
+      cleanup();
+      resolve(result);
+    }
 
     function handleKeyPress(key: string) {
       const choice = key.toLowerCase();
@@ -165,49 +162,30 @@ export function displayUpdatePrompt(
       switch (choice) {
         case UPDATE_OPTION_CHARS.patch:
           if (updateOptions.patch.length > 0) {
-            cleanup();
-            resolve('patch');
+            settle('patch');
           } else {
             console.log(ansi.red('\nNo patch updates available'));
           }
           break;
         case UPDATE_OPTION_CHARS.minor:
           if (updateOptions.minor.length > 0) {
-            cleanup();
-            resolve('minor');
+            settle('minor');
           } else {
             console.log(ansi.red('\nNo minor updates available'));
           }
           break;
         case UPDATE_OPTION_CHARS.all:
           if (updateOptions.all.length > 0) {
-            cleanup();
-            resolve('all');
+            settle('all');
           } else {
             console.log(ansi.red('\nNo updates available'));
           }
           break;
-        case OTHER_OPTION_CHARS.quit:
-          cleanup();
-          resolve(null);
-          break;
-        case OTHER_OPTION_CHARS.help:
-          cleanup();
-          displayHelp();
-          console.log();
-          showOptions();
-          setupListeners();
-          break;
-        case OTHER_OPTION_CHARS.version:
-          cleanup();
-          displayVersion();
-          console.log();
-          showOptions();
-          setupListeners();
+        case QUIT_CHAR:
+          settle(null);
           break;
         case '\u0003': // Ctrl+C
-          cleanup();
-          resolve(null);
+          settle('interrupt');
           break;
         default:
           // Ignore other keys
@@ -223,8 +201,7 @@ export function displayUpdatePrompt(
     }
 
     function handleSignal() {
-      cleanup();
-      process.exit(130);
+      settle('interrupt');
     }
 
     function setupListeners() {

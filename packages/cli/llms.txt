@@ -1,0 +1,223 @@
+# patch-pulse CLI
+
+A zero-dependency CLI that checks npm packages for outdated dependencies. Run it from any Node.js project root — it finds every `package.json`, queries the npm registry, and reports what needs updating.
+
+```
+npx patch-pulse
+```
+
+## Flags
+
+### Informational
+- `-h, --help`       Print help
+- `-v, --version`    Print version
+- `--about`          Print project links and support info
+- `-l, --license`    Print license
+
+### Output control
+- `--json`           Emit machine-readable JSON to stdout instead of the human-readable report
+- `--hide-clean`     In monorepos, suppress projects where all dependencies are up to date
+- `--expand`         In monorepos, print full dependency tables for every project (including clean ones)
+- `--fail`           Exit with code 1 if any outdated packages are found (useful as a CI gate)
+
+### Filtering
+- `--project <name|path>`   Limit output to one project in a monorepo (matches package name or relative path)
+- `-s, --skip <packages>`   Comma-separated list of package names or glob patterns to skip (e.g. `"lodash,@types/*"`)
+
+### Updates (interactive mode)
+- `-i, --interactive`    After the summary, show a prompt to apply patch, minor, or all updates
+- `--no-interactive`     Suppress the prompt explicitly (this is the default)
+
+### Overrides
+- `--package-manager <pm>`   Override detected package manager: `npm`, `pnpm`, `yarn`, or `bun`
+
+## Config file
+
+Create `patchpulse.json` in the project root. `patchpulse.config.json`, `.patchpulserc.json`, and `.patchpulserc` are also supported.
+
+```json
+{
+  "skip": ["lodash", "@types/*", "test-*"],
+  "ignorePaths": ["packages/cli/e2e", "**/fixtures"],
+  "includePaths": ["some-gitignored-dir"],
+  "packageManager": "pnpm",
+  "interactive": true
+}
+```
+
+### Config fields
+
+| Field | Type | Description |
+|---|---|---|
+| `skip` | `string[]` | Package names or glob patterns to ignore (e.g. `"@types/*"`, `"test-*"`) |
+| `ignorePaths` | `string[]` | Directory or file paths to exclude from scanning. Supports globs. |
+| `includePaths` | `string[]` | Paths to force-include even if they are gitignored |
+| `packageManager` | `"npm" \| "pnpm" \| "yarn" \| "bun"` | Override auto-detected package manager |
+| `interactive` | `boolean` | `true` to show the interactive update prompt after the summary. Default: `false` |
+
+CLI flags take precedence over file config. `skip` arrays are merged (not replaced).
+
+## Output format (human-readable)
+
+Each project prints a header block followed by sections per dependency type:
+
+```
+my-app
+Location: package.json
+────────────────────────────────────────────────────────────
+Dependencies:
+─────────────
+PATCH  lodash 4.17.20 → 4.17.21
+MINOR  chalk 5.0.0 → 5.3.0
+MAJOR  webpack 4.46.0 → 5.88.0
+UP TO DATE  react 18.2.0
+SKIPPED  some-internal-package
+
+Dev Dependencies:
+─────────────────
+PATCH  vitest 1.0.0 → 1.0.4
+════════════════════════════════════════════════════════════
+📊 Summary (6 packages)
+════════════════════════════════════════════════════════════
+  ✓  Up to date: 1
+  ⚠  Outdated: 4 (1 major, 1 minor, 2 patch)
+  ⏭  Skipped: 1
+════════════════════════════════════════════════════════════
+```
+
+Status labels: `PATCH`, `MINOR`, `MAJOR`, `UP TO DATE`, `SKIPPED`, `UNKNOWN` (lookup failed), `NOT FOUND` (not on npm registry), `LATEST TAG` (pinned to `latest` tag).
+
+## JSON output schema (`--json`)
+
+```jsonc
+{
+  "cwd": "/absolute/path/to/project",
+  "generatedAt": "2025-01-01T00:00:00.000Z",
+  "isMonorepo": true,
+  "hasCatalogDependencies": false,
+  "projectFilter": null,           // value of --project, or null
+  "visibleProjectCount": 2,
+  "projects": [
+    {
+      "displayName": "my-app (packages/app)",
+      "relativePath": "packages/app",
+      "needsAttention": true,
+      "summary": {
+        "total": 10,
+        "upToDate": 7,
+        "outdated": 3,
+        "unknown": 0,
+        "skipped": 0,
+        "majorUpdates": 1,
+        "minorUpdates": 1,
+        "patchUpdates": 1
+      },
+      "sections": [
+        {
+          "category": "Dependencies",
+          "dependencies": [
+            {
+              "packageName": "lodash",
+              "currentVersion": "4.17.20",
+              "latestVersion": "4.17.21",
+              "isOutdated": true,
+              "updateType": "patch",   // "patch" | "minor" | "major" | null
+              "category": "Dependencies",
+              "status": "update-available",
+              "isSkipped": false
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total": 10,
+    "upToDate": 7,
+    "outdated": 3,
+    "unknown": 0,
+    "skipped": 0,
+    "majorUpdates": 1,
+    "minorUpdates": 1,
+    "patchUpdates": 1,
+    "projectCount": 2,
+    "projectsWithAttention": 1
+  }
+}
+```
+
+## Monorepo behaviour
+
+- Recursively finds every `package.json` outside `node_modules`
+- `workspace:*` dependencies are skipped (they are internal packages)
+- pnpm `catalog:` and `catalog:<name>` entries are resolved from `pnpm-workspace.yaml`
+- A project with more than one `package.json` is treated as a monorepo
+
+## Dependency updates (interactive mode)
+
+When `--interactive` is passed (or `"interactive": true` in config), a menu appears after the summary:
+
+```
+  p - Update outdated patch dependencies
+  m - Update outdated minor & patch dependencies
+  u - Update all outdated dependencies
+
+  q - Quit
+```
+
+**How updates are written:**
+- Direct dependencies: the version range in the relevant `package.json` is updated in-place, preserving any prefix (`^`, `~`, etc.)
+- pnpm catalog entries: the version is updated in `pnpm-workspace.yaml`, not in the individual `package.json` files (the `catalog:` reference is left untouched)
+- After writing files, the detected (or configured) package manager runs `install` to update the lockfile
+
+## Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | Success (even if outdated packages exist, unless `--fail` is set) |
+| `1` | Error, unknown flag, or `--fail` triggered by outdated packages |
+
+## Environment variables
+
+| Variable | Effect |
+|---|---|
+| `PATCH_PULSE_DEBUG=1` | Log npm registry lookup failures and HTTP errors to stderr |
+
+## Common recipes
+
+```bash
+# Basic check
+npx patch-pulse
+
+# CI — fail the build if anything is outdated
+npx patch-pulse --fail
+
+# CI — machine-readable results + non-zero exit
+npx patch-pulse --json --fail
+
+# Monorepo — show only projects that need attention
+npx patch-pulse --hide-clean
+
+# Monorepo — focus on one package
+npx patch-pulse --project packages/api
+
+# Skip noisy packages
+npx patch-pulse --skip "@types/*,eslint-*"
+
+# Apply patch updates interactively
+npx patch-pulse --interactive
+
+# pnpm workspace — suppress pnpm script header before JSON
+pnpm -s pp -- --json
+```
+
+## Package manager detection
+
+Auto-detected from lockfile presence in the project root, in this order: pnpm (`pnpm-lock.yaml`), npm (`package-lock.json`), bun (`bun.lock`, `bun.lockb`), yarn (`yarn.lock`). Falls back to npm if none found. Override with `--package-manager`.
+
+## Scanning rules
+
+- Scans recursively from `cwd`
+- Skips `node_modules` and `.git`
+- Respects `.gitignore` (uses `ignorePaths` in config to override)
+- `package.json` files with no dependency fields (no `dependencies`, `devDependencies`, `peerDependencies`, `optionalDependencies`) are silently skipped

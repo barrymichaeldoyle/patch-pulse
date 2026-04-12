@@ -7,6 +7,7 @@ import {
 } from '@patch-pulse/shared';
 import { runCli } from '../../src/cli';
 import { stripAnsi } from '../test-utils';
+import { VERSION } from '../../src/gen/version.gen';
 
 vi.mock('@patch-pulse/shared', async () => {
   const actual = await vi.importActual<typeof import('@patch-pulse/shared')>(
@@ -54,7 +55,7 @@ describe('basic project', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(fetchNpmPackageManifest).mockResolvedValue({
-      'dist-tags': { latest: '3.0.0' },
+      'dist-tags': { latest: VERSION },
     });
     vi.mocked(checkNpmDependencyStatuses).mockImplementation(
       async (dependencies, options) => {
@@ -76,7 +77,7 @@ describe('basic project', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const exitCode = await runCli({
-      argv: ['--no-update-prompt'],
+      argv: ['--no-interactive'],
       cwd: fixturePath,
     });
 
@@ -97,7 +98,7 @@ describe('basic project', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const exitCode = await runCli({
-      argv: ['--no-update-prompt'],
+      argv: ['--no-interactive'],
       cwd: fixturePath,
     });
 
@@ -110,7 +111,7 @@ describe('basic project', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const exitCode = await runCli({
-      argv: ['--json', '--no-update-prompt'],
+      argv: ['--json', '--no-interactive'],
       cwd: fixturePath,
     });
 
@@ -133,5 +134,30 @@ describe('basic project', () => {
     expect(parsed.projects[0]?.summary.outdated).toBe(2);
     expect(parsed.summary.total).toBe(3);
     expect(parsed.summary.outdated).toBe(2);
+  });
+
+  it('exits with code 1 with --fail when outdated packages are found', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const exitCode = await runCli({
+      argv: ['--fail', '--no-interactive'],
+      cwd: fixturePath,
+    });
+
+    expect(exitCode).toBe(1);
+  });
+
+  it('exits with code 1 with --json --fail when outdated packages are found', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const exitCode = await runCli({
+      argv: ['--json', '--fail', '--no-interactive'],
+      cwd: fixturePath,
+    });
+
+    expect(exitCode).toBe(1);
+    expect(() => JSON.parse(logSpy.mock.calls.flat().join('\n'))).not.toThrow();
   });
 });

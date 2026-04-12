@@ -7,7 +7,7 @@ PatchPulse helps you stay on top of npm dependency updates across your projects.
 | Tool                                             | Status                          | Description                                              |
 | ------------------------------------------------ | ------------------------------- | -------------------------------------------------------- |
 | [Slack bot](#slack-bot)                          | Live                            | Get notified in Slack when your packages release updates |
-| [CLI](./packages/cli)                            | v2.x on npm · v3 in development | Check for outdated dependencies from the terminal        |
+| [CLI](./packages/cli)                            | v3.x on npm · v4 in development | Check for outdated dependencies from the terminal        |
 | [VS Code extension](./packages/vscode-extension) | Early development               | In-editor dependency info (not yet released)             |
 
 ---
@@ -60,6 +60,7 @@ PatchPulse is a `pnpm` monorepo.
 ### Packages
 
 - `packages/cli` — npm CLI for checking outdated dependencies
+- `packages/docs` — Astro/Starlight docs site
 - `packages/notifier-bot` — Convex-powered Slack notification backend
 - `packages/shared` — shared runtime helpers and types
 - `packages/vscode-extension` — VS Code extension for in-editor dependency info
@@ -88,6 +89,7 @@ pnpm install          # install all dependencies
 pnpm ci:check         # lint, format, knip, typecheck, test, build — mirrors CI
 
 pnpm dev:notifier     # run Slack bot locally (requires Convex setup)
+pnpm dev:docs         # run docs locally
 pnpm dev:cli          # run CLI in dev mode
 pnpm pp               # dogfood the local CLI from the repo root
 pnpm -s pp -- --json  # same, but without pnpm's script banner for pipe-safe JSON

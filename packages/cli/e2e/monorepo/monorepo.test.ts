@@ -6,6 +6,7 @@ import {
 } from '@patch-pulse/shared';
 import { runCli } from '../../src/cli';
 import { stripAnsi } from '../test-utils';
+import { VERSION } from '../../src/gen/version.gen';
 
 vi.mock('@patch-pulse/shared', async () => {
   const actual = await vi.importActual<typeof import('@patch-pulse/shared')>(
@@ -24,7 +25,7 @@ describe('monorepo project', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(fetchNpmPackageManifest).mockResolvedValue({
-      'dist-tags': { latest: '3.0.0' },
+      'dist-tags': { latest: VERSION },
     });
     vi.mocked(checkNpmDependencyStatuses).mockImplementation(
       async (dependencies, options) => {
@@ -55,7 +56,7 @@ describe('monorepo project', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const exitCode = await runCli({
-      argv: ['--no-update-prompt'],
+      argv: ['--no-interactive'],
       cwd: fixturePath,
     });
 
@@ -68,7 +69,7 @@ describe('monorepo project', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    await runCli({ argv: ['--no-update-prompt'], cwd: fixturePath });
+    await runCli({ argv: ['--no-interactive'], cwd: fixturePath });
 
     // @repo/shared (no deps) and workspace:* entries should never appear
     const allCalls = vi
@@ -83,7 +84,7 @@ describe('monorepo project', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const exitCode = await runCli({
-      argv: ['--no-update-prompt'],
+      argv: ['--no-interactive'],
       cwd: fixturePath,
     });
 
@@ -91,12 +92,12 @@ describe('monorepo project', () => {
     expect(stripAnsi(logSpy.mock.calls.flat().join('\n'))).toMatchSnapshot();
   });
 
-  it('prints full sections for clean projects with --verbose-projects', async () => {
+  it('prints full sections for clean projects with --expand', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const exitCode = await runCli({
-      argv: ['--verbose-projects', '--no-update-prompt'],
+      argv: ['--expand', '--no-interactive'],
       cwd: fixturePath,
     });
 
@@ -107,7 +108,7 @@ describe('monorepo project', () => {
     expect(output).not.toContain('✓  Up to date: 1 package');
   });
 
-  it('hides clean projects with --only-outdated', async () => {
+  it('hides clean projects with --hide-clean', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -140,7 +141,7 @@ describe('monorepo project', () => {
     );
 
     const exitCode = await runCli({
-      argv: ['--only-outdated', '--no-update-prompt'],
+      argv: ['--hide-clean', '--no-interactive'],
       cwd: fixturePath,
     });
 
@@ -158,7 +159,7 @@ describe('monorepo project', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const exitCode = await runCli({
-      argv: ['--project', 'packages/app', '--no-update-prompt'],
+      argv: ['--project', 'packages/app', '--no-interactive'],
       cwd: fixturePath,
     });
 
@@ -202,7 +203,7 @@ describe('monorepo project', () => {
     );
 
     const exitCode = await runCli({
-      argv: ['--json', '--project', 'packages/app', '--no-update-prompt'],
+      argv: ['--json', '--project', 'packages/app', '--no-interactive'],
       cwd: fixturePath,
     });
 

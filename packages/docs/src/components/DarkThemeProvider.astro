@@ -1,0 +1,7 @@
+{/* Keep docs dark-only and avoid honoring any stored light preference. */}
+<script is:inline>
+  document.documentElement.dataset.theme = 'dark';
+  try {
+    localStorage.setItem('starlight-theme', 'dark');
+  } catch {}
+</script>

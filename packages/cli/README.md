@@ -28,8 +28,9 @@ That's it! Patch Pulse scans the current project for `package.json` files and sh
 
 ## Configuration
 
-Patch Pulse supports configuration files for persistent settings. Create one of these files in your project root:
+Patch Pulse supports configuration files for persistent settings. Prefer `patchpulse.json` in your project root. These filenames are supported:
 
+- `patchpulse.json`
 - `patchpulse.config.json`
 - `.patchpulserc.json`
 - `.patchpulserc`
@@ -41,7 +42,7 @@ Patch Pulse supports configuration files for persistent settings. Create one of 
   "skip": ["lodash", "@types/*", "test-*"],
   "ignorePaths": ["packages/cli/e2e"],
   "packageManager": "npm",
-  "noUpdatePrompt": false
+  "interactive": true
 }
 ```
 
@@ -68,29 +69,29 @@ The `packageManager` option allows you to override the package manager detection
 - `yarn`
 - `bun`
 
-### No Update Prompt
+### Interactive Mode
 
-The `noUpdatePrompt` option allows you to skip the update prompt.
+The `interactive` option opts in to the interactive update prompt after the summary.
 
 ### CLI vs File Configuration
 
 CLI arguments override file configuration:
 
 ```bash
-# This will override any settings in patchpulse.config.json
-npx patch-pulse --skip "react,react-dom" --package-manager pnpm --no-update-prompt
+# This will override any settings in patchpulse.json
+npx patch-pulse --skip "react,react-dom" --package-manager pnpm --no-interactive
 ```
 
-For monorepos, use `--verbose-projects` to print full dependency sections for clean workspaces too.
+For monorepos, use `--expand` to print full dependency sections for clean workspaces too.
 
 ```bash
-npx patch-pulse --verbose-projects
+npx patch-pulse --expand
 ```
 
-Use `--only-outdated` to hide clean workspaces entirely.
+Use `--hide-clean` to hide clean workspaces entirely.
 
 ```bash
-npx patch-pulse --only-outdated
+npx patch-pulse --hide-clean
 ```
 
 Focus one project by workspace path or package name:
@@ -105,7 +106,15 @@ Use `--json` for scripts, CI, or editor integrations:
 npx patch-pulse --json
 ```
 
-When dogfooding the local workspace CLI through the root script, use `pnpm -s`
+Use `--fail` to exit with code `1` if any outdated packages are found — useful as a CI gate:
+
+```bash
+npx patch-pulse --fail
+# or combine with --json for machine-readable output + non-zero exit
+npx patch-pulse --json --fail
+```
+
+When running the local workspace CLI through the root script, use `pnpm -s`
 to suppress pnpm's script banner before JSON output:
 
 ```bash

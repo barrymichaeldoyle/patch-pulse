@@ -1,0 +1,111 @@
+---
+title: Configuration
+description: Persistent configuration for the Patch Pulse CLI.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+The CLI supports a configuration file for persistent settings. Use `patchpulse.json` in your project root going forward. These filenames are supported:
+
+- `patchpulse.json`
+- `patchpulse.config.json`
+- `.patchpulserc.json`
+- `.patchpulserc`
+
+## Example
+
+```json
+{
+  "skip": ["lodash", "@types/*", "test-*"],
+  "ignorePaths": ["packages/cli/e2e"],
+  "packageManager": "pnpm",
+  "interactive": true
+}
+```
+
+## Options
+
+### `skip`
+
+An array of package names or glob patterns to exclude from version checks.
+
+```json
+{
+  "skip": ["lodash", "@types/*", "test-*", "*-dev"]
+}
+```
+
+Supported pattern syntax:
+
+| Pattern      | Matches                              |
+| ------------ | ------------------------------------ |
+| `"lodash"`   | Exact package name                   |
+| `"@types/*"` | Any package under the `@types` scope |
+| `"test-*"`   | Any package starting with `test-`    |
+| `"*-dev"`    | Any package ending with `-dev`       |
+
+<Aside>
+  `--skip` passed on the command line is **merged** with the config file's
+  `skip` array — it does not replace it.
+</Aside>
+
+---
+
+### `ignorePaths`
+
+An array of directory or file paths to exclude from workspace scanning. Useful for ignoring fixture directories or generated packages.
+
+```json
+{
+  "ignorePaths": ["packages/cli/e2e", "**/fixtures", "packages/*/dist"]
+}
+```
+
+Both exact paths and glob patterns are supported.
+
+---
+
+### `includePaths`
+
+An array of paths to force-include in the workspace scan, even if they would otherwise be excluded (e.g. by `.gitignore`). `ignorePaths` still takes priority.
+
+```json
+{
+  "includePaths": ["tools/internal-package"]
+}
+```
+
+---
+
+### `packageManager`
+
+Override the auto-detected package manager. Accepted values: `npm`, `pnpm`, `yarn`, `bun`.
+
+```json
+{
+  "packageManager": "pnpm"
+}
+```
+
+---
+
+### `interactive`
+
+Enable the interactive update prompt automatically after every run.
+
+```json
+{
+  "interactive": true
+}
+```
+
+---
+
+## CLI vs file precedence
+
+CLI flags take precedence over file settings for most options. The `skip` array is an exception — values from both sources are **merged**.
+
+```bash
+# Overrides packageManager and interactive, but merges with file's skip list
+npx patch-pulse --skip "react,react-dom" --package-manager npm --no-interactive
+```

@@ -1,5 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreFiles": ["packages/docs/.astro/**"],
   "workspaces": {
     "packages/shared": {
       "project": ["src/**/*.ts"]

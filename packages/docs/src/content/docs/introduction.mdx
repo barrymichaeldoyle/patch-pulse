@@ -1,0 +1,30 @@
+---
+title: Introduction
+description: What is Patch Pulse and what does it offer?
+---
+
+Patch Pulse is a suite of tools that help you keep your npm dependencies up to date.
+
+## What's in the ecosystem?
+
+| Tool                                    | Description                                                                  |
+| --------------------------------------- | ---------------------------------------------------------------------------- |
+| [CLI](../cli/overview)                  | Zero-dependency command-line tool to scan your project for outdated packages |
+| [VS Code Extension](../vscode/overview) | Inline version information directly in your `package.json` files             |
+| [Slack Bot](../slack-bot)               | Get notified in Slack when packages you depend on release new versions       |
+
+## Core concepts
+
+Patch Pulse checks your dependencies against the npm registry and tells you which packages have newer versions available — breaking them down by **patch**, **minor**, and **major** updates so you can decide what to act on.
+
+It is **monorepo-aware**: running from the root of a workspace will scan every `package.json` found under the project, with full support for pnpm `catalog:` entries.
+
+## Quick start
+
+The fastest way to try it is with the CLI — no install required:
+
+```bash
+npx patch-pulse
+```
+
+See the [CLI overview](../cli/overview) to dive deeper.

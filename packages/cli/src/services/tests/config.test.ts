@@ -29,7 +29,12 @@ describe('Configuration Service', () => {
   describe('getConfig', () => {
     it('should return the config', () => {
       const config = getConfig();
-      expect(config).toEqual({ skip: [], ignorePaths: [], includePaths: [] });
+      expect(config).toEqual({
+        skip: [],
+        ignorePaths: [],
+        includePaths: [],
+        interactive: false,
+      });
     });
   });
 
@@ -75,6 +80,25 @@ describe('Configuration Service', () => {
       );
 
       consoleSpy.mockRestore();
+    });
+
+    it('should ignore unsupported package manager values from file config', () => {
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(join).mockReturnValue('/test/patchpulse.json');
+      vi.mocked(readFileSync).mockReturnValue(
+        JSON.stringify({
+          interactive: true,
+          packageManager: 'nope',
+          skip: ['lodash'],
+        }),
+      );
+
+      const result = readConfigFile('/test');
+
+      expect(result).toEqual({
+        interactive: true,
+        skip: ['lodash'],
+      });
     });
   });
 
@@ -132,6 +156,7 @@ describe('Configuration Service', () => {
         skip: ['lodash', '@types/*', 'express', 'test-*'],
         ignorePaths: ['packages/cli/e2e', 'packages/shared/tests'],
         includePaths: ['dist/special', 'build/other'],
+        interactive: false,
       });
     });
 
@@ -146,6 +171,7 @@ describe('Configuration Service', () => {
         skip: ['express', 'test-*'],
         ignorePaths: [],
         includePaths: [],
+        interactive: false,
       });
     });
 
@@ -162,6 +188,7 @@ describe('Configuration Service', () => {
         skip: ['lodash', '@types/*'],
         ignorePaths: ['packages/cli/e2e'],
         includePaths: ['dist/special'],
+        interactive: false,
       });
     });
   });

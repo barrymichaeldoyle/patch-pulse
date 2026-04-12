@@ -260,7 +260,9 @@ export function manageActionsModalView(entry: HomePackageEntry) {
     { text: { type: 'plain_text', text: 'Major only' }, value: 'major' },
   ];
   const currentThreshold = entry.minUpdateType ?? 'patch';
-  const initialOption = allThresholds.find((t) => t.value === currentThreshold)!;
+  const initialOption = allThresholds.find(
+    (t) => t.value === currentThreshold,
+  )!;
   const actionValue = JSON.stringify({
     s: entry.subscriptionId,
     p: entry.packageName,

@@ -8,7 +8,7 @@ export interface PatchPulseConfig {
   ignorePaths?: string[];
   includePaths?: string[];
   packageManager?: PackageManager;
-  noUpdatePrompt?: boolean;
+  interactive?: boolean;
 }
 
 /**
@@ -87,13 +87,12 @@ export function parseCliConfig(args: string[]): PatchPulseConfig {
     }
   }
 
-  // Parse no update prompt argument
-  if (args.includes('--no-update-prompt')) {
-    config.noUpdatePrompt = true;
+  // Parse interactive flag
+  if (args.includes('--interactive') || args.includes('-i')) {
+    config.interactive = true;
   }
-  // Parse update prompt argument (overrides noUpdatePrompt)
-  if (args.includes('--update-prompt')) {
-    config.noUpdatePrompt = false;
+  if (args.includes('--no-interactive')) {
+    config.interactive = false;
   }
 
   return config;
@@ -113,6 +112,7 @@ export function mergeConfigs(
     skip: [],
     ignorePaths: [],
     includePaths: [],
+    interactive: false,
   };
 
   // Add file config values
@@ -153,11 +153,11 @@ export function mergeConfigs(
     merged.packageManager = fileConfig.packageManager;
   }
 
-  // Handle noUpdatePrompt (CLI takes precedence)
-  if (cliConfig.noUpdatePrompt !== undefined) {
-    merged.noUpdatePrompt = cliConfig.noUpdatePrompt;
-  } else if (fileConfig?.noUpdatePrompt !== undefined) {
-    merged.noUpdatePrompt = fileConfig.noUpdatePrompt;
+  // Handle interactive (CLI takes precedence)
+  if (cliConfig.interactive !== undefined) {
+    merged.interactive = cliConfig.interactive;
+  } else if (fileConfig?.interactive !== undefined) {
+    merged.interactive = fileConfig.interactive;
   }
 
   return merged;
@@ -190,11 +190,14 @@ function validateConfig(config: any): PatchPulseConfig {
   }
 
   if (typeof config.packageManager === 'string') {
-    validated.packageManager = config.packageManager;
+    const packageManager = config.packageManager as PackageManager;
+    if (PACKAGE_MANAGERS.includes(packageManager)) {
+      validated.packageManager = packageManager;
+    }
   }
 
-  if (typeof config.noUpdatePrompt === 'boolean') {
-    validated.noUpdatePrompt = config.noUpdatePrompt;
+  if (typeof config.interactive === 'boolean') {
+    validated.interactive = config.interactive;
   }
 
   return validated;

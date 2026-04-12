@@ -1,0 +1,49 @@
+---
+title: VS Code Settings
+description: Configuration settings for the Patch Pulse VS Code extension.
+---
+
+All settings are available under the `patchPulse` namespace in VS Code's settings UI or `settings.json`.
+
+## Settings
+
+### `patchPulse.enabled`
+
+Enable or disable the Patch Pulse extension entirely.
+
+|             |           |
+| ----------- | --------- |
+| **Type**    | `boolean` |
+| **Default** | `true`    |
+
+---
+
+### `patchPulse.checkOnOpen`
+
+Automatically check package versions when a `package.json` file is opened.
+
+|             |           |
+| ----------- | --------- |
+| **Type**    | `boolean` |
+| **Default** | `true`    |
+
+---
+
+### `patchPulse.updateInterval`
+
+How often (in seconds) Patch Pulse should re-check versions in the background.
+
+|             |                 |
+| ----------- | --------------- |
+| **Type**    | `number`        |
+| **Default** | `3600` (1 hour) |
+
+## Example `settings.json`
+
+```json
+{
+  "patchPulse.enabled": true,
+  "patchPulse.checkOnOpen": true,
+  "patchPulse.updateInterval": 1800
+}
+```

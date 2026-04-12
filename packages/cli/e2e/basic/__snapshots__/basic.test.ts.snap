@@ -1,7 +1,10 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`basic project > prints a full dependency summary 1`] = `
-"Dependencies:
+"fixture-basic
+Location: package.json
+────────────────────────────────────────────────────────────
+Dependencies:
 ─────────────
 MINOR chalk 5.0.0 → 5.6.2
 UP TO DATE lodash 4.17.21

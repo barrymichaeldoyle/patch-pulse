@@ -79,7 +79,9 @@ describe('scanWorkspace (gitignore)', () => {
 
     const result = await scanWorkspace(workspacePath);
 
-    const relativePaths = result.projects.map((project) => project.relativePath);
+    const relativePaths = result.projects.map(
+      (project) => project.relativePath,
+    );
     expect(relativePaths).toContain('packages/app');
     expect(relativePaths).not.toContain('dist');
   });
@@ -93,7 +95,9 @@ describe('scanWorkspace (gitignore)', () => {
       includePaths: ['dist'],
     });
 
-    const relativePaths = result.projects.map((project) => project.relativePath);
+    const relativePaths = result.projects.map(
+      (project) => project.relativePath,
+    );
     expect(relativePaths).toContain('dist');
     expect(relativePaths).toContain('packages/app');
   });

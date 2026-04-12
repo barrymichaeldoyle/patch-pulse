@@ -49,3 +49,8 @@ jobs:
 
       - name: Build (VS Code extension)
         run: pnpm build:vscode-extension
+
+      - name: Build (docs)
+        run: pnpm build:docs
+        env:
+          DOCS_BASE_PATH: /patch-pulse

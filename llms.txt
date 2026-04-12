@@ -1,0 +1,14 @@
+# Patch Pulse
+
+Patch Pulse checks for outdated npm dependencies across single projects and monorepos. It hits the npm registry, categorises updates by severity (patch / minor / major), and optionally applies updates in-place.
+
+## Packages in this repo
+
+- `patch-pulse` (`packages/cli`) — the CLI tool, published to npm. This is the main product.
+- `@patch-pulse/shared` (`packages/shared`) — shared logic (npm registry fetching, version comparison). Internal.
+- `@patch-pulse/notifier-bot` (`packages/notifier-bot`) — Slack bot that notifies workspaces of new releases. Internal.
+- `patch-pulse-vscode-extension` (`packages/vscode-extension`) — VS Code extension. In progress.
+
+## Detailed reference
+
+See `packages/cli/llms.txt` for the full CLI flag reference, config schema, output format, and common recipes.

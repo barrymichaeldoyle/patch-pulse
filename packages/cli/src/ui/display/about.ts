@@ -21,5 +21,5 @@ ${ansi.cyanBold('Slack Bot:')} ${ansi.white(ansi.link('Add the Patch Pulse Slack
 
 ${ansi.gray('Tip:')}
   ${ansi.white('Use --json for scripts, --project <name-or-path> to focus one workspace,')}
-  ${ansi.white('and --verbose-projects when you want the full monorepo report.')}`);
+  ${ansi.white('and --expand when you want the full monorepo report.')}`);
 }

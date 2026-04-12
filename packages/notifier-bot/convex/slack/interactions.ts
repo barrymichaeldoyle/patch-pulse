@@ -110,9 +110,9 @@ export const slackInteractions = httpAction(async (ctx, request) => {
       }
 
       if (action.action_id === 'manage_untrack') {
-        const { s: subscriptionId } = JSON.parse(
-          action.value ?? '{}',
-        ) as { s?: string };
+        const { s: subscriptionId } = JSON.parse(action.value ?? '{}') as {
+          s?: string;
+        };
         if (subscriptionId && details) {
           await ctx.scheduler.runAfter(
             0,

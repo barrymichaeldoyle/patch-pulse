@@ -45,7 +45,8 @@ const VALID_FLAGS = [
   '-h',
   '--help',
   '-i',
-  '--info',
+  '--interactive',
+  '--no-interactive',
   '-v',
   '--version',
   '--about',
@@ -56,10 +57,9 @@ const VALID_FLAGS = [
   '--skip',
   '--package-manager',
   '--project',
-  '--update-prompt',
-  '--no-update-prompt',
-  '--only-outdated',
-  '--verbose-projects',
+  '--hide-clean',
+  '--expand',
+  '--fail',
 ];
 
 export async function runCli({
@@ -71,9 +71,10 @@ export async function runCli({
 } = {}): Promise<number> {
   argv = argv.filter((arg) => arg !== '--');
   const jsonOutput = argv.includes('--json');
-  const onlyOutdated = argv.includes('--only-outdated');
+  const onlyOutdated = argv.includes('--hide-clean');
+  const failOnOutdated = argv.includes('--fail');
   const projectFilter = getFlagValue(argv, '--project');
-  const verboseProjects = argv.includes('--verbose-projects');
+  const verboseProjects = argv.includes('--expand');
 
   const unknownArgs = getUnknownArgs({
     args: argv,
@@ -85,7 +86,7 @@ export async function runCli({
     return 1;
   }
 
-  if (hasAnyFlag({ args: argv, flags: ['--help', '-h', '--info', '-i'] })) {
+  if (hasAnyFlag({ args: argv, flags: ['--help', '-h'] })) {
     displayHelp();
     return 0;
   }
@@ -147,7 +148,11 @@ export async function runCli({
     };
 
     if (filteredProjects.length > 0) {
-      // --only-outdated monorepo: buffer all results then display only outdated projects.
+      if (!jsonOutput) {
+        console.log();
+      }
+
+      // --hide-clean monorepo: buffer all results then display only outdated projects.
       // All other modes stream output per-project as data arrives.
       const bufferAll = onlyOutdated && workspace.isMonorepo;
 
@@ -187,11 +192,11 @@ export async function runCli({
         let projectSpinner: ProgressSpinner | null = null;
 
         if (!jsonOutput && !bufferAll) {
-          if (workspace.isMonorepo) {
-            console.log(ansi.whiteBold(project.displayName));
-            console.log(ansi.gray(`Location: ${project.relativePath}`));
-            console.log(ansi.gray('─'.repeat(60)));
-          }
+          console.log(ansi.whiteBold(project.displayName));
+          console.log(
+            ansi.gray(`Location: ${toPackageJsonPath(project.relativePath)}`),
+          );
+          console.log(ansi.gray('─'.repeat(60)));
           if (useProjectSpinner) {
             projectSpinner = new ProgressSpinner();
           }
@@ -295,6 +300,10 @@ export async function runCli({
 
       scanSpinner?.stop();
 
+      const hasOutdatedDependencies = allDependencies.some(
+        (dependency) => dependency.isOutdated && !dependency.isSkipped,
+      );
+
       // JSON output always uses the fully buffered data.
       if (jsonOutput) {
         const visibleProjectReports = bufferAll
@@ -314,7 +323,7 @@ export async function runCli({
             2,
           ),
         );
-        return 0;
+        return failOnOutdated && hasOutdatedDependencies ? 1 : 0;
       }
 
       // Buffer-all display: show only outdated projects after the full scan.
@@ -323,7 +332,9 @@ export async function runCli({
           (p) => p.projectNeedsAttention,
         )) {
           console.log(ansi.whiteBold(project.displayName));
-          console.log(ansi.gray(`Location: ${project.relativePath}`));
+          console.log(
+            ansi.gray(`Location: ${toPackageJsonPath(project.relativePath)}`),
+          );
           console.log(ansi.gray('─'.repeat(60)));
           if (verboseProjects) {
             for (const section of project.sectionResults) {
@@ -342,12 +353,16 @@ export async function runCli({
         ).length,
       });
 
-      if (!config.noUpdatePrompt) {
+      if (config.interactive) {
         const packageManager = config.packageManager
           ? getPackageManagerInfo(config.packageManager)
           : detectPackageManager(cwd);
 
         const updateType = await displayUpdatePrompt(allDependencies, config);
+
+        if (updateType === 'interrupt') {
+          return 130;
+        }
 
         if (updateType) {
           const outdatedDeps = allDependencies.filter(
@@ -406,6 +421,10 @@ export async function runCli({
       }
 
       displayThankYouMessage();
+
+      if (failOnOutdated && hasOutdatedDependencies) {
+        return 1;
+      }
     } else {
       if (jsonOutput) {
         console.log(
@@ -442,6 +461,10 @@ export async function runCli({
     console.error(ansi.red(`Error: ${error}`));
     return 1;
   }
+}
+
+function toPackageJsonPath(relativePath: string): string {
+  return relativePath === '.' ? 'package.json' : `${relativePath}/package.json`;
 }
 
 function getFlagValue(args: string[], flag: string): string | undefined {
@@ -619,13 +642,23 @@ function displayAttentionProjectStatus(
     dependencyInfos: DependencyInfo[];
   }>,
 ): void {
-  const attentionDependencies = sectionResults.flatMap((section) =>
-    section.dependencyInfos.filter(
-      (dependency) =>
-        !dependency.isSkipped &&
-        (dependency.isOutdated || !dependency.latestVersion),
-    ),
+  const allDependencies = sectionResults.flatMap(
+    (section) => section.dependencyInfos,
   );
+  const attentionDependencies = allDependencies.filter(
+    (dependency) =>
+      !dependency.isSkipped &&
+      (dependency.isOutdated || !dependency.latestVersion),
+  );
+  const upToDateCount = allDependencies.filter(
+    (dependency) =>
+      !dependency.isSkipped &&
+      !dependency.isOutdated &&
+      Boolean(dependency.latestVersion),
+  ).length;
+  const skippedCount = allDependencies.filter(
+    (dependency) => dependency.isSkipped,
+  ).length;
   const outdatedCount = attentionDependencies.filter(
     (dependency) => dependency.isOutdated,
   ).length;
@@ -649,8 +682,17 @@ function displayAttentionProjectStatus(
     console.log(
       `${ansi.yellow('!  Attention:')} ${attentionDependencies.length} ${packageWord} ${reviewWord} review${detailText}`,
     );
-    console.log();
   }
+
+  if (upToDateCount > 0) {
+    console.log(`${ansi.green('✓  Up to date:')} ${upToDateCount}`);
+  }
+
+  if (skippedCount > 0) {
+    console.log(`${ansi.gray('⏭  Skipped:')} ${skippedCount}`);
+  }
+
+  console.log();
 
   for (const section of sectionResults) {
     const relevantDependencies = section.dependencyInfos.filter(

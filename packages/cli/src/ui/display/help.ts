@@ -17,7 +17,7 @@ ${ansi.cyanBoldUnderline('📖 Usage:')}
   ${ansi.white('npx patch-pulse')} ${ansi.gray('[options]')}
 
 ${ansi.cyanBoldUnderline('⚙️  Options:')}
-  ${ansi.white('-i, -h, --info, --help')}   ${ansi.gray('Show current message')}
+  ${ansi.white('-h, --help')}               ${ansi.gray('Show current message')}
   ${ansi.white('-v, --version')}            ${ansi.gray('Show version information')}
   ${ansi.white('--about')}                  ${ansi.gray('Show project links and support info')}
   ${ansi.white('--json')}                   ${ansi.gray('Print machine-readable JSON output')}
@@ -27,18 +27,20 @@ ${ansi.cyanBoldUnderline('🔧 Configuration Options:')}
   ${ansi.white('-s, --skip <packages>')}    ${ansi.gray('Skip packages (supports exact names and patterns)')}
   ${ansi.white('--package-manager <pm>')}   ${ansi.gray('Override detected package manager (npm, pnpm, yarn, bun)')}
   ${ansi.white('--project <name|path>')}    ${ansi.gray('Limit the scan output to one project in a monorepo')}
-  ${ansi.white('--no-update-prompt')}       ${ansi.gray('Skip update prompt after summary (exit immediately)')}
-  ${ansi.white('--only-outdated')}          ${ansi.gray('Hide clean projects in monorepos')}
-  ${ansi.white('--verbose-projects')}       ${ansi.gray('Show full output for every project in monorepos')}
-  ${ansi.white('--update-prompt')}          ${ansi.gray('Force update prompt after summary (even if config disables it)')}
+  ${ansi.white('-i, --interactive')}        ${ansi.gray('Show interactive update prompt after summary')}
+  ${ansi.white('--no-interactive')}         ${ansi.gray('Skip update prompt after summary (default)')}
+  ${ansi.white('--hide-clean')}             ${ansi.gray('Hide clean projects in monorepos')}
+  ${ansi.white('--expand')}                 ${ansi.gray('Show full output for every project in monorepos')}
+  ${ansi.white('--fail')}                   ${ansi.gray('Exit with code 1 if any outdated packages are found')}
 
 ${ansi.cyanBoldUnderline('📁 Configuration File:')}
-  Create a \`patchpulse.config.json\` file in your project root:
+  Prefer \`patchpulse.json\` in your project root
+  (also supports \`patchpulse.config.json\`, \`.patchpulserc.json\`, and \`.patchpulserc\`):
   ${ansi.gray('{')}
     ${ansi.gray('"skip": ["lodash", "@types/*", "test-*"],')}
     ${ansi.gray('"ignorePaths": ["packages/cli/e2e"],')}
     ${ansi.gray('"packageManager": "npm",')}
-    ${ansi.gray('"noUpdatePrompt": true')}
+    ${ansi.gray('"interactive": true')}
   ${ansi.gray('}')}
 
 ${ansi.cyanBoldUnderline('📝 Description:')}
@@ -48,9 +50,9 @@ ${ansi.cyanBoldUnderline('📝 Description:')}
   In pnpm workspaces, \`catalog:\` dependencies are resolved from
   \`pnpm-workspace.yaml\`, while \`workspace:*\` dependencies are ignored.
   Use \`ignorePaths\` to exclude fixture or generated directories from scanning.
-  After the summary, you can choose to update patch, minor, or all
-  outdated dependencies across the scanned project, unless
-  --no-update-prompt is set (in which case the CLI exits after summary).
+  After the summary, the CLI exits immediately by default. Pass
+  --interactive (or -i) to enter interactive mode, where you can
+  choose to update patch, minor, or all outdated dependencies.
 
 ${ansi.cyanBoldUnderline('💡 Examples:')}
   ${ansi.white('npx patch-pulse')}                          ${ansi.gray('# Check dependencies across the current project')}
@@ -61,10 +63,11 @@ ${ansi.cyanBoldUnderline('💡 Examples:')}
   ${ansi.white('npx patch-pulse --skip "lodash,@types/*"')} ${ansi.gray('# Skip specific packages and patterns')}
   ${ansi.white('npx patch-pulse --package-manager pnpm')}   ${ansi.gray('# Use pnpm for updates (overrides automatic package manager detection)')}
   ${ansi.white('npx patch-pulse --project packages/app')}   ${ansi.gray('# Focus one project inside a monorepo')}
-  ${ansi.white('npx patch-pulse --no-update-prompt')}       ${ansi.gray('# Exit after summary (no update prompt)')}
-  ${ansi.white('npx patch-pulse --only-outdated')}          ${ansi.gray('# Show only projects that need attention')}
-  ${ansi.white('npx patch-pulse --verbose-projects')}       ${ansi.gray('# Show full monorepo output including clean projects')}
-  ${ansi.white('npx patch-pulse --update-prompt')}          ${ansi.gray('# Force update prompt after summary (overrides patchpulse.config.json file)')}
+  ${ansi.white('npx patch-pulse --interactive')}            ${ansi.gray('# Show interactive update prompt after summary')}
+  ${ansi.white('npx patch-pulse --hide-clean')}             ${ansi.gray('# Show only projects that need attention')}
+  ${ansi.white('npx patch-pulse --expand')}                 ${ansi.gray('# Show full monorepo output including clean projects')}
+  ${ansi.white('npx patch-pulse --fail')}                   ${ansi.gray('# Exit 1 if any outdated packages found (useful in CI)')}
+  ${ansi.white('npx patch-pulse --json --fail')}            ${ansi.gray('# Machine-readable output + non-zero exit for CI scripts')}
 
 ${ansi.cyanBoldUnderline('🔗 Links:')}
   ${ansi.blue('📚 Docs:')}      ${ansi.white(ansi.link('barrymichaeldoyle/patch-pulse', CLI_REPO_URL))}

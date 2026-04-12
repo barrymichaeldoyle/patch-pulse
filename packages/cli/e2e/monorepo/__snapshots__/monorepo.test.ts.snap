@@ -2,11 +2,11 @@
 
 exports[`monorepo project > prints a full monorepo summary 1`] = `
 "@fixture/admin (packages/admin)
-Location: packages/admin
+Location: packages/admin/package.json
 ────────────────────────────────────────────────────────────
 ✓  Up to date: 1 package
 @fixture/app (packages/app)
-Location: packages/app
+Location: packages/app/package.json
 ────────────────────────────────────────────────────────────
 ✓  Up to date: 2 packages
 ════════════════════════════════════════════════════════════

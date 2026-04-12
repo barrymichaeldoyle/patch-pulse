@@ -1,0 +1,37 @@
+---
+title: VS Code Extension Overview
+description: The Patch Pulse VS Code extension.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+The Patch Pulse VS Code extension shows inline version information for packages in your `package.json` files, so you can see which dependencies are outdated without leaving the editor.
+
+<Aside type="caution">
+  The extension is currently in early development. Features and settings are
+  subject to change.
+</Aside>
+
+## Features
+
+- **Inline decorations** — version status shown directly next to each dependency in `package.json`
+- **Automatic checks** — versions are checked when a `package.json` file is opened
+- **Manual refresh** — trigger a re-check at any time via the command palette
+
+## Commands
+
+The following commands are available in the VS Code command palette (`Cmd/Ctrl + Shift + P`):
+
+| Command                                 | Description                                  |
+| --------------------------------------- | -------------------------------------------- |
+| `Patch Pulse: Check Package Versions`   | Run a version check on the current workspace |
+| `Patch Pulse: Refresh Package Versions` | Refresh previously checked version data      |
+
+## Activation
+
+The extension activates automatically when:
+
+- A JSON file is opened, or
+- A `package.json` file is detected anywhere in the workspace
+
+See [Settings](../settings) for configuration options.

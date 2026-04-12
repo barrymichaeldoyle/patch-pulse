@@ -1,0 +1,37 @@
+---
+title: Patch Pulse
+description: Keep a pulse on your npm dependencies.
+template: splash
+hero:
+  tagline: Keep a pulse on your npm dependencies.
+  actions:
+    - text: Get Started
+      link: ./introduction
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/barrymichaeldoyle/patch-pulse
+      icon: external
+      variant: minimal
+---
+
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+## Products
+
+<CardGrid>
+  <LinkCard
+    title="CLI"
+    href="./cli/overview"
+    description="Scan projects and monorepos for outdated npm dependencies."
+  />
+  <LinkCard
+    title="Slack Bot"
+    href="./slack-bot"
+    description="Get update notifications in Slack when tracked packages release new versions."
+  />
+  <LinkCard
+    title="VS Code Extension"
+    href="./vscode/overview"
+    description="See dependency version status inline in your package.json files."
+  />
+</CardGrid>

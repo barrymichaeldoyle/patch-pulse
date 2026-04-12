@@ -1,4 +1,4 @@
 {
   "skip": ["react"],
-  "noUpdatePrompt": true
+  "interactive": false
 }

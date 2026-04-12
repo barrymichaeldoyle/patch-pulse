@@ -27,6 +27,7 @@ export function parseGitignorePatterns(content: string): RegExp[] {
 export function gitignorePatternToRegex(pattern: string): RegExp | null {
   // Strip trailing slash (only marks directory intent, irrelevant for our traversal)
   let p = pattern.endsWith('/') ? pattern.slice(0, -1) : pattern;
+  const doubleStarSentinel = '__PATCH_PULSE_DOUBLE_STAR__';
 
   if (p.length === 0 || p === '**') {
     return null;
@@ -53,10 +54,10 @@ export function gitignorePatternToRegex(pattern: string): RegExp | null {
   // Convert glob syntax to regex, escaping regex special chars first
   const body = p
     .replace(/[.+^${}()|[\]\\]/g, '\\$&') // escape regex special chars
-    .replace(/\*\*/g, '\x00') // temporarily protect **
+    .replace(/\*\*/g, doubleStarSentinel) // temporarily protect **
     .replace(/\*/g, '[^/]*') // * matches within a single segment
     .replace(/\?/g, '[^/]') // ? matches one char within a segment
-    .replace(/\x00/g, '.*'); // ** matches across segments
+    .replaceAll(doubleStarSentinel, '.*'); // ** matches across segments
 
   if (anchored) {
     // Must match from the start of the relative path
@@ -67,7 +68,10 @@ export function gitignorePatternToRegex(pattern: string): RegExp | null {
   return new RegExp(`(?:^|/)${body}(?:/.*)?$`);
 }
 
-export function isGitignored(relativePath: string, patterns: RegExp[]): boolean {
+export function isGitignored(
+  relativePath: string,
+  patterns: RegExp[],
+): boolean {
   const normalized = relativePath.replace(/\\/g, '/');
   return patterns.some((pattern) => pattern.test(normalized));
 }

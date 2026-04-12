@@ -1,0 +1,63 @@
+---
+title: CLI Overview
+description: The Patch Pulse command-line tool.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+The Patch Pulse CLI scans your project for `package.json` files and reports which dependencies have newer versions available on the npm registry.
+
+## Key features
+
+- **Zero runtime dependencies** — nothing extra is installed into your project
+- **Monorepo-aware** — scans all workspaces from the repo root, including pnpm `catalog:` support
+- **Interactive updates** — optionally apply patch, minor, or all updates in one step
+- **CI-friendly** — `--json` output and a `--fail` exit-code gate for pipelines
+- **Configurable** — persistent settings via `patchpulse.json`
+
+## Installation
+
+Run without installing:
+
+```bash
+npx patch-pulse
+```
+
+Or install globally:
+
+```bash
+npm install -g patch-pulse
+```
+
+## Basic usage
+
+Run from any project directory:
+
+```bash
+npx patch-pulse
+```
+
+Patch Pulse will scan every `package.json` it finds (excluding `node_modules`) and display a summary of outdated dependencies grouped by project and dependency type.
+
+<Aside>
+  `workspace:*` dependencies are ignored automatically. pnpm `catalog:` entries
+  are resolved from `pnpm-workspace.yaml`.
+</Aside>
+
+## Enabling interactive updates
+
+Pass `--interactive` (or `-i`) to get a prompt after the summary that lets you apply patch, minor, or all updates in one step:
+
+```bash
+npx patch-pulse --interactive
+```
+
+You can also enable this permanently in your [configuration file](../configuration).
+
+## Debugging
+
+To log npm registry lookup failures and network errors, set the `PATCH_PULSE_DEBUG` environment variable:
+
+```bash
+PATCH_PULSE_DEBUG=1 npx patch-pulse
+```
