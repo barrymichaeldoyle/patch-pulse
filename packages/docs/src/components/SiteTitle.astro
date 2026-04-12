@@ -1,6 +1,9 @@
 ---
 const { siteTitle, siteTitleHref } = Astro.locals.starlightRoute;
-const logoSrc = `${import.meta.env.BASE_URL}patch-pulse-logo.svg`;
+const baseUrl = import.meta.env.BASE_URL.endsWith('/')
+  ? import.meta.env.BASE_URL
+  : `${import.meta.env.BASE_URL}/`;
+const logoSrc = `${baseUrl}patch-pulse-logo.svg`;
 ---
 
 <a href={siteTitleHref} class="site-title sl-flex">
