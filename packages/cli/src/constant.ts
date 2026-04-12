@@ -15,6 +15,7 @@ export const PACKAGE_MANAGERS: readonly PackageManager[] = [
  * The filenames of the configuration files that PatchPulse looks for.
  */
 export const CONFIG_FILENAMES: readonly string[] = [
+  'patchpulse.json',
   'patchpulse.config.json',
   '.patchpulserc.json',
   '.patchpulserc',

@@ -7,6 +7,7 @@ import {
   parseCliConfig,
   readConfigFile,
   shouldIgnorePath,
+  shouldIncludePath,
   shouldSkipPackage,
   type PatchPulseConfig,
 } from '../config';
@@ -28,7 +29,7 @@ describe('Configuration Service', () => {
   describe('getConfig', () => {
     it('should return the config', () => {
       const config = getConfig();
-      expect(config).toEqual({ skip: [], ignorePaths: [] });
+      expect(config).toEqual({ skip: [], ignorePaths: [], includePaths: [] });
     });
   });
 
@@ -69,7 +70,7 @@ describe('Configuration Service', () => {
       expect(result).toBeNull();
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringMatching(
-          /Warning: Could not parse patchpulse.config.json: SyntaxError: Unexpected token/,
+          /Warning: Could not parse patchpulse(\.(config))?\.json: SyntaxError: Unexpected token/,
         ),
       );
 
@@ -116,11 +117,13 @@ describe('Configuration Service', () => {
       const fileConfig: PatchPulseConfig = {
         skip: ['lodash', '@types/*'],
         ignorePaths: ['packages/cli/e2e'],
+        includePaths: ['dist/special'],
       };
 
       const cliConfig: PatchPulseConfig = {
         skip: ['express', 'test-*'],
         ignorePaths: ['packages/shared/tests'],
+        includePaths: ['build/other'],
       };
 
       const result = mergeConfigs(fileConfig, cliConfig);
@@ -128,6 +131,7 @@ describe('Configuration Service', () => {
       expect(result).toEqual({
         skip: ['lodash', '@types/*', 'express', 'test-*'],
         ignorePaths: ['packages/cli/e2e', 'packages/shared/tests'],
+        includePaths: ['dist/special', 'build/other'],
       });
     });
 
@@ -141,6 +145,7 @@ describe('Configuration Service', () => {
       expect(result).toEqual({
         skip: ['express', 'test-*'],
         ignorePaths: [],
+        includePaths: [],
       });
     });
 
@@ -148,6 +153,7 @@ describe('Configuration Service', () => {
       const fileConfig: PatchPulseConfig = {
         skip: ['lodash', '@types/*'],
         ignorePaths: ['packages/cli/e2e'],
+        includePaths: ['dist/special'],
       };
 
       const result = mergeConfigs(fileConfig, {});
@@ -155,6 +161,7 @@ describe('Configuration Service', () => {
       expect(result).toEqual({
         skip: ['lodash', '@types/*'],
         ignorePaths: ['packages/cli/e2e'],
+        includePaths: ['dist/special'],
       });
     });
   });
@@ -249,6 +256,38 @@ describe('Configuration Service', () => {
     expect(shouldSkipPackage({ packageName: 'lodash', config: {} })).toBe(
       false,
     );
+  });
+
+  describe('shouldIncludePath', () => {
+    it('returns false when includePaths is not set', () => {
+      expect(shouldIncludePath({ path: 'dist', config: {} })).toBe(false);
+    });
+
+    it('returns false when includePaths is empty', () => {
+      expect(
+        shouldIncludePath({ path: 'dist', config: { includePaths: [] } }),
+      ).toBe(false);
+    });
+
+    it('returns true for an exact match', () => {
+      const config: PatchPulseConfig = { includePaths: ['dist'] };
+      expect(shouldIncludePath({ path: 'dist', config })).toBe(true);
+    });
+
+    it('returns true for a descendant of an included path', () => {
+      const config: PatchPulseConfig = { includePaths: ['dist'] };
+      expect(shouldIncludePath({ path: 'dist/server', config })).toBe(true);
+    });
+
+    it('returns false for paths not in includePaths', () => {
+      const config: PatchPulseConfig = { includePaths: ['dist'] };
+      expect(shouldIncludePath({ path: 'build', config })).toBe(false);
+    });
+
+    it('normalises leading ./ and trailing /', () => {
+      const config: PatchPulseConfig = { includePaths: ['./dist/'] };
+      expect(shouldIncludePath({ path: 'dist', config })).toBe(true);
+    });
   });
 
   describe('shouldIgnorePath', () => {

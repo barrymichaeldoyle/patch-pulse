@@ -6,6 +6,7 @@ import { type PackageManager } from '../types';
 export interface PatchPulseConfig {
   skip?: string[];
   ignorePaths?: string[];
+  includePaths?: string[];
   packageManager?: PackageManager;
   noUpdatePrompt?: boolean;
 }
@@ -111,6 +112,7 @@ export function mergeConfigs(
   const merged: PatchPulseConfig = {
     skip: [],
     ignorePaths: [],
+    includePaths: [],
   };
 
   // Add file config values
@@ -122,6 +124,10 @@ export function mergeConfigs(
     merged.ignorePaths!.push(...fileConfig.ignorePaths);
   }
 
+  if (fileConfig?.includePaths) {
+    merged.includePaths!.push(...fileConfig.includePaths);
+  }
+
   // Add CLI config values (merge instead of override)
   if (cliConfig.skip) {
     merged.skip!.push(...cliConfig.skip);
@@ -131,9 +137,14 @@ export function mergeConfigs(
     merged.ignorePaths!.push(...cliConfig.ignorePaths);
   }
 
+  if (cliConfig.includePaths) {
+    merged.includePaths!.push(...cliConfig.includePaths);
+  }
+
   // Remove duplicates while preserving order
   merged.skip = [...new Set(merged.skip!)];
   merged.ignorePaths = [...new Set(merged.ignorePaths!)];
+  merged.includePaths = [...new Set(merged.includePaths!)];
 
   // Handle packageManager (CLI takes precedence)
   if (cliConfig.packageManager) {
@@ -168,6 +179,12 @@ function validateConfig(config: any): PatchPulseConfig {
 
   if (config.ignorePaths && Array.isArray(config.ignorePaths)) {
     validated.ignorePaths = config.ignorePaths.filter(
+      (item: any) => typeof item === 'string',
+    );
+  }
+
+  if (config.includePaths && Array.isArray(config.includePaths)) {
+    validated.includePaths = config.includePaths.filter(
       (item: any) => typeof item === 'string',
     );
   }
@@ -220,6 +237,41 @@ export function shouldIgnorePath({
   const normalizedPath = normalizeConfigPath(path);
 
   return config.ignorePaths.some((pattern) => {
+    const normalizedPattern = normalizeConfigPath(pattern);
+
+    if (
+      !hasPatternSyntax(normalizedPattern) &&
+      (normalizedPath === normalizedPattern ||
+        normalizedPath.startsWith(`${normalizedPattern}/`))
+    ) {
+      return true;
+    }
+
+    return matchesPattern({
+      value: normalizedPath,
+      pattern: normalizedPattern,
+    });
+  });
+}
+
+/**
+ * Checks if a path is explicitly included via config, overriding gitignore.
+ * ignorePaths still takes priority over includePaths.
+ */
+export function shouldIncludePath({
+  path,
+  config = {},
+}: {
+  path: string;
+  config: PatchPulseConfig | undefined;
+}): boolean {
+  if (!config.includePaths || config.includePaths.length === 0) {
+    return false;
+  }
+
+  const normalizedPath = normalizeConfigPath(path);
+
+  return config.includePaths.some((pattern) => {
     const normalizedPattern = normalizeConfigPath(pattern);
 
     if (

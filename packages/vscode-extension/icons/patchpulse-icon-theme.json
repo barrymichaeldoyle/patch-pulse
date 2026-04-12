@@ -1,0 +1,13 @@
+{
+  "iconDefinitions": {
+    "_patchpulse": {
+      "iconPath": "./patchpulse-file.svg"
+    }
+  },
+  "fileNames": {
+    "patchpulse.json": "_patchpulse",
+    "patchpulse.config.json": "_patchpulse",
+    ".patchpulserc": "_patchpulse",
+    ".patchpulserc.json": "_patchpulse"
+  }
+}

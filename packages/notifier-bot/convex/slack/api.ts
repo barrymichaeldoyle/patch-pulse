@@ -207,6 +207,179 @@ export function trackModalView() {
   };
 }
 
+export const MANAGE_MODAL_CALLBACK_ID = 'manage_modal';
+export const MANAGE_ACTIONS_MODAL_CALLBACK_ID = 'manage_actions_modal';
+export function manageModalView(entries: HomePackageEntry[]) {
+  const sorted = [...entries].sort((a, b) =>
+    a.packageName.localeCompare(b.packageName),
+  );
+  const options = sorted.map((entry) => {
+    const dest = entry.channelName
+      ? `#${entry.channelName}`
+      : entry.channelId
+        ? `<#${entry.channelId}>`
+        : 'DM';
+    const label = `${entry.packageName} (${dest})`.slice(0, 75);
+    return {
+      text: { type: 'plain_text', text: label },
+      value: entry.subscriptionId,
+    };
+  });
+  return {
+    type: 'modal',
+    callback_id: MANAGE_MODAL_CALLBACK_ID,
+    title: { type: 'plain_text', text: 'Manage a package' },
+    submit: { type: 'plain_text', text: 'Next' },
+    close: { type: 'plain_text', text: 'Cancel' },
+    blocks: [
+      {
+        type: 'input',
+        block_id: 'subscription_block',
+        label: { type: 'plain_text', text: 'Package' },
+        element: {
+          type: 'static_select',
+          action_id: 'subscription_input',
+          placeholder: { type: 'plain_text', text: 'Select a package…' },
+          options,
+        },
+      },
+    ],
+  };
+}
+
+export function manageActionsModalView(entry: HomePackageEntry) {
+  const allThresholds = [
+    {
+      text: { type: 'plain_text', text: 'All updates (patch+)' },
+      value: 'patch',
+    },
+    {
+      text: { type: 'plain_text', text: 'Minor & major only' },
+      value: 'minor',
+    },
+    { text: { type: 'plain_text', text: 'Major only' }, value: 'major' },
+  ];
+  const currentThreshold = entry.minUpdateType ?? 'patch';
+  const initialOption = allThresholds.find((t) => t.value === currentThreshold)!;
+  const actionValue = JSON.stringify({
+    s: entry.subscriptionId,
+    p: entry.packageName,
+  });
+  return {
+    type: 'modal',
+    callback_id: MANAGE_ACTIONS_MODAL_CALLBACK_ID,
+    private_metadata: JSON.stringify({ subscriptionId: entry.subscriptionId }),
+    title: { type: 'plain_text', text: 'Manage package' },
+    submit: { type: 'plain_text', text: 'Save' },
+    close: { type: 'plain_text', text: 'Back' },
+    blocks: [
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `*${entry.packageName}*  \`${entry.currentVersion}\``,
+        },
+      },
+      {
+        type: 'input',
+        block_id: 'threshold_block',
+        label: { type: 'plain_text', text: 'Notify me on' },
+        element: {
+          type: 'static_select',
+          action_id: 'threshold_input',
+          initial_option: initialOption,
+          options: allThresholds,
+        },
+      },
+      {
+        type: 'actions',
+        elements: [
+          {
+            type: 'button',
+            text: { type: 'plain_text', text: '↪️  Move to channel…' },
+            action_id: 'manage_move',
+            value: actionValue,
+          },
+          {
+            type: 'button',
+            text: { type: 'plain_text', text: '🗑️  Untrack' },
+            action_id: 'manage_untrack',
+            style: 'danger',
+            value: actionValue,
+            confirm: {
+              title: { type: 'plain_text', text: 'Untrack package' },
+              text: {
+                type: 'mrkdwn',
+                text: `Stop tracking *${entry.packageName}*?`,
+              },
+              confirm: { type: 'plain_text', text: 'Untrack' },
+              deny: { type: 'plain_text', text: 'Cancel' },
+            },
+          },
+        ],
+      },
+    ],
+  };
+}
+
+export async function openManageModal(
+  token: string,
+  triggerId: string,
+  entries: HomePackageEntry[],
+): Promise<void> {
+  const response = await fetch('https://slack.com/api/views.open', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      trigger_id: triggerId,
+      view: manageModalView(entries),
+    }),
+  });
+  const data = await response.json();
+  if (!data.ok) throw new Error(`Slack views.open error: ${data.error}`);
+}
+
+export async function pushMoveChannelModal(
+  token: string,
+  triggerId: string,
+  subscriptionId: string,
+  packageName: string,
+): Promise<void> {
+  const response = await fetch('https://slack.com/api/views.push', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      trigger_id: triggerId,
+      view: moveChannelModalView(subscriptionId, packageName),
+    }),
+  });
+  const data = await response.json();
+  if (!data.ok) throw new Error(`Slack views.push error: ${data.error}`);
+}
+
+export async function updateSlackView(
+  token: string,
+  viewId: string,
+  view: object,
+): Promise<void> {
+  const response = await fetch('https://slack.com/api/views.update', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ view_id: viewId, view }),
+  });
+  const data = await response.json();
+  if (!data.ok) throw new Error(`Slack views.update error: ${data.error}`);
+}
+
 export const MOVE_CHANNEL_MODAL_CALLBACK_ID = 'move_channel_modal';
 
 export function moveChannelModalView(
@@ -301,18 +474,22 @@ export async function publishAppHome(
     { type: 'divider' },
   ];
 
-  // "Track a package" button always at the top
-  blocks.push({
-    type: 'actions',
-    elements: [
-      {
-        type: 'button',
-        text: { type: 'plain_text', text: '＋  Track a package' },
-        style: 'primary',
-        action_id: 'track_package',
-      },
-    ],
-  });
+  const actionButtons: any[] = [
+    {
+      type: 'button',
+      text: { type: 'plain_text', text: '＋  Track a package' },
+      style: 'primary',
+      action_id: 'track_package',
+    },
+  ];
+  if (entries && entries.length > 0) {
+    actionButtons.push({
+      type: 'button',
+      text: { type: 'plain_text', text: '⚙️  Manage a package' },
+      action_id: 'manage_package',
+    });
+  }
+  blocks.push({ type: 'actions', elements: actionButtons });
 
   if (entries && entries.length > 0) {
     // Group by destination key, sort DM before channels
@@ -323,8 +500,10 @@ export async function publishAppHome(
     for (const entry of [...entries].sort((a, b) =>
       a.packageName.localeCompare(b.packageName),
     )) {
+      // Group by channel name (when resolved) to avoid duplicates from ID mismatches,
+      // falling back to channel ID, then DM user ID.
       const key = entry.channelId
-        ? `channel:${entry.channelId}`
+        ? `channel:${(entry.channelName ?? entry.channelId).toLowerCase()}`
         : `dm:${entry.userId}`;
       const heading = entry.channelId
         ? `📣 *${channelLabel(entry.channelId, entry.channelName)}*`
@@ -351,72 +530,20 @@ export async function publishAppHome(
     blocks.push({ type: 'section', text: { type: 'mrkdwn', text: summary } });
 
     for (const [, { heading, entries: groupEntries }] of sortedGroups) {
+      blocks.push({ type: 'divider' });
       blocks.push({ type: 'section', text: { type: 'mrkdwn', text: heading } });
-      blocks.push({
-        type: 'section',
-        fields: [
-          { type: 'mrkdwn', text: '*Package*' },
-          { type: 'mrkdwn', text: '*Version*' },
-          { type: 'mrkdwn', text: '*Notify on*' },
-        ],
-      });
 
       for (const entry of groupEntries) {
         const npmUrl = `https://www.npmjs.com/package/${entry.packageName}`;
         const versionText = entry.githubRepoUrl
           ? `<${entry.githubRepoUrl}/releases|${entry.currentVersion}>`
-          : entry.currentVersion;
+          : `\`${entry.currentVersion}\``;
         const thresholdLabel = homeThresholdLabel(entry.minUpdateType);
-
-        const sid = entry.subscriptionId;
-
-        // Build threshold change options — only show options different from current
-        const allThresholds: Array<{
-          label: string;
-          value: 'patch' | 'minor' | 'major';
-        }> = [
-          { label: 'All updates (patch+)', value: 'patch' },
-          { label: 'Minor & major only', value: 'minor' },
-          { label: 'Major only', value: 'major' },
-        ];
-        const currentThreshold = entry.minUpdateType ?? 'patch';
-        const thresholdOptions = allThresholds
-          .filter((t) => t.value !== currentThreshold)
-          .map((t) => ({
-            text: { type: 'plain_text', text: `🔔  ${t.label}` },
-            value: JSON.stringify({ a: 't', t: t.value, s: sid }),
-          }));
-
-        const moveOption = {
-          text: { type: 'plain_text', text: '↪️  Move to channel…' },
-          value: JSON.stringify({ a: 'm', s: sid }),
-        };
-
-        const untrackOption = {
-          text: { type: 'plain_text', text: '🗑️  Untrack' },
-          value: JSON.stringify({ a: 'u', s: sid }),
-        };
-
         blocks.push({
           type: 'section',
-          fields: [
-            {
-              type: 'mrkdwn',
-              text: `<${npmUrl}|${entry.packageName}>`,
-            },
-            {
-              type: 'mrkdwn',
-              text: versionText,
-            },
-            {
-              type: 'mrkdwn',
-              text: thresholdLabel,
-            },
-          ],
-          accessory: {
-            type: 'overflow',
-            action_id: 'package_menu',
-            options: [...thresholdOptions, moveOption, untrackOption],
+          text: {
+            type: 'mrkdwn',
+            text: `*<${npmUrl}|${entry.packageName}>*  ${versionText}  ·  ${thresholdLabel}`,
           },
         });
       }

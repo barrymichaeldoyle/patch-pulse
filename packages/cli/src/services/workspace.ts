@@ -5,7 +5,12 @@ import {
   getDependencySections,
 } from '@patch-pulse/shared';
 import { type DependencySource, type PackageJson } from '../types';
-import { type PatchPulseConfig, shouldIgnorePath } from './config';
+import { isGitignored, readGitignorePatterns } from '../utils/gitignore';
+import {
+  type PatchPulseConfig,
+  shouldIgnorePath,
+  shouldIncludePath,
+} from './config';
 import { readPackageJson } from './package';
 
 type DependencySectionName = (typeof PACKAGE_JSON_DEPENDENCY_FIELDS)[number];
@@ -96,15 +101,22 @@ function findPackageJsonPaths(
   config?: PatchPulseConfig,
 ): string[] {
   const packageJsonPaths: string[] = [];
+  const gitignorePatterns = readGitignorePatterns(rootCwd);
 
   function visitDirectory(directory: string): void {
     const relativeDirectory = relative(rootCwd, directory) || '.';
 
-    if (
-      relativeDirectory !== '.' &&
-      shouldIgnorePath({ path: relativeDirectory, config })
-    ) {
-      return;
+    if (relativeDirectory !== '.') {
+      if (shouldIgnorePath({ path: relativeDirectory, config })) {
+        return;
+      }
+
+      if (
+        isGitignored(relativeDirectory, gitignorePatterns) &&
+        !shouldIncludePath({ path: relativeDirectory, config })
+      ) {
+        return;
+      }
     }
 
     const entries = readdirSync(directory, { withFileTypes: true });

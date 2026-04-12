@@ -70,3 +70,31 @@ describe('scanWorkspace', () => {
     ]);
   });
 });
+
+describe('scanWorkspace (gitignore)', () => {
+  it('skips directories listed in .gitignore', async () => {
+    const workspacePath = fileURLToPath(
+      new URL('../../../e2e/with-gitignore/fixtures/', import.meta.url),
+    );
+
+    const result = await scanWorkspace(workspacePath);
+
+    const relativePaths = result.projects.map((project) => project.relativePath);
+    expect(relativePaths).toContain('packages/app');
+    expect(relativePaths).not.toContain('dist');
+  });
+
+  it('scans a gitignored directory when it is listed in includePaths', async () => {
+    const workspacePath = fileURLToPath(
+      new URL('../../../e2e/with-gitignore/fixtures/', import.meta.url),
+    );
+
+    const result = await scanWorkspace(workspacePath, {
+      includePaths: ['dist'],
+    });
+
+    const relativePaths = result.projects.map((project) => project.relativePath);
+    expect(relativePaths).toContain('dist');
+    expect(relativePaths).toContain('packages/app');
+  });
+});

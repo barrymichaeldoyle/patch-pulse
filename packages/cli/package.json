@@ -1,6 +1,6 @@
 {
   "name": "patch-pulse",
-  "version": "3.0.1",
+  "version": "3.1.0",
   "description": "Check for outdated npm dependencies",
   "type": "module",
   "bin": {
@@ -46,7 +46,6 @@
     "test:ui": "vitest --ui"
   },
   "devDependencies": {
-    "@patch-pulse/shared": "workspace:*",
-    "esbuild": "0.25.6"
+    "@patch-pulse/shared": "workspace:*"
   }
 }

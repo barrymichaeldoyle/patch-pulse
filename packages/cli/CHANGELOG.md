@@ -1,5 +1,17 @@
 # patch-pulse
 
+## 3.1.0
+
+### Minor Changes
+
+- Automatically respect `.gitignore` when scanning for `package.json` files. Directories listed in `.gitignore` (such as `dist/`, `build/`, `.next/`) are now skipped during workspace traversal, preventing false positives from build output.
+
+  A new `includePaths` config option lets you opt specific gitignored directories back into scanning when needed. `ignorePaths` continues to take priority over `includePaths`.
+
+  `patchpulse.json` is now a supported config filename and is the preferred format going forward. `patchpulse.config.json` and `.patchpulserc` variants remain supported.
+
+  Also updated the README example screenshot.
+
 ## 3.0.1
 
 ### Patch Changes

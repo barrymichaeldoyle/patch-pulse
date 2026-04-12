@@ -4,8 +4,13 @@ import { Id } from '../_generated/dataModel';
 import { verifySlackRequest } from './verify';
 import {
   openTrackModal,
-  openMoveChannelModal,
+  openManageModal,
+  manageActionsModalView,
+  pushMoveChannelModal,
+  updateSlackView,
   TRACK_MODAL_CALLBACK_ID,
+  MANAGE_MODAL_CALLBACK_ID,
+  MANAGE_ACTIONS_MODAL_CALLBACK_ID,
   MOVE_CHANNEL_MODAL_CALLBACK_ID,
 } from './api';
 
@@ -21,21 +26,18 @@ export const slackInteractions = httpAction(async (ctx, request) => {
   const payload = JSON.parse(params.get('payload') ?? '{}');
 
   if (payload.type === 'block_actions') {
+    // Fetch subscriber/details once — used by multiple action handlers below
+    const subscriber = await ctx.runQuery(internal.subscribers.getByTeamId, {
+      teamId: payload.team.id,
+    });
+    const details = subscriber
+      ? await ctx.runQuery(internal.subscribers.getSlackDetails, {
+          subscriberId: subscriber._id,
+        })
+      : null;
+
     for (const action of payload.actions ?? []) {
       if (action.action_id === 'track_package') {
-        // Must call views.open synchronously — trigger_id expires in 3 seconds
-        const subscriber = await ctx.runQuery(
-          internal.subscribers.getByTeamId,
-          {
-            teamId: payload.team.id,
-          },
-        );
-        const details = subscriber
-          ? await ctx.runQuery(internal.subscribers.getSlackDetails, {
-              subscriberId: subscriber._id,
-            })
-          : null;
-
         if (details) {
           try {
             await openTrackModal(details.accessToken, payload.trigger_id);
@@ -45,69 +47,99 @@ export const slackInteractions = httpAction(async (ctx, request) => {
         }
       }
 
-      if (action.action_id === 'package_menu') {
-        const value = JSON.parse(action.selected_option?.value ?? '{}') as {
-          a: 't' | 'm' | 'u';
-          s?: string;
-          t?: 'patch' | 'minor' | 'major';
-        };
-        const subscriptionId = value.s as Id<'subscriptions'> | undefined;
-        if (!subscriptionId) continue;
+      if (action.action_id === 'manage_package') {
+        if (details && subscriber) {
+          try {
+            const allSubscriptions = await ctx.runQuery(
+              internal.subscriptions.getBySubscriber,
+              { subscriberId: subscriber._id },
+            );
+            const subscriptions = allSubscriptions.filter(
+              (sub) => sub.channelId || sub.userId === payload.user.id,
+            );
+            const packageIds = [
+              ...new Set(subscriptions.map((s) => s.packageId)),
+            ];
+            const packages = await ctx.runQuery(internal.packages.getByIds, {
+              ids: packageIds,
+            });
+            const entries = subscriptions
+              .map((sub) => {
+                const pkg = packages.find((p) => p?._id === sub.packageId);
+                if (!pkg) return null;
+                return {
+                  subscriptionId: sub._id,
+                  packageName: pkg.name,
+                  currentVersion: pkg.currentVersion,
+                  githubRepoUrl: pkg.githubRepoUrl,
+                  minUpdateType: sub.minUpdateType,
+                  channelId: sub.channelId,
+                  channelName: sub.channelName,
+                  userId: sub.userId,
+                  lastChecked: pkg.lastChecked,
+                };
+              })
+              .filter((e): e is NonNullable<typeof e> => e !== null);
+            await openManageModal(
+              details.accessToken,
+              payload.trigger_id,
+              entries,
+            );
+          } catch (error) {
+            console.error('Failed to open manage modal:', error);
+          }
+        }
+      }
 
-        if (value.a === 'u') {
-          // Untrack
+      if (action.action_id === 'manage_move') {
+        const { s: subscriptionId, p: packageName } = JSON.parse(
+          action.value ?? '{}',
+        ) as { s?: string; p?: string };
+        if (details && subscriptionId && packageName) {
+          try {
+            await pushMoveChannelModal(
+              details.accessToken,
+              payload.trigger_id,
+              subscriptionId,
+              packageName,
+            );
+          } catch (error) {
+            console.error('Failed to push move channel modal:', error);
+          }
+        }
+      }
+
+      if (action.action_id === 'manage_untrack') {
+        const { s: subscriptionId } = JSON.parse(
+          action.value ?? '{}',
+        ) as { s?: string };
+        if (subscriptionId && details) {
           await ctx.scheduler.runAfter(
             0,
             internal.slack.commands.processUntrackAction,
             {
               teamId: payload.team.id,
               viewingUserId: payload.user.id,
-              subscriptionId,
+              subscriptionId: subscriptionId as Id<'subscriptions'>,
             },
           );
-        } else if (value.a === 't' && value.t) {
-          // Change threshold
-          await ctx.scheduler.runAfter(
-            0,
-            internal.slack.commands.processThresholdChange,
-            {
-              teamId: payload.team.id,
-              viewingUserId: payload.user.id,
-              subscriptionId,
-              minUpdateType: value.t,
-            },
-          );
-        } else if (value.a === 'm') {
-          // Move to channel — open modal synchronously
-          const subscriber = await ctx.runQuery(
-            internal.subscribers.getByTeamId,
-            {
-              teamId: payload.team.id,
-            },
-          );
-          const details = subscriber
-            ? await ctx.runQuery(internal.subscribers.getSlackDetails, {
-                subscriberId: subscriber._id,
-              })
-            : null;
-          const sub = await ctx.runQuery(internal.subscriptions.getById, {
-            subscriptionId,
-          });
-          if (details && sub) {
-            const pkg = await ctx.runQuery(internal.packages.getByIds, {
-              ids: [sub.packageId],
+          try {
+            await updateSlackView(details.accessToken, payload.view.id, {
+              type: 'modal',
+              title: { type: 'plain_text', text: 'Done' },
+              close: { type: 'plain_text', text: 'Close' },
+              blocks: [
+                {
+                  type: 'section',
+                  text: {
+                    type: 'mrkdwn',
+                    text: '✅ Package untracked successfully.',
+                  },
+                },
+              ],
             });
-            const packageName = pkg[0]?.name ?? '';
-            try {
-              await openMoveChannelModal(
-                details.accessToken,
-                payload.trigger_id,
-                subscriptionId,
-                packageName,
-              );
-            } catch (error) {
-              console.error('Failed to open move channel modal:', error);
-            }
+          } catch (error) {
+            console.error('Failed to update view after untrack:', error);
           }
         }
       }
@@ -146,6 +178,73 @@ export const slackInteractions = httpAction(async (ctx, request) => {
       }
 
       return new Response(JSON.stringify({}), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (payload.view?.callback_id === MANAGE_MODAL_CALLBACK_ID) {
+      const selectedSubId: string | undefined =
+        payload.view.state.values?.subscription_block?.subscription_input
+          ?.selected_option?.value;
+      if (selectedSubId) {
+        const sub = await ctx.runQuery(internal.subscriptions.getById, {
+          subscriptionId: selectedSubId as Id<'subscriptions'>,
+        });
+        if (sub) {
+          const pkgs = await ctx.runQuery(internal.packages.getByIds, {
+            ids: [sub.packageId],
+          });
+          const pkg = pkgs[0];
+          if (pkg) {
+            const entry = {
+              subscriptionId: sub._id,
+              packageName: pkg.name,
+              currentVersion: pkg.currentVersion,
+              githubRepoUrl: pkg.githubRepoUrl,
+              minUpdateType: sub.minUpdateType,
+              channelId: sub.channelId,
+              channelName: sub.channelName,
+              userId: sub.userId,
+              lastChecked: pkg.lastChecked,
+            };
+            return new Response(
+              JSON.stringify({
+                response_action: 'push',
+                view: manageActionsModalView(entry),
+              }),
+              { headers: { 'Content-Type': 'application/json' } },
+            );
+          }
+        }
+      }
+      return new Response(JSON.stringify({ response_action: 'clear' }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (payload.view?.callback_id === MANAGE_ACTIONS_MODAL_CALLBACK_ID) {
+      const newThreshold: 'patch' | 'minor' | 'major' =
+        payload.view.state.values?.threshold_block?.threshold_input
+          ?.selected_option?.value ?? 'patch';
+      let metadata: { subscriptionId?: string } = {};
+      try {
+        metadata = JSON.parse(payload.view.private_metadata ?? '{}');
+      } catch {
+        console.error('Failed to parse manage_actions_modal metadata');
+      }
+      if (metadata.subscriptionId) {
+        await ctx.scheduler.runAfter(
+          0,
+          internal.slack.commands.processThresholdChange,
+          {
+            teamId: payload.team.id,
+            viewingUserId: payload.user.id,
+            subscriptionId: metadata.subscriptionId as Id<'subscriptions'>,
+            minUpdateType: newThreshold,
+          },
+        );
+      }
+      return new Response(JSON.stringify({ response_action: 'clear' }), {
         headers: { 'Content-Type': 'application/json' },
       });
     }
