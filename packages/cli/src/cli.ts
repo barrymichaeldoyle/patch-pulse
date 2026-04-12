@@ -192,10 +192,7 @@ export async function runCli({
         let projectSpinner: ProgressSpinner | null = null;
 
         if (!jsonOutput && !bufferAll) {
-          console.log(ansi.whiteBold(project.displayName));
-          console.log(
-            ansi.gray(`Location: ${toPackageJsonPath(project.relativePath)}`),
-          );
+          console.log(formatProjectHeader(project.displayName, project.relativePath));
           console.log(ansi.gray('─'.repeat(60)));
           if (useProjectSpinner) {
             projectSpinner = new ProgressSpinner();
@@ -331,10 +328,7 @@ export async function runCli({
         for (const project of projectReports.filter(
           (p) => p.projectNeedsAttention,
         )) {
-          console.log(ansi.whiteBold(project.displayName));
-          console.log(
-            ansi.gray(`Location: ${toPackageJsonPath(project.relativePath)}`),
-          );
+          console.log(formatProjectHeader(project.displayName, project.relativePath));
           console.log(ansi.gray('─'.repeat(60)));
           if (verboseProjects) {
             for (const section of project.sectionResults) {
@@ -465,6 +459,28 @@ export async function runCli({
 
 function toPackageJsonPath(relativePath: string): string {
   return relativePath === '.' ? 'package.json' : `${relativePath}/package.json`;
+}
+
+function formatProjectHeader(
+  displayName: string,
+  relativePath: string,
+): string {
+  const packageJsonPath = toPackageJsonPath(relativePath);
+
+  if (relativePath === '.') {
+    return `${ansi.cyanBold(displayName)} ${ansi.whiteBold(`(${packageJsonPath})`)}`;
+  }
+
+  const relativePathSuffix = `(${relativePath})`;
+
+  if (displayName.endsWith(relativePathSuffix)) {
+    return (
+      `${ansi.cyanBold(displayName.slice(0, -relativePathSuffix.length).trimEnd())} ` +
+      `${ansi.whiteBold(`(${packageJsonPath})`)}`
+    );
+  }
+
+  return `${ansi.cyanBold(displayName)} ${ansi.whiteBold(`(${packageJsonPath})`)}`;
 }
 
 function getFlagValue(args: string[], flag: string): string | undefined {
@@ -705,8 +721,8 @@ function displayAttentionProjectStatus(
       continue;
     }
 
-    console.log(ansi.cyanBold(`${section.category}:`));
-    console.log(ansi.cyan('─'.repeat(section.category.length + 1)));
+    console.log(ansi.whiteBold(`${section.category}:`));
+    console.log(ansi.gray('─'.repeat(section.category.length + 1)));
 
     for (const dependency of relevantDependencies) {
       console.log(formatDependencyResult(dependency));

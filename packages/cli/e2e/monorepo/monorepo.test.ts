@@ -148,7 +148,7 @@ describe('monorepo project', () => {
     expect(exitCode).toBe(0);
     const output = stripAnsi(logSpy.mock.calls.flat().join('\n'));
     expect(output).not.toContain('@fixture/admin (packages/admin)');
-    expect(output).toContain('@fixture/app (packages/app)');
+    expect(output).toContain('@fixture/app (packages/app/package.json)');
     expect(output).toContain(
       '!  Attention: 1 package needs review (1 outdated)',
     );
@@ -165,7 +165,7 @@ describe('monorepo project', () => {
 
     expect(exitCode).toBe(0);
     const output = stripAnsi(logSpy.mock.calls.flat().join('\n'));
-    expect(output).toContain('@fixture/app (packages/app)');
+    expect(output).toContain('@fixture/app (packages/app/package.json)');
     expect(output).not.toContain('@fixture/admin (packages/admin)');
     expect(output).not.toContain('@repo/shared');
   });

@@ -1,8 +1,7 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`project with config skip > prints skipped packages alongside checked ones 1`] = `
-"fixture-with-config-skip
-Location: package.json
+"fixture-with-config-skip (package.json)
 ────────────────────────────────────────────────────────────
 Dependencies:
 ─────────────

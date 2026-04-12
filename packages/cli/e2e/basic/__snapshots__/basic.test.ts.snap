@@ -1,8 +1,7 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`basic project > prints a full dependency summary 1`] = `
-"fixture-basic
-Location: package.json
+"fixture-basic (package.json)
 ────────────────────────────────────────────────────────────
 Dependencies:
 ─────────────

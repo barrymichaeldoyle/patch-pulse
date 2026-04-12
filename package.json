@@ -45,7 +45,7 @@
     "test": "pnpm run test:shared && pnpm run test:cli && pnpm run test:notifier",
     "typecheck": "pnpm --filter patch-pulse typecheck && pnpm --filter @patch-pulse/notifier-bot typecheck",
     "changeset": "changeset",
-    "changeset:version": "changeset version",
+    "changeset:version": "changeset version && pnpm --filter patch-pulse exec node scripts/generate-version.cjs",
     "changeset:publish": "pnpm build:cli && changeset publish"
   }
 }

@@ -48,6 +48,7 @@
     "oxfmt",
     "oxlint",
     "patchpulse",
+    "Updateable",
     "vitest"
   ]
 }

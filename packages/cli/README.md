@@ -26,7 +26,7 @@ Docs: https://barrymichaeldoyle.github.io/patch-pulse/
 - Monorepo-aware, including pnpm `catalog:` support
 - Interactive terminal updates for patch, minor, or all outdated packages
 
-![Example Screenshot](assets/example.png)
+![Example CLI Demo](assets/example.gif)
 
 ## Configuration
 

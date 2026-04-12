@@ -103,8 +103,8 @@ export function displayDependencyResults({
   category: string;
   dependencyInfos: DependencyInfo[];
 }): void {
-  console.log(ansi.cyanBold(`${category}:`));
-  console.log(ansi.cyan('─'.repeat(category.length + 1)));
+  console.log(ansi.whiteBold(`${category}:`));
+  console.log(ansi.gray('─'.repeat(category.length + 1)));
   displayResults(dependencyInfos);
   console.log();
 }
