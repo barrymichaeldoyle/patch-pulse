@@ -1,0 +1,96 @@
+---
+const owner = 'barrymichaeldoyle';
+const repo = 'patch-pulse';
+const repoUrl = `https://github.com/${owner}/${repo}`;
+const stargazersUrl = `${repoUrl}/stargazers`;
+
+let starCount: string | null = null;
+
+try {
+  const response = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
+    headers: {
+      Accept: 'application/vnd.github+json',
+      'User-Agent': 'patch-pulse-docs',
+    },
+  });
+
+  if (response.ok) {
+    const data = await response.json();
+
+    if (typeof data.stargazers_count === 'number') {
+      starCount = new Intl.NumberFormat('en').format(data.stargazers_count);
+    }
+  }
+} catch {
+  // Keep the header CTA available even if the API is unavailable during build.
+}
+---
+
+<a
+  class="header-repo-star"
+  href={starCount ? stargazersUrl : repoUrl}
+  target="_blank"
+  rel="noreferrer"
+  aria-label={starCount ? `Star Patch Pulse on GitHub. ${starCount} stars.` : 'Star Patch Pulse on GitHub'}
+>
+  <span class="header-repo-star__label">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path
+        fill="currentColor"
+        d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
+      />
+    </svg>
+    <span>Star</span>
+  </span>
+
+  {starCount && <span class="header-repo-star__count">{starCount}</span>}
+</a>
+
+<style>
+  .header-repo-star {
+    display: inline-flex;
+    gap: 0.55rem;
+    align-items: center;
+    padding: 0.45rem 0.7rem 0.45rem 0.65rem;
+    border: 1px solid rgba(37, 237, 156, 0.22);
+    border-radius: 999px;
+    color: var(--sl-color-gray-1);
+    background: rgba(16, 49, 38, 0.38);
+    text-decoration: none;
+    line-height: 1;
+    transition:
+      border-color 160ms ease,
+      background-color 160ms ease,
+      transform 160ms ease;
+  }
+
+  .header-repo-star:hover {
+    transform: translateY(-1px);
+    border-color: rgba(37, 237, 156, 0.42);
+    background: rgba(16, 49, 38, 0.6);
+  }
+
+  .header-repo-star__label {
+    display: inline-flex;
+    gap: 0.4rem;
+    align-items: center;
+    font-size: 0.9rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .header-repo-star__label svg {
+    width: 0.9rem;
+    height: 0.9rem;
+    color: var(--sl-color-text-accent);
+  }
+
+  .header-repo-star__count {
+    padding: 0.2rem 0.45rem;
+    border-radius: 999px;
+    color: var(--sl-color-text-invert);
+    background: var(--sl-color-accent);
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+</style>

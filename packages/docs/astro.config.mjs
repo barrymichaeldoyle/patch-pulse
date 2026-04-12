@@ -14,6 +14,7 @@ export default defineConfig({
       disable404Route: true,
       customCss: ['./src/styles/custom.css'],
       components: {
+        Header: './src/components/Header.astro',
         SiteTitle: './src/components/SiteTitle.astro',
         ThemeProvider: './src/components/DarkThemeProvider.astro',
         ThemeSelect: './src/components/ThemeTogglePlaceholder.astro',
