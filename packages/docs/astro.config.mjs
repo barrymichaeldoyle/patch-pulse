@@ -11,6 +11,7 @@ export default defineConfig({
     starlight({
       title: 'Patch Pulse',
       description: 'Keep a pulse on your npm dependencies.',
+      disable404Route: true,
       customCss: ['./src/styles/custom.css'],
       components: {
         SiteTitle: './src/components/SiteTitle.astro',
