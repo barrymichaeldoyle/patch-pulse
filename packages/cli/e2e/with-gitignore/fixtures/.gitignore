@@ -1,2 +1,4 @@
 # build output
 dist/
+!dist/
+!dist/package.json

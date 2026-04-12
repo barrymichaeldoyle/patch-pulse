@@ -4,6 +4,8 @@
 
 PatchPulse helps you stay on top of npm dependency updates across your projects.
 
+Live docs: https://barrymichaeldoyle.github.io/patch-pulse/
+
 | Tool                                             | Status                          | Description                                              |
 | ------------------------------------------------ | ------------------------------- | -------------------------------------------------------- |
 | [Slack bot](#slack-bot)                          | Live                            | Get notified in Slack when your packages release updates |
@@ -69,6 +71,7 @@ PatchPulse is a `pnpm` monorepo.
 
 Workspace docs:
 
+- [Live docs site](https://barrymichaeldoyle.github.io/patch-pulse/)
 - [Contributing](./CONTRIBUTING.md)
 - [Support](./SUPPORT.md)
 

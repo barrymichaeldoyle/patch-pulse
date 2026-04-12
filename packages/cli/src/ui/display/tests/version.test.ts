@@ -27,9 +27,13 @@ describe('displayVersion', () => {
     expect(output).toContain('Patch Pulse CLI');
     expect(output).toContain('Version:');
     expect(output).toContain('Author:');
+    expect(output).toContain('Docs:');
     expect(output).toContain('Repo:');
     expect(output).toContain('License:');
     expect(output).toContain('MIT');
+    expect(output).toContain(
+      'https://barrymichaeldoyle.github.io/patch-pulse/',
+    );
     expect(output).toContain(
       'https://github.com/barrymichaeldoyle/patch-pulse/tree/main/packages/cli',
     );

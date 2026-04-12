@@ -2,6 +2,7 @@ import { ansi } from '../ansi';
 import { createCenteredBox } from '../createCenteredBox';
 import {
   CLI_REPO_URL,
+  DOCS_URL,
   ISSUES_URL,
   SLACK_BOT_URL,
   SPONSORS_URL,
@@ -14,6 +15,7 @@ ${ansi.white('Patch Pulse checks npm dependency versions across apps and monorep
 ${ansi.white('It keeps the CLI lean: zero runtime dependencies, pnpm catalog support,')}
 ${ansi.white('interactive updates, and now machine-readable output with --json.')}
 
+${ansi.cyanBold('Docs:')}      ${ansi.white(ansi.link('barrymichaeldoyle.github.io/patch-pulse', DOCS_URL))}
 ${ansi.cyanBold('Repo:')}      ${ansi.white(ansi.link('barrymichaeldoyle/patch-pulse', CLI_REPO_URL))}
 ${ansi.cyanBold('Issues:')}    ${ansi.white(ansi.link('Report a bug or request a feature', ISSUES_URL))}
 ${ansi.cyanBold('Sponsors:')}  ${ansi.white(ansi.link('Support development on GitHub Sponsors', SPONSORS_URL))}

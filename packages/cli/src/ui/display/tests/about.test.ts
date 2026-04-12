@@ -20,6 +20,7 @@ describe('displayAbout', () => {
     expect(output).toContain('About Patch Pulse');
     expect(output).toContain('zero runtime dependencies');
     expect(output).toContain('--json');
+    expect(output).toContain('barrymichaeldoyle.github.io/patch-pulse');
     expect(output).toContain('barrymichaeldoyle/patch-pulse');
     expect(output).toContain('GitHub Sponsors');
     expect(output).toContain('Patch Pulse Slack bot');

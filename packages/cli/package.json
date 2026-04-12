@@ -1,6 +1,6 @@
 {
   "name": "patch-pulse",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "description": "Check for outdated npm dependencies",
   "type": "module",
   "bin": {
@@ -26,7 +26,7 @@
     "name": "Barry Michael Doyle",
     "email": "barry@barrymichaeldoyle.com"
   },
-  "homepage": "https://github.com/barrymichaeldoyle/patch-pulse/tree/main/packages/cli#readme",
+  "homepage": "https://barrymichaeldoyle.github.io/patch-pulse/",
   "bugs": {
     "url": "https://github.com/barrymichaeldoyle/patch-pulse/issues"
   },

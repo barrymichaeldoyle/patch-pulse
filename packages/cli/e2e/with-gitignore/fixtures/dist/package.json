@@ -1,0 +1,6 @@
+{
+  "name": "dist-build-output",
+  "dependencies": {
+    "react": "^18.2.0"
+  }
+}

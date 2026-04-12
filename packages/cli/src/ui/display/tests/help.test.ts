@@ -30,6 +30,7 @@ describe('displayHelp', () => {
     expect(output).toContain('Configuration File:');
     expect(output).toContain('--json');
     expect(output).toContain('--project <name|path>');
+    expect(output).toContain('barrymichaeldoyle.github.io/patch-pulse');
     expect(madeWithLoveSpy).toHaveBeenCalled();
   });
 });

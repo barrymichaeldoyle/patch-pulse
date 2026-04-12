@@ -20,6 +20,8 @@ npx patch-pulse
 
 That's it! Patch Pulse scans the current project for `package.json` files and shows which dependencies are outdated.
 
+Docs: https://barrymichaeldoyle.github.io/patch-pulse/
+
 - Zero runtime dependencies
 - Monorepo-aware, including pnpm `catalog:` support
 - Interactive terminal updates for patch, minor, or all outdated packages
@@ -162,6 +164,7 @@ Get notified in Slack whenever a package you depend on releases a new version.
 
 ## Support
 
+- 📚 **Read the docs** at [barrymichaeldoyle.github.io/patch-pulse](https://barrymichaeldoyle.github.io/patch-pulse/)
 - ⭐ **Star** the repo
 - 🐛 **Report bugs** via [Issues](https://github.com/barrymichaeldoyle/patch-pulse/issues)
 - 💬 **Join discussions** in [Discussions](https://github.com/barrymichaeldoyle/patch-pulse/discussions)

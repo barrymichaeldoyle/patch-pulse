@@ -1,5 +1,15 @@
 # patch-pulse
 
+## 4.0.1
+
+### Patch Changes
+
+- Refresh the CLI screenshot and point users to the live docs site from the CLI package.
+  - update the example screenshot in the CLI README/package assets
+  - point the npm package homepage at the published docs site
+  - add the docs site to the CLI help, about, and version output
+  - add explicit docs links in the CLI README
+
 ## 4.0.0
 
 ### Major Changes

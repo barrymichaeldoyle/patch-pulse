@@ -1,6 +1,6 @@
 import { ansi } from '../ansi';
 import { createCenteredBox } from '../createCenteredBox';
-import { CLI_REPO_URL, ISSUES_URL, SLACK_BOT_URL } from '../../constant';
+import { DOCS_URL, ISSUES_URL, SLACK_BOT_URL } from '../../constant';
 import { displayMadeWithLove } from './madeWithLove';
 
 /**
@@ -70,7 +70,7 @@ ${ansi.cyanBoldUnderline('💡 Examples:')}
   ${ansi.white('npx patch-pulse --json --fail')}            ${ansi.gray('# Machine-readable output + non-zero exit for CI scripts')}
 
 ${ansi.cyanBoldUnderline('🔗 Links:')}
-  ${ansi.blue('📚 Docs:')}      ${ansi.white(ansi.link('barrymichaeldoyle/patch-pulse', CLI_REPO_URL))}
+  ${ansi.blue('📚 Docs:')}      ${ansi.white(ansi.link('barrymichaeldoyle.github.io/patch-pulse', DOCS_URL))}
   ${ansi.blue('🐛 Issues:')}    ${ansi.white(ansi.link('Open an issue', ISSUES_URL))}
   ${ansi.blue('👨‍ Author:')}    ${ansi.white(ansi.link('github.com/barrymichaeldoyle', 'https://github.com/barrymichaeldoyle'))}
   ${ansi.blue('🤖 Slack Bot:')} ${ansi.white(ansi.link('Add to Slack', SLACK_BOT_URL))}`);
