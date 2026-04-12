@@ -192,7 +192,9 @@ export async function runCli({
         let projectSpinner: ProgressSpinner | null = null;
 
         if (!jsonOutput && !bufferAll) {
-          console.log(formatProjectHeader(project.displayName, project.relativePath));
+          console.log(
+            formatProjectHeader(project.displayName, project.relativePath),
+          );
           console.log(ansi.gray('─'.repeat(60)));
           if (useProjectSpinner) {
             projectSpinner = new ProgressSpinner();
@@ -328,7 +330,9 @@ export async function runCli({
         for (const project of projectReports.filter(
           (p) => p.projectNeedsAttention,
         )) {
-          console.log(formatProjectHeader(project.displayName, project.relativePath));
+          console.log(
+            formatProjectHeader(project.displayName, project.relativePath),
+          );
           console.log(ansi.gray('─'.repeat(60)));
           if (verboseProjects) {
             for (const section of project.sectionResults) {
