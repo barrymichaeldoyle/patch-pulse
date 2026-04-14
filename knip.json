@@ -14,9 +14,8 @@
       "project": ["convex/**/*.ts", "!convex/_generated/**"]
     },
     "packages/vscode-extension": {
-      "entry": ["src/extension.ts", "src/test/**/*.ts", ".vscode-test.mjs"],
-      "project": ["src/**/*.ts"],
-      "ignoreDependencies": ["@vscode/test-electron"]
+      "entry": ["src/extension.ts"],
+      "project": ["src/**/*.ts"]
     }
   }
 }

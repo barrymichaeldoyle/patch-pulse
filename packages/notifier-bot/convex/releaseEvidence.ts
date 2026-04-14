@@ -80,6 +80,11 @@ async function fetchGitHubJson<T>(path: string): Promise<T | null> {
 
   if (response.status === 404) return null;
 
+  if (response.status === 429) {
+    console.warn(`GitHub API rate limited for ${path} — will retry later`);
+    return null;
+  }
+
   if (!response.ok) {
     throw new Error(`GitHub API error ${response.status} for ${path}`);
   }

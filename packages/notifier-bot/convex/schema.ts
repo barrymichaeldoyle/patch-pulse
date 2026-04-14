@@ -33,6 +33,7 @@ export default defineSchema({
     fullText: v.string(),
     retryCount: v.number(),
     commentTs: v.optional(v.string()),
+    currentReaction: v.optional(v.string()),
     packages: v.array(
       v.object({
         name: v.string(),

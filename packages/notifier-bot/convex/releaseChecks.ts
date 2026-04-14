@@ -1,5 +1,9 @@
 import { v } from 'convex/values';
-import { internalAction, internalMutation } from './_generated/server';
+import {
+  internalAction,
+  internalMutation,
+  internalQuery,
+} from './_generated/server';
 import { internal } from './_generated/api';
 import { type Doc } from './_generated/dataModel';
 import { fetchNpmPackageManifest } from '@patch-pulse/shared';
@@ -97,31 +101,38 @@ async function syncStatusReaction(args: {
   accessToken: string;
   channelId: string;
   messageTs: string;
+  previousReaction: string | undefined;
   nextStatus: keyof typeof STATUS_REACTIONS;
-}): Promise<void> {
-  for (const reaction of Object.values(STATUS_REACTIONS)) {
+}): Promise<string> {
+  const nextReaction = STATUS_REACTIONS[args.nextStatus];
+
+  if (args.previousReaction && args.previousReaction !== nextReaction) {
     try {
       await reactionsRemove(
         args.accessToken,
         args.channelId,
         args.messageTs,
-        reaction,
+        args.previousReaction,
       );
     } catch (error) {
       console.warn('failed to remove Slack reaction:', error);
     }
   }
 
-  try {
-    await reactionsAdd(
-      args.accessToken,
-      args.channelId,
-      args.messageTs,
-      STATUS_REACTIONS[args.nextStatus],
-    );
-  } catch (error) {
-    console.warn('failed to add Slack reaction:', error);
+  if (args.previousReaction !== nextReaction) {
+    try {
+      await reactionsAdd(
+        args.accessToken,
+        args.channelId,
+        args.messageTs,
+        nextReaction,
+      );
+    } catch (error) {
+      console.warn('failed to add Slack reaction:', error);
+    }
   }
+
+  return nextReaction;
 }
 
 export const create = internalMutation({
@@ -136,12 +147,14 @@ export const create = internalMutation({
     const checkId = await ctx.db.insert('pendingReleaseChecks', {
       ...args,
       retryCount: 0,
+      currentReaction: STATUS_REACTIONS.pending,
     });
     await ctx.scheduler.runAfter(0, internal.releaseChecks.retry, { checkId });
+    return checkId;
   },
 });
 
-export const get = internalMutation({
+export const get = internalQuery({
   args: { checkId: v.id('pendingReleaseChecks') },
   handler: async (ctx, { checkId }) => {
     return await ctx.db.get(checkId);
@@ -155,10 +168,9 @@ export const saveProgress = internalMutation({
     retryCount: v.number(),
     packages: v.array(pendingPackageValidator),
     commentTs: v.optional(v.string()),
+    currentReaction: v.optional(v.string()),
   },
   handler: async (ctx, { checkId, ...patch }) => {
-    const check = await ctx.db.get(checkId);
-    if (!check) return;
     await ctx.db.patch(checkId, patch);
   },
 });
@@ -173,7 +185,7 @@ export const remove = internalMutation({
 export const retry = internalAction({
   args: { checkId: v.id('pendingReleaseChecks') },
   handler: async (ctx, { checkId }) => {
-    const check: Doc<'pendingReleaseChecks'> | null = await ctx.runMutation(
+    const check: Doc<'pendingReleaseChecks'> | null = await ctx.runQuery(
       internal.releaseChecks.get,
       { checkId },
     );
@@ -308,10 +320,11 @@ export const retry = internalAction({
     }
 
     const hasPendingWork = updatedPackages.some(packageNeedsWork);
-    await syncStatusReaction({
+    const nextReaction = await syncStatusReaction({
       accessToken: details.accessToken,
       channelId: check.channelId,
       messageTs: check.messageTs,
+      previousReaction: check.currentReaction,
       nextStatus: hasPendingWork
         ? 'pending'
         : updatedPackages.some((pkg) => pkg.summaryStatus === 'ready')
@@ -325,6 +338,7 @@ export const retry = internalAction({
         fullText: updatedText,
         retryCount: check.retryCount + 1,
         packages: updatedPackages,
+        currentReaction: nextReaction,
         ...(commentTs ? { commentTs } : {}),
       });
       await ctx.scheduler.runAfter(nextDelayMs, internal.releaseChecks.retry, {

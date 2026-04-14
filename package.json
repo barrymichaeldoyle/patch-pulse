@@ -34,6 +34,8 @@
     "dev:vscode-extension": "pnpm --filter patch-pulse-vscode-extension watch",
     "format": "pnpm exec oxfmt --write . '!packages/docs/.astro/**' '!packages/*/convex/_generated/**'",
     "format:check": "pnpm exec oxfmt --check . '!packages/docs/.astro/**' '!packages/*/convex/_generated/**'",
+    "format:changed": "node scripts/format-changed.mjs",
+    "format:staged": "node scripts/format-staged.mjs",
     "ci:check": "pnpm lint && pnpm format:check && pnpm knip && pnpm typecheck && pnpm test:shared && pnpm test:cli && pnpm test:notifier && pnpm build:cli && pnpm build:vscode-extension && pnpm build:docs",
     "knip": "pnpm exec knip",
     "lint": "pnpm exec oxlint .",
@@ -41,11 +43,11 @@
     "test:cli": "pnpm --filter patch-pulse test:run",
     "test:notifier": "pnpm --filter @patch-pulse/notifier-bot test",
     "test:shared": "pnpm --filter @patch-pulse/shared test",
-    "test:vscode-extension": "pnpm --filter patch-pulse-vscode-extension test",
     "test": "pnpm run test:shared && pnpm run test:cli && pnpm run test:notifier",
     "typecheck": "pnpm --filter patch-pulse typecheck && pnpm --filter @patch-pulse/notifier-bot typecheck",
     "changeset": "changeset",
     "changeset:version": "changeset version && pnpm --filter patch-pulse exec node scripts/generate-version.cjs",
-    "changeset:publish": "pnpm build:cli && changeset publish"
+    "changeset:publish": "pnpm build:cli && changeset publish",
+    "prepare": "node scripts/setup-git-hooks.mjs"
   }
 }

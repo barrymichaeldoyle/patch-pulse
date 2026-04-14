@@ -42,7 +42,9 @@ pnpm test                # Run all tests
 pnpm test:cli            # CLI tests only
 pnpm test:vscode-extension  # VS Code extension tests only
 pnpm lint                # Lint
-pnpm format              # Format
+pnpm format              # Format the entire repo
+pnpm format:changed      # Format modified and untracked files
+pnpm format:staged       # Format only staged files
 ```
 
 ## Submitting a PR

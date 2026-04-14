@@ -45,9 +45,9 @@ function buildSummaryPrompt(args: {
 async function callOpenAiSummary(
   model: string,
   prompt: string,
-): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return '';
+): Promise<string | null> {
+  // Caller (summarizeReleaseEvidence) guards that the key exists before calling.
+  const apiKey = process.env.OPENAI_API_KEY!;
 
   const response = await fetch(OPENAI_API_URL, {
     method: 'POST',
@@ -86,7 +86,7 @@ async function callOpenAiSummary(
     output_text?: string;
   };
 
-  return data.output_text?.trim() ?? '';
+  return data.output_text?.trim() || null;
 }
 
 export async function summarizeReleaseEvidence(args: {
@@ -97,6 +97,8 @@ export async function summarizeReleaseEvidence(args: {
   evidence: ReleaseEvidence;
 }): Promise<{ model: string; summary: string } | null> {
   const prompt = buildSummaryPrompt(args);
+
+  if (!process.env.OPENAI_API_KEY) return null;
 
   for (const model of [
     process.env.OPENAI_SUMMARY_NANO_MODEL ?? DEFAULT_NANO_MODEL,

@@ -2,6 +2,11 @@
 
 ![PatchPulse Banner](./assets/banner.png)
 
+[![CI](https://github.com/barrymichaeldoyle/patch-pulse/actions/workflows/ci.yml/badge.svg)](https://github.com/barrymichaeldoyle/patch-pulse/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/patch-pulse)](https://www.npmjs.com/package/patch-pulse)
+[![npm downloads](https://img.shields.io/npm/dm/patch-pulse)](https://www.npmjs.com/package/patch-pulse)
+[![GitHub stars](https://img.shields.io/github/stars/barrymichaeldoyle/patch-pulse)](https://github.com/barrymichaeldoyle/patch-pulse/stargazers)
+
 PatchPulse helps you stay on top of npm dependency updates across your projects.
 
 Live docs: https://barrymichaeldoyle.github.io/patch-pulse/

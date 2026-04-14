@@ -7,7 +7,7 @@
     "lib": ["ES2022"],
     "sourceMap": true,
     "rootDir": "src",
-    "types": ["node", "vscode", "mocha"]
+    "types": ["node", "vscode"]
   },
   "include": ["src"]
 }
