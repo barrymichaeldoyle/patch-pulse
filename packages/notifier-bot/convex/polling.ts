@@ -15,6 +15,7 @@ import {
   chatPostMessage,
   conversationsFindByName,
   PrivateChannelError,
+  reactionsAdd,
 } from './slack/api';
 
 const UPDATE_TYPE_RANK: Record<UpdateType, number> = {
@@ -43,6 +44,8 @@ export const checkForUpdates = internalAction({
       toVersion: string;
       updateType: UpdateType;
       originalLine: string;
+      lineStatus: 'pending' | 'resolved';
+      summaryStatus: 'pending';
     };
     type DestinationEntry = {
       lines: string[];
@@ -135,15 +138,15 @@ export const checkForUpdates = internalAction({
             } satisfies DestinationEntry);
           entry.lines.push(line);
           entry.stamps.push({ subscriptionId: sub._id, newVersion: version });
-          if (!extractGitHubRepoUrl(manifest)) {
-            entry.pendingByLine.set(line, {
-              name: pkg.name,
-              fromVersion: pkg.currentVersion,
-              toVersion: version,
-              updateType,
-              originalLine: line,
-            });
-          }
+          entry.pendingByLine.set(line, {
+            name: pkg.name,
+            fromVersion: pkg.currentVersion,
+            toVersion: version,
+            updateType,
+            originalLine: line,
+            lineStatus: extractGitHubRepoUrl(manifest) ? 'resolved' : 'pending',
+            summaryStatus: 'pending',
+          });
           channelMap.set(key, entry);
           updatesBySubscriber.set(sub.subscriberId, channelMap);
         }
@@ -249,17 +252,27 @@ export const checkForUpdates = internalAction({
             break;
           }
 
-          // Schedule release-link back-fill for packages that had no GitHub URL
+          // Schedule metadata enrichment for every package in the batch.
           const batchPending = batchLines
             .filter((l) => pendingByLine.has(l))
             .map((l) => pendingByLine.get(l)!);
           if (batchPending.length > 0 && messageTs) {
+            try {
+              await reactionsAdd(
+                details.accessToken,
+                targetChannel,
+                messageTs,
+                'hourglass_flowing_sand',
+              );
+            } catch (error) {
+              console.warn('failed to add Slack pending reaction:', error);
+            }
             await ctx.runMutation(internal.releaseChecks.create, {
               subscriberId,
               channelId: targetChannel,
               messageTs,
               fullText: text,
-              pendingPackages: batchPending,
+              packages: batchPending,
             });
           }
         }

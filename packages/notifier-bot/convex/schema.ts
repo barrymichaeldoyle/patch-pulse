@@ -32,7 +32,8 @@ export default defineSchema({
     messageTs: v.string(),
     fullText: v.string(),
     retryCount: v.number(),
-    pendingPackages: v.array(
+    commentTs: v.optional(v.string()),
+    packages: v.array(
       v.object({
         name: v.string(),
         fromVersion: v.string(),
@@ -43,6 +44,25 @@ export default defineSchema({
           v.literal('major'),
         ),
         originalLine: v.string(),
+        lineStatus: v.union(
+          v.literal('pending'),
+          v.literal('resolved'),
+          v.literal('abandoned'),
+        ),
+        summaryStatus: v.union(
+          v.literal('pending'),
+          v.literal('ready'),
+          v.literal('abandoned'),
+        ),
+        summaryText: v.optional(v.string()),
+        sourceLinks: v.optional(
+          v.array(
+            v.object({
+              label: v.string(),
+              url: v.string(),
+            }),
+          ),
+        ),
       }),
     ),
   }),

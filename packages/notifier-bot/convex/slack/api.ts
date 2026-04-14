@@ -653,6 +653,7 @@ export async function chatPostMessage(
   token: string,
   channel: string,
   text: string,
+  threadTs?: string,
 ): Promise<{ ts: string }> {
   const response = await fetch('https://slack.com/api/chat.postMessage', {
     method: 'POST',
@@ -660,7 +661,11 @@ export async function chatPostMessage(
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ channel, text }),
+    body: JSON.stringify({
+      channel,
+      text,
+      ...(threadTs ? { thread_ts: threadTs } : {}),
+    }),
   });
   const data = await response.json();
 
@@ -692,4 +697,44 @@ export async function chatUpdateMessage(
   });
   const data = await response.json();
   if (!data.ok) throw new Error(`Slack chat.update error: ${data.error}`);
+}
+
+export async function reactionsAdd(
+  token: string,
+  channel: string,
+  ts: string,
+  name: string,
+): Promise<void> {
+  const response = await fetch('https://slack.com/api/reactions.add', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ channel, timestamp: ts, name }),
+  });
+  const data = await response.json();
+  if (!data.ok && data.error !== 'already_reacted') {
+    throw new Error(`Slack reactions.add error: ${data.error}`);
+  }
+}
+
+export async function reactionsRemove(
+  token: string,
+  channel: string,
+  ts: string,
+  name: string,
+): Promise<void> {
+  const response = await fetch('https://slack.com/api/reactions.remove', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ channel, timestamp: ts, name }),
+  });
+  const data = await response.json();
+  if (!data.ok && data.error !== 'no_reaction') {
+    throw new Error(`Slack reactions.remove error: ${data.error}`);
+  }
 }

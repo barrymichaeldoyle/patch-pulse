@@ -92,6 +92,55 @@ Checks:
 - inspect logs from [`convex/polling.ts`](../convex/polling.ts)
 - verify update threshold filters like `minor` or `major`
 
+## Release Summary Stays At `⏳`
+
+Symptoms:
+
+- the original Slack update message keeps the pending reaction
+- no thread summary appears
+
+Checks:
+
+- inspect the `pendingReleaseChecks` row in Convex
+- verify the package has a usable GitHub repo URL
+- verify GitHub release or compare endpoints eventually return structured evidence
+- verify `OPENAI_API_KEY` is configured if summaries are expected
+- inspect logs from [`convex/releaseChecks.ts`](../convex/releaseChecks.ts)
+
+Explanation:
+
+- `⏳` means Patch Pulse is still retrying because upstream metadata is incomplete or not yet trustworthy
+- the retry ladder is `1h`, `3h`, `6h`, `12h`, `24h`
+
+## Release Summary Ends At `⚠️`
+
+Symptoms:
+
+- the original Slack message ends with a warning reaction
+- no summary thread reply is present
+
+Checks:
+
+- confirm whether the package ever published release notes or comparable GitHub metadata
+- verify the package repo and tag naming match the npm version
+
+Explanation:
+
+- `⚠️` means the job completed, but Patch Pulse never found enough trustworthy evidence to summarize
+- this is different from a processing failure
+
+## Release Summary Ends At `❌`
+
+Symptoms:
+
+- the original Slack message shows an `❌`
+
+Checks:
+
+- inspect Slack API errors around reactions or message updates
+- inspect OpenAI API errors if summarization is enabled
+- verify environment variables are set correctly
+
 ## Useful Files
 
 - [`convex/http.ts`](../convex/http.ts)

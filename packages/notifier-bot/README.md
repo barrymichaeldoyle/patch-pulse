@@ -11,6 +11,7 @@ It currently supports:
 - Slack workspace subscriptions
 - npm package polling
 - Multi-channel Slack tracking per workspace
+- Delayed GitHub metadata enrichment and AI release summaries
 
 More detailed docs live here:
 
@@ -29,6 +30,7 @@ An hourly cron checks tracked packages for updates. When a newer version is foun
 2. GitHub repo metadata is stored on the package when it can be derived from npm metadata.
 3. Matching subscribers are grouped by Slack target channel.
 4. Slack notifications are sent to the relevant channel or the workspace default channel.
+5. If upstream metadata is incomplete, Patch Pulse retries later, updates the original post with release links, and adds an AI summary in the thread when the evidence is strong enough.
 
 ## Slack Summary
 
@@ -61,3 +63,4 @@ Useful commands from this package directory:
 - `/npmlist` does not perform live npm lookups. It uses stored package metadata so the response stays fast.
 - GitHub links in `/npmlist` appear after polling has enriched a package with repo metadata.
 - Update notifications can include richer release links because polling already fetches npm manifests during the update check.
+- Patch Pulse uses status reactions on the original Slack post: `⏳` queued/pending, `📝` summary added, `⚠️` no trustworthy release details found after retries, `❌` processing failed.

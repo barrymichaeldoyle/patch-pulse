@@ -19,6 +19,14 @@ Current Slack OAuth flow depends on these environment variables:
 - `SLACK_CLIENT_ID`
 - `SLACK_CLIENT_SECRET`
 - `SLACK_REDIRECT_URI`
+- `SLACK_SIGNING_SECRET`
+
+AI-powered release summaries additionally support:
+
+- `OPENAI_API_KEY`
+- `OPENAI_SUMMARY_NANO_MODEL` optional override
+- `OPENAI_SUMMARY_MINI_MODEL` optional override
+- `GITHUB_TOKEN` optional, for higher GitHub API rate limits
 
 These are read in [`convex/slack/oauth.ts`](../convex/slack/oauth.ts).
 
@@ -54,6 +62,7 @@ This cron:
 3. stores the latest version
 4. stores GitHub repo metadata when available
 5. delivers notifications grouped by Slack target channel
+6. queues release enrichment jobs that can backfill links and post thread summaries later
 
 ## Data Expectations
 
@@ -71,7 +80,10 @@ Tracked packages create:
 
 - Set `SLACK_CLIENT_ID`
 - Set `SLACK_CLIENT_SECRET`
+- Set `SLACK_SIGNING_SECRET`
 - Set `SLACK_REDIRECT_URI`
+- Set `OPENAI_API_KEY` if AI summaries should be enabled
+- Optionally set `GITHUB_TOKEN` if you expect heavier GitHub API usage
 - Confirm Slack app redirect URL matches `SLACK_REDIRECT_URI`
 - Confirm slash command request URLs point to the Convex HTTP endpoints
 - Confirm event subscriptions point to `/slack/events`
@@ -85,3 +97,5 @@ Tracked packages create:
 - Run `/npmlist`
 - Verify the default channel and explicit channel grouping
 - Verify update notifications arrive in the expected channels
+- Verify new notifications receive `⏳` while enrichment is pending
+- Verify a thread summary appears and the reaction changes to `📝` when evidence is available
