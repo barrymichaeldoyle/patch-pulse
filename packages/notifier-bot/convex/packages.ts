@@ -60,14 +60,18 @@ export const ensureExists = internalMutation({
     name: v.string(),
     version: v.string(),
     ecosystem: v.optional(v.string()),
+    githubRepoUrl: v.optional(v.string()),
   },
-  handler: async (ctx, { name, version, ecosystem }) => {
+  handler: async (ctx, { name, version, ecosystem, githubRepoUrl }) => {
     const existing = await ctx.db
       .query('packages')
       .withIndex('by_name', (q) => q.eq('name', name))
       .first();
 
     if (existing) {
+      if (githubRepoUrl && existing.githubRepoUrl !== githubRepoUrl) {
+        await ctx.db.patch(existing._id, { githubRepoUrl });
+      }
       return { packageId: existing._id, dbVersion: existing.currentVersion };
     }
 
@@ -76,6 +80,7 @@ export const ensureExists = internalMutation({
       currentVersion: version,
       ecosystem: ecosystem ?? 'npm',
       lastChecked: Date.now(),
+      githubRepoUrl,
     });
 
     return { packageId, dbVersion: version };

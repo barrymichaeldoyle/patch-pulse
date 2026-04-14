@@ -1,9 +1,18 @@
 import { v } from 'convex/values';
-import { fetchNpmLatestVersion, isVersionOutdated } from '@patch-pulse/shared';
+import {
+  fetchNpmPackageManifest,
+  getNpmLatestVersion,
+  isVersionOutdated,
+} from '@patch-pulse/shared';
 import { ActionCtx, httpAction, internalAction } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Id } from '../_generated/dataModel';
-import { formatSlackPackageLink, formatSlackVersionText } from './links';
+import {
+  extractGitHubRepoUrl,
+  formatSlackPackageLink,
+  formatSlackVersionText,
+  resolveSlackVersionText,
+} from './links';
 import {
   chatPostMessage,
   conversationsFindByName,
@@ -33,10 +42,6 @@ function formatPackageName(packageName: string): string {
   return `\`${packageName}\``;
 }
 
-function formatVersion(version: string): string {
-  return `\`${version}\``;
-}
-
 type TrackOutcome =
   | {
       kind: 'tracked';
@@ -44,6 +49,8 @@ type TrackOutcome =
       packageName: string;
       version: string;
       displayVersion: string;
+      versionText: string;
+      displayVersionText: string;
       filterLabel: string | null;
       pendingUpdate: boolean;
     }
@@ -51,6 +58,7 @@ type TrackOutcome =
       kind: 'updated';
       packageName: string;
       version: string;
+      versionText: string;
       filterLabel: string | null;
       channelName?: string;
     }
@@ -58,6 +66,7 @@ type TrackOutcome =
       kind: 'already';
       packageName: string;
       version: string;
+      versionText: string;
       filterLabel: string | null;
       channelName?: string;
     }
@@ -86,13 +95,16 @@ async function trackPackage(
 ): Promise<TrackOutcome> {
   packageName = normalizeNpmPackageName(packageName);
 
-  const version = await fetchNpmLatestVersion(packageName, {
+  const manifest = await fetchNpmPackageManifest(packageName, {
     userAgent: 'patch-pulse-notifier-bot',
   }).catch(() => null);
+  const version = getNpmLatestVersion(manifest);
 
   if (!version) {
     return { kind: 'not_found', packageName };
   }
+
+  const githubRepoUrl = manifest ? extractGitHubRepoUrl(manifest) : undefined;
 
   const { packageId, dbVersion } = await ctx.runMutation(
     internal.packages.ensureExists,
@@ -100,6 +112,7 @@ async function trackPackage(
       name: packageName,
       version,
       ecosystem: 'npm',
+      githubRepoUrl,
     },
   );
 
@@ -124,6 +137,11 @@ async function trackPackage(
         kind: 'updated',
         packageName,
         version,
+        versionText: await resolveSlackVersionText(
+          version,
+          manifest,
+          githubRepoUrl,
+        ),
         filterLabel: formatMinUpdateType(minUpdateType),
         channelName: existing.channelName,
       };
@@ -133,6 +151,11 @@ async function trackPackage(
       kind: 'already',
       packageName,
       version,
+      versionText: await resolveSlackVersionText(
+        version,
+        manifest,
+        githubRepoUrl,
+      ),
       filterLabel: formatMinUpdateType(existing.minUpdateType as MinUpdateType),
       channelName: existing.channelName,
     };
@@ -148,12 +171,24 @@ async function trackPackage(
     userId: channelId ? undefined : userId,
   });
 
+  const displayVersion = pendingUpdate ? dbVersion : version;
+
   return {
     kind: 'tracked',
     packageId,
     packageName,
     version,
-    displayVersion: pendingUpdate ? dbVersion : version,
+    displayVersion,
+    versionText: await resolveSlackVersionText(
+      version,
+      manifest,
+      githubRepoUrl,
+    ),
+    displayVersionText: await resolveSlackVersionText(
+      displayVersion,
+      manifest,
+      githubRepoUrl,
+    ),
     filterLabel: formatMinUpdateType(minUpdateType),
     pendingUpdate,
   };
@@ -162,11 +197,11 @@ async function trackPackage(
 function formatTrackOutcomeLine(outcome: TrackOutcome): string {
   switch (outcome.kind) {
     case 'tracked':
-      return `• ${formatSlackPackageLink(outcome.packageName)} — current version ${formatVersion(outcome.displayVersion)}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ''}${outcome.pendingUpdate ? ` (update available: ${formatVersion(outcome.version)})` : ''}`;
+      return `• ${formatSlackPackageLink(outcome.packageName)} — current version ${outcome.displayVersionText}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ''}${outcome.pendingUpdate ? ` (update available: ${outcome.versionText})` : ''}`;
     case 'updated':
-      return `• ${formatSlackPackageLink(outcome.packageName)} — updated threshold to ${outcome.filterLabel ?? 'all'} notifications, current version ${formatVersion(outcome.version)}`;
+      return `• ${formatSlackPackageLink(outcome.packageName)} — updated threshold to ${outcome.filterLabel ?? 'all'} notifications, current version ${outcome.versionText}`;
     case 'already':
-      return `• ${formatSlackPackageLink(outcome.packageName)} — already tracked at ${formatVersion(outcome.version)}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ''}`;
+      return `• ${formatSlackPackageLink(outcome.packageName)} — already tracked at ${outcome.versionText}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ''}`;
     case 'not_found':
       return `• ${formatPackageName(outcome.packageName)} — not found on npm`;
   }
@@ -593,7 +628,7 @@ export const processNpmTrack = internalAction({
       const channelLabel = formatChannelPhrase(outcome.channelName);
       await sendFeedback(
         details,
-        `Updated: now tracking ${formatSlackPackageLink(packageName)}${channelLabel} with ${outcome.filterLabel ?? 'all'} notifications — currently at ${formatVersion(outcome.version)}`,
+        `Updated: now tracking ${formatSlackPackageLink(packageName)}${channelLabel} with ${outcome.filterLabel ?? 'all'} notifications — currently at ${outcome.versionText}`,
       );
       if (!responseUrl && userId) {
         await ctx.scheduler.runAfter(
@@ -609,7 +644,7 @@ export const processNpmTrack = internalAction({
       const channelLabel = formatChannelPhrase(outcome.channelName);
       await sendFeedback(
         details,
-        `Already tracking ${formatSlackPackageLink(packageName)} — currently at ${formatVersion(outcome.version)}${channelLabel}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ''}`,
+        `Already tracking ${formatSlackPackageLink(packageName)} — currently at ${outcome.versionText}${channelLabel}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ''}`,
       );
       if (!responseUrl && userId) {
         await ctx.scheduler.runAfter(
@@ -623,7 +658,7 @@ export const processNpmTrack = internalAction({
 
     if (details) {
       const updateSuffix = outcome.pendingUpdate
-        ? ` There's already an update available (${formatVersion(outcome.displayVersion)} → ${formatVersion(outcome.version)}) — I'll notify you about it shortly.`
+        ? ` There's already an update available (${outcome.displayVersionText} → ${outcome.versionText}) — I'll notify you about it shortly.`
         : '';
 
       if (channelId) {
@@ -632,7 +667,7 @@ export const processNpmTrack = internalAction({
           await chatPostMessage(
             details.accessToken,
             channelId,
-            `<@${userId}> is now tracking ${formatSlackPackageLink(packageName)} in this channel — current version ${formatVersion(outcome.displayVersion)}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ''}${updateSuffix}`,
+            `<@${userId}> is now tracking ${formatSlackPackageLink(packageName)} in this channel — current version ${outcome.displayVersionText}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ''}${updateSuffix}`,
           );
         } catch (error) {
           if (error instanceof PrivateChannelError) {
@@ -654,7 +689,7 @@ export const processNpmTrack = internalAction({
         await chatPostMessage(
           details.accessToken,
           userId,
-          `You're now tracking ${formatSlackPackageLink(packageName)} — current version ${formatVersion(outcome.displayVersion)}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ''}.${updateSuffix || " I'll DM you when updates are available."}`,
+          `You're now tracking ${formatSlackPackageLink(packageName)} — current version ${outcome.displayVersionText}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ''}.${updateSuffix || " I'll DM you when updates are available."}`,
         );
       }
     }

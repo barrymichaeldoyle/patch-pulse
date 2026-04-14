@@ -19,11 +19,13 @@ function createFetchMock(
   responseMessages: string[],
   options?: {
     npmVersions?: Record<string, string>;
+    npmRepositories?: Record<string, string | null>;
     postedMessages?: Array<{ channel: string; text: string }>;
     publishedViews?: Array<{ userId: string; blocks: unknown[] }>;
     channelNames?: Record<string, string>;
     channelIdsByName?: Record<string, string>;
     conversationsListError?: string;
+    githubReleaseUrlsByTag?: Record<string, string>;
   },
 ) {
   return vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
@@ -43,11 +45,22 @@ function createFetchMock(
         return jsonResponse({ error: 'not_found' }, 404);
       }
 
+      const repository = options?.npmRepositories?.[packageName];
       return jsonResponse({
         'dist-tags': { latest: version },
-        repository: 'github:facebook/react',
+        ...(repository ? { repository } : {}),
         versions: { [version]: {} },
       });
+    }
+
+    if (url.startsWith('https://api.github.com/repos/')) {
+      const match = url.match(/\/releases\/tags\/([^/?#]+)$/);
+      const tag = match ? decodeURIComponent(match[1]) : '';
+      const htmlUrl = tag ? options?.githubReleaseUrlsByTag?.[tag] : undefined;
+      if (!htmlUrl) {
+        return jsonResponse({ message: 'Not Found' }, 404);
+      }
+      return jsonResponse({ html_url: htmlUrl });
     }
 
     if (url === 'https://slack.com/api/chat.postMessage') {
@@ -390,6 +403,63 @@ describe('Slack multi-channel subscriptions', () => {
     expect(responseMessages).toEqual([]);
   });
 
+  it('links the tracked current version to the exact GitHub release tag when available', async () => {
+    const postedMessages: Array<{ channel: string; text: string }> = [];
+    vi.stubGlobal(
+      'fetch',
+      createFetchMock([], {
+        postedMessages,
+        npmVersions: { react: '19.0.0' },
+        npmRepositories: { react: 'github:facebook/react' },
+        githubReleaseUrlsByTag: {
+          'v19.0.0': 'https://github.com/facebook/react/releases/tag/v19.0.0',
+        },
+      }),
+    );
+
+    const t = convexTest(schema, modules);
+    await seedWorkspace(t);
+
+    await t.action(internal.slack.commands.processNpmTrack, {
+      packageName: 'react',
+      teamId: TEAM_ID,
+      minUpdateType: 'patch',
+      userId: 'U_ALICE',
+    });
+
+    expect(postedMessages).toHaveLength(1);
+    expect(postedMessages[0].text).toContain(
+      'current version <https://github.com/facebook/react/releases/tag/v19.0.0|19.0.0>',
+    );
+  });
+
+  it('falls back to the repo releases page when tracking cannot resolve an exact release tag', async () => {
+    const postedMessages: Array<{ channel: string; text: string }> = [];
+    vi.stubGlobal(
+      'fetch',
+      createFetchMock([], {
+        postedMessages,
+        npmVersions: { react: '19.0.0' },
+        npmRepositories: { react: 'github:facebook/react' },
+      }),
+    );
+
+    const t = convexTest(schema, modules);
+    await seedWorkspace(t);
+
+    await t.action(internal.slack.commands.processNpmTrack, {
+      packageName: 'react',
+      teamId: TEAM_ID,
+      minUpdateType: 'patch',
+      userId: 'U_ALICE',
+    });
+
+    expect(postedMessages).toHaveLength(1);
+    expect(postedMessages[0].text).toContain(
+      'current version <https://github.com/facebook/react/releases|19.0.0>',
+    );
+  });
+
   it('resolves a typed channel name to a Slack channel ID before posting and storing', async () => {
     const responseMessages: string[] = [];
     const postedMessages: Array<{ channel: string; text: string }> = [];
@@ -574,7 +644,12 @@ describe('Slack multi-channel subscriptions', () => {
 
   it('stores github repo metadata during polling so list can use it later', async () => {
     const responseMessages: string[] = [];
-    vi.stubGlobal('fetch', createFetchMock(responseMessages));
+    vi.stubGlobal(
+      'fetch',
+      createFetchMock(responseMessages, {
+        npmRepositories: { react: 'github:facebook/react' },
+      }),
+    );
 
     const t = convexTest(schema, modules);
     const subscriberId = await seedWorkspace(t);

@@ -1,11 +1,11 @@
 ---
 title: Slack Bot
-description: Get notified in Slack when packages you depend on release new versions.
+description: Get Slack notifications for new package releases, plus GitHub release links and AI summaries.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-The Patch Pulse Slack Bot notifies your workspace whenever a package you depend on releases a new version — so your team stays informed without having to run the CLI manually.
+The Patch Pulse Slack Bot notifies your workspace whenever a package you depend on releases a new version, updates the message with GitHub release links when they are available, and posts an AI-generated summary in the thread when the release evidence is strong enough.
 
 <a
   href="https://grand-yak-92.convex.site/slack/install"
@@ -28,3 +28,10 @@ The Patch Pulse Slack Bot notifies your workspace whenever a package you depend 
 ## How it works
 
 Once installed, the bot monitors packages you care about and sends a Slack notification when a new version is published to the npm registry.
+
+For supported releases, Patch Pulse also enriches that notification after the initial post:
+
+- it adds GitHub release links when repository metadata can be resolved
+- it posts a short AI-generated thread summary of what changed when upstream release evidence is strong enough
+
+That gives your team the version bump, the release source, and a quick readable summary without leaving Slack.
