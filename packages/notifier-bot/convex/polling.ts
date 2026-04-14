@@ -3,19 +3,14 @@ import {
   getUpdateType,
   getNpmLatestVersion,
   fetchNpmPackageManifest,
-  isVersionOutdated,
   type UpdateType,
   type NpmPackageManifest,
 } from '@patch-pulse/shared';
 import { internalAction } from './_generated/server';
 import { internal } from './_generated/api';
 import { Id } from './_generated/dataModel';
-import {
-  buildNpmPackageUrl,
-  extractGitHubRepoUrl,
-  formatSlackPackageLink,
-  formatSlackVersionLink,
-} from './slack/links';
+import { extractGitHubRepoUrl } from './slack/links';
+import { formatUpdateLine } from './slack/format';
 import {
   chatPostMessage,
   conversationsFindByName,
@@ -35,52 +30,6 @@ function meetsThreshold(
   return UPDATE_TYPE_RANK[updateType] >= UPDATE_TYPE_RANK[minUpdateType];
 }
 
-function getIntermediateVersions(
-  manifest: NpmPackageManifest,
-  fromVersion: string,
-  toVersion: string,
-): string[] {
-  return Object.keys(manifest.versions ?? {})
-    .filter((v) => {
-      if (v.includes('-')) return false; // skip pre-releases (alpha, beta, rc)
-      const newerThanFrom = isVersionOutdated({
-        current: fromVersion,
-        latest: v,
-      });
-      const notNewerThanTo = !isVersionOutdated({
-        current: toVersion,
-        latest: v,
-      });
-      return newerThanFrom && notNewerThanTo;
-    })
-    .sort((a, b) => (isVersionOutdated({ current: a, latest: b }) ? -1 : 1))
-    .slice(0, 10);
-}
-
-function formatUpdateLine(
-  name: string,
-  fromVersion: string,
-  toVersion: string,
-  updateType: UpdateType,
-  manifest: NpmPackageManifest,
-): string {
-  const npmUrl = buildNpmPackageUrl(name);
-  const githubUrl = extractGitHubRepoUrl(manifest);
-
-  const releaseLinks = githubUrl
-    ? getIntermediateVersions(manifest, fromVersion, toVersion).map(
-        (v) => `<${githubUrl}/releases/tag/v${v}|v${v}>`,
-      )
-    : [];
-
-  const links = [...releaseLinks, `<${npmUrl}|npm>`].join(' · ');
-
-  return (
-    `• ${formatSlackPackageLink(name)} ${fromVersion} → ` +
-    `${formatSlackVersionLink(name, toVersion, manifest)} [${updateType}]\n  ↳ ${links}`
-  );
-}
-
 export const checkForUpdates = internalAction({
   args: {},
   handler: async (ctx) => {
@@ -88,12 +37,21 @@ export const checkForUpdates = internalAction({
 
     // Collect updates: subscriberId → destination key → { lines, subscription stamps to write after send }
     // Key format: "channel:<id>" | "dm:<userId>" | "default" (legacy fallback)
+    type PendingPackageInfo = {
+      name: string;
+      fromVersion: string;
+      toVersion: string;
+      updateType: UpdateType;
+      originalLine: string;
+    };
     type DestinationEntry = {
       lines: string[];
       stamps: Array<{
         subscriptionId: Id<'subscriptions'>;
         newVersion: string;
       }>;
+      // Lines for packages that had no GitHub URL at send time, keyed by the line string
+      pendingByLine: Map<string, PendingPackageInfo>;
     };
     const updatesBySubscriber = new Map<
       Id<'subscribers'>,
@@ -165,9 +123,22 @@ export const checkForUpdates = internalAction({
           const channelMap =
             updatesBySubscriber.get(sub.subscriberId) ??
             new Map<string, DestinationEntry>();
-          const entry = channelMap.get(key) ?? { lines: [], stamps: [] };
+          const entry = channelMap.get(key) ?? ({
+            lines: [] as string[],
+            stamps: [] as Array<{ subscriptionId: Id<'subscriptions'>; newVersion: string }>,
+            pendingByLine: new Map<string, PendingPackageInfo>(),
+          } satisfies DestinationEntry);
           entry.lines.push(line);
           entry.stamps.push({ subscriptionId: sub._id, newVersion: version });
+          if (!extractGitHubRepoUrl(manifest)) {
+            entry.pendingByLine.set(line, {
+              name: pkg.name,
+              fromVersion: pkg.currentVersion,
+              toVersion: version,
+              updateType,
+              originalLine: line,
+            });
+          }
           channelMap.set(key, entry);
           updatesBySubscriber.set(sub.subscriberId, channelMap);
         }
@@ -189,7 +160,7 @@ export const checkForUpdates = internalAction({
 
       if (!details) continue;
 
-      for (const [key, { lines: updates, stamps }] of channelMap) {
+      for (const [key, { lines: updates, stamps, pendingByLine }] of channelMap) {
         const rawTarget = key.startsWith('channel:')
           ? key.slice('channel:'.length)
           : key.slice('dm:'.length);
@@ -251,8 +222,13 @@ export const checkForUpdates = internalAction({
           const text =
             `📦 *${updates.length} npm package update${updates.length === 1 ? '' : 's'}*\n\n` +
             batchLines.join('\n');
+          let messageTs: string | undefined;
           try {
-            await chatPostMessage(details.accessToken, targetChannel, text);
+            ({ ts: messageTs } = await chatPostMessage(
+              details.accessToken,
+              targetChannel,
+              text,
+            ));
           } catch (error) {
             allBatchesSent = false;
             if (error instanceof PrivateChannelError) {
@@ -263,6 +239,20 @@ export const checkForUpdates = internalAction({
               console.error(`error sending to ${targetChannel}:`, error);
             }
             break;
+          }
+
+          // Schedule release-link back-fill for packages that had no GitHub URL
+          const batchPending = batchLines
+            .filter((l) => pendingByLine.has(l))
+            .map((l) => pendingByLine.get(l)!);
+          if (batchPending.length > 0 && messageTs) {
+            await ctx.runMutation(internal.releaseChecks.create, {
+              subscriberId,
+              channelId: targetChannel,
+              messageTs,
+              fullText: text,
+              pendingPackages: batchPending,
+            });
           }
         }
 

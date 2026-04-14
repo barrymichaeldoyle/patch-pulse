@@ -26,6 +26,27 @@ export default defineSchema({
     .index('by_subscriber', ['subscriberId'])
     .index('by_team_id', ['teamId']),
 
+  pendingReleaseChecks: defineTable({
+    subscriberId: v.id('subscribers'),
+    channelId: v.string(),
+    messageTs: v.string(),
+    fullText: v.string(),
+    retryCount: v.number(),
+    pendingPackages: v.array(
+      v.object({
+        name: v.string(),
+        fromVersion: v.string(),
+        toVersion: v.string(),
+        updateType: v.union(
+          v.literal('patch'),
+          v.literal('minor'),
+          v.literal('major'),
+        ),
+        originalLine: v.string(),
+      }),
+    ),
+  }),
+
   subscriptions: defineTable({
     packageId: v.id('packages'),
     subscriberId: v.id('subscribers'),

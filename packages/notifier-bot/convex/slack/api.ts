@@ -653,7 +653,7 @@ export async function chatPostMessage(
   token: string,
   channel: string,
   text: string,
-): Promise<void> {
+): Promise<{ ts: string }> {
   const response = await fetch('https://slack.com/api/chat.postMessage', {
     method: 'POST',
     headers: {
@@ -671,4 +671,25 @@ export async function chatPostMessage(
     }
     throw new Error(`Slack error: ${data.error}`);
   }
+
+  return { ts: data.ts as string };
+}
+
+/** Edits an existing Slack message in-place. */
+export async function chatUpdateMessage(
+  token: string,
+  channel: string,
+  ts: string,
+  text: string,
+): Promise<void> {
+  const response = await fetch('https://slack.com/api/chat.update', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ channel, ts, text }),
+  });
+  const data = await response.json();
+  if (!data.ok) throw new Error(`Slack chat.update error: ${data.error}`);
 }

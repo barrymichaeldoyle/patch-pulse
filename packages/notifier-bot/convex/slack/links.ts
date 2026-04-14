@@ -27,27 +27,8 @@ export function extractGitHubRepoUrl(
   return normalized.includes('github.com') ? normalized : undefined;
 }
 
-export function buildVersionUrl(
-  packageName: string,
-  manifest: NpmPackageManifest | null | undefined,
-  githubRepoUrl?: string,
-): string {
-  const githubUrl =
-    githubRepoUrl ?? (manifest ? extractGitHubRepoUrl(manifest) : undefined);
-  return githubUrl ? `${githubUrl}/releases` : buildNpmPackageUrl(packageName);
-}
-
 export function formatSlackPackageLink(packageName: string): string {
   return `*<${buildNpmPackageUrl(packageName)}|${packageName}>*`;
-}
-
-export function formatSlackVersionLink(
-  packageName: string,
-  version: string,
-  manifest: NpmPackageManifest | null | undefined,
-  githubRepoUrl?: string,
-): string {
-  return `<${buildVersionUrl(packageName, manifest, githubRepoUrl)}|${version}>`;
 }
 
 export function formatSlackVersionText(
