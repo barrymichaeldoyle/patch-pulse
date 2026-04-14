@@ -123,11 +123,16 @@ export const checkForUpdates = internalAction({
           const channelMap =
             updatesBySubscriber.get(sub.subscriberId) ??
             new Map<string, DestinationEntry>();
-          const entry = channelMap.get(key) ?? ({
-            lines: [] as string[],
-            stamps: [] as Array<{ subscriptionId: Id<'subscriptions'>; newVersion: string }>,
-            pendingByLine: new Map<string, PendingPackageInfo>(),
-          } satisfies DestinationEntry);
+          const entry =
+            channelMap.get(key) ??
+            ({
+              lines: [] as string[],
+              stamps: [] as Array<{
+                subscriptionId: Id<'subscriptions'>;
+                newVersion: string;
+              }>,
+              pendingByLine: new Map<string, PendingPackageInfo>(),
+            } satisfies DestinationEntry);
           entry.lines.push(line);
           entry.stamps.push({ subscriptionId: sub._id, newVersion: version });
           if (!extractGitHubRepoUrl(manifest)) {
@@ -160,7 +165,10 @@ export const checkForUpdates = internalAction({
 
       if (!details) continue;
 
-      for (const [key, { lines: updates, stamps, pendingByLine }] of channelMap) {
+      for (const [
+        key,
+        { lines: updates, stamps, pendingByLine },
+      ] of channelMap) {
         const rawTarget = key.startsWith('channel:')
           ? key.slice('channel:'.length)
           : key.slice('dm:'.length);

@@ -17,8 +17,14 @@ export function getIntermediateVersions(
   return Object.keys(manifest.versions ?? {})
     .filter((v) => {
       if (v.includes('-')) return false;
-      const newerThanFrom = isVersionOutdated({ current: fromVersion, latest: v });
-      const notNewerThanTo = !isVersionOutdated({ current: toVersion, latest: v });
+      const newerThanFrom = isVersionOutdated({
+        current: fromVersion,
+        latest: v,
+      });
+      const notNewerThanTo = !isVersionOutdated({
+        current: toVersion,
+        latest: v,
+      });
       return newerThanFrom && notNewerThanTo;
     })
     .sort((a, b) => (isVersionOutdated({ current: a, latest: b }) ? -1 : 1))

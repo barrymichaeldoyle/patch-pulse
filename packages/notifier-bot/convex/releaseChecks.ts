@@ -155,7 +155,10 @@ export const retry = internalAction({
           updatedText,
         );
       } catch (err) {
-        console.error('failed to update Slack message with release links:', err);
+        console.error(
+          'failed to update Slack message with release links:',
+          err,
+        );
       }
     }
 
