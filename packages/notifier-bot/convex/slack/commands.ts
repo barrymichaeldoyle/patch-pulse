@@ -162,11 +162,11 @@ async function trackPackage(
 function formatTrackOutcomeLine(outcome: TrackOutcome): string {
   switch (outcome.kind) {
     case 'tracked':
-      return `• ${formatPackageName(outcome.packageName)} — current version ${formatVersion(outcome.displayVersion)}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ''}${outcome.pendingUpdate ? ` (update available: ${formatVersion(outcome.version)})` : ''}`;
+      return `• ${formatSlackPackageLink(outcome.packageName)} — current version ${formatVersion(outcome.displayVersion)}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ''}${outcome.pendingUpdate ? ` (update available: ${formatVersion(outcome.version)})` : ''}`;
     case 'updated':
-      return `• ${formatPackageName(outcome.packageName)} — updated threshold to ${outcome.filterLabel ?? 'all'} notifications, current version ${formatVersion(outcome.version)}`;
+      return `• ${formatSlackPackageLink(outcome.packageName)} — updated threshold to ${outcome.filterLabel ?? 'all'} notifications, current version ${formatVersion(outcome.version)}`;
     case 'already':
-      return `• ${formatPackageName(outcome.packageName)} — already tracked at ${formatVersion(outcome.version)}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ''}`;
+      return `• ${formatSlackPackageLink(outcome.packageName)} — already tracked at ${formatVersion(outcome.version)}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ''}`;
     case 'not_found':
       return `• ${formatPackageName(outcome.packageName)} — not found on npm`;
   }
@@ -593,7 +593,7 @@ export const processNpmTrack = internalAction({
       const channelLabel = formatChannelPhrase(outcome.channelName);
       await sendFeedback(
         details,
-        `Updated: now tracking ${formatPackageName(packageName)}${channelLabel} with ${outcome.filterLabel ?? 'all'} notifications — currently at ${formatVersion(outcome.version)}`,
+        `Updated: now tracking ${formatSlackPackageLink(packageName)}${channelLabel} with ${outcome.filterLabel ?? 'all'} notifications — currently at ${formatVersion(outcome.version)}`,
       );
       if (!responseUrl && userId) {
         await ctx.scheduler.runAfter(
@@ -609,7 +609,7 @@ export const processNpmTrack = internalAction({
       const channelLabel = formatChannelPhrase(outcome.channelName);
       await sendFeedback(
         details,
-        `Already tracking ${formatPackageName(packageName)} — currently at ${formatVersion(outcome.version)}${channelLabel}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ''}`,
+        `Already tracking ${formatSlackPackageLink(packageName)} — currently at ${formatVersion(outcome.version)}${channelLabel}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ''}`,
       );
       if (!responseUrl && userId) {
         await ctx.scheduler.runAfter(
@@ -632,7 +632,7 @@ export const processNpmTrack = internalAction({
           await chatPostMessage(
             details.accessToken,
             channelId,
-            `<@${userId}> is now tracking ${formatPackageName(packageName)} in this channel — current version ${formatVersion(outcome.displayVersion)}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ''}${updateSuffix}`,
+            `<@${userId}> is now tracking ${formatSlackPackageLink(packageName)} in this channel — current version ${formatVersion(outcome.displayVersion)}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ''}${updateSuffix}`,
           );
         } catch (error) {
           if (error instanceof PrivateChannelError) {
@@ -654,7 +654,7 @@ export const processNpmTrack = internalAction({
         await chatPostMessage(
           details.accessToken,
           userId,
-          `You're now tracking ${formatPackageName(packageName)} — current version ${formatVersion(outcome.displayVersion)}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ''}.${updateSuffix || " I'll DM you when updates are available."}`,
+          `You're now tracking ${formatSlackPackageLink(packageName)} — current version ${formatVersion(outcome.displayVersion)}${outcome.filterLabel ? ` ${outcome.filterLabel}` : ''}.${updateSuffix || " I'll DM you when updates are available."}`,
         );
       }
     }

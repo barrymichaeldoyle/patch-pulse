@@ -182,7 +182,7 @@ describe('Slack multi-channel subscriptions', () => {
     ).toBe(true);
 
     expect(responseMessages).toEqual([
-      'Already tracking `react` — currently at `19.0.0` in *#frontend* [minor+]',
+      'Already tracking *<https://www.npmjs.com/package/react|react>* — currently at `19.0.0` in *#frontend* [minor+]',
     ]);
   });
 
@@ -217,7 +217,9 @@ describe('Slack multi-channel subscriptions', () => {
     );
     expect(subscriptions).toHaveLength(1);
     expect(subscriptions[0].minUpdateType).toBe('major');
-    expect(responseMessages[0]).toContain('Updated: now tracking `react`');
+    expect(responseMessages[0]).toContain(
+      'Updated: now tracking *<https://www.npmjs.com/package/react|react>*',
+    );
     expect(responseMessages[0]).toContain('[major only]');
   });
 
@@ -377,13 +379,13 @@ describe('Slack multi-channel subscriptions', () => {
       '<@U_ALICE> processed *3* package requests in this channel:',
     );
     expect(postedMessages[0].text).toContain(
-      '• `tsx` — current version `4.21.0`',
+      '• *<https://www.npmjs.com/package/tsx|tsx>* — current version `4.21.0`',
     );
     expect(postedMessages[0].text).toContain(
-      '• `oxlint` — current version `1.59.0`',
+      '• *<https://www.npmjs.com/package/oxlint|oxlint>* — current version `1.59.0`',
     );
     expect(postedMessages[0].text).toContain(
-      '• `vitest` — current version `4.1.4`',
+      '• *<https://www.npmjs.com/package/vitest|vitest>* — current version `4.1.4`',
     );
     expect(responseMessages).toEqual([]);
   });
@@ -425,7 +427,7 @@ describe('Slack multi-channel subscriptions', () => {
     expect(postedMessages).toHaveLength(1);
     expect(postedMessages[0].channel).toBe('C_RELEASES');
     expect(postedMessages[0].text).toContain(
-      'is now tracking `pnpm` in this channel',
+      'is now tracking *<https://www.npmjs.com/package/pnpm|pnpm>* in this channel',
     );
     expect(responseMessages).toEqual([]);
   });
