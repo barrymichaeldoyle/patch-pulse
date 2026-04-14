@@ -27,7 +27,6 @@ jobs:
         with:
           path: .
           node-version: 22
-          package-manager: pnpm@10.30.3
           build-cmd: pnpm build:docs
           out-dir: packages/docs/dist
         env:
