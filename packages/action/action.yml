@@ -1,0 +1,32 @@
+name: 'PatchPulse PR Bot'
+description: 'Automatically creates PRs for outdated npm dependencies detected by patch-pulse'
+author: 'Barry Michael Doyle'
+
+branding:
+  icon: 'refresh-cw'
+  color: 'blue'
+
+inputs:
+  github-token:
+    description: 'GitHub token with contents:write and pull-requests:write permissions'
+    required: true
+  update-types:
+    description: 'Comma-separated update types to process (patch, minor, major)'
+    required: false
+    default: 'patch,minor,major'
+  groups:
+    description: 'JSON object mapping group names to arrays of package names that should be updated together'
+    required: false
+    default: '{}'
+  auto-merge:
+    description: 'Automatically merge PRs at or below this update type (patch, minor, or none)'
+    required: false
+    default: 'none'
+  working-directory:
+    description: 'Working directory to run patch-pulse in'
+    required: false
+    default: '.'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'

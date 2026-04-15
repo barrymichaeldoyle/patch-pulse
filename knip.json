@@ -16,6 +16,10 @@
     "packages/vscode-extension": {
       "entry": ["src/extension.ts"],
       "project": ["src/**/*.ts"]
+    },
+    "packages/action": {
+      "entry": ["src/main.ts", "scripts/*.cjs"],
+      "project": ["src/**/*.ts", "scripts/*.cjs"]
     }
   }
 }

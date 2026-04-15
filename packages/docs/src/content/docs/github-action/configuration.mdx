@@ -1,0 +1,123 @@
+---
+title: GitHub Action Configuration
+description: Inputs, grouping, auto-merge, and update type filtering for the PatchPulse GitHub Action.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Inputs
+
+| Input               | Required | Default             | Description                                                                       |
+| ------------------- | -------- | ------------------- | --------------------------------------------------------------------------------- |
+| `github-token`      | Yes      | —                   | GitHub token with `contents: write` and `pull-requests: write` permissions        |
+| `update-types`      | No       | `patch,minor,major` | Comma-separated list of update types to open PRs for                              |
+| `groups`            | No       | `{}`                | JSON object grouping related packages into a single PR                            |
+| `auto-merge`        | No       | `none`              | Auto-merge PRs at or below this level: `patch`, `minor`, or `none`                |
+| `working-directory` | No       | `.`                 | Directory to run patch-pulse in (useful if the repo root is not the project root) |
+
+## Filtering update types
+
+By default the action opens PRs for all three update types. You can narrow this — for example, to only open PRs for minor and major updates (and handle patches via auto-merge separately):
+
+```yaml
+- uses: barrymichaeldoyle/patch-pulse/packages/action@action/v0
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    update-types: 'minor,major'
+```
+
+## Grouping related packages
+
+Some packages are tightly coupled and should always update together. Use the `groups` input to define these relationships:
+
+```yaml
+- uses: barrymichaeldoyle/patch-pulse/packages/action@action/v0
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    groups: |
+      {
+        "tanstack": [
+          "@tanstack/router",
+          "@tanstack/start",
+          "@tanstack/react-query"
+        ],
+        "storybook": [
+          "storybook",
+          "@storybook/react",
+          "@storybook/addon-essentials"
+        ]
+      }
+```
+
+When at least one package in a group is outdated, the action creates a single branch `patch-pulse/<group-name>` and bumps all outdated packages in that group together. The PR's risk level reflects the **highest** update type across the group.
+
+<Aside type="note">
+  Packages not listed in any group each get their own branch and PR.
+</Aside>
+
+## Auto-merge
+
+Enable auto-merge to have the action immediately squash-merge PRs once it opens them, without waiting for a human review. This works best for patch updates that you trust implicitly.
+
+```yaml
+- uses: barrymichaeldoyle/patch-pulse/packages/action@action/v0
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    auto-merge: 'patch' # or 'minor' to also auto-merge minor updates
+```
+
+The threshold is inclusive: `auto-merge: minor` auto-merges both patch and minor PRs; major PRs always require manual review.
+
+<Aside type="caution">
+  Auto-merge calls the GitHub merge API immediately after the PR is created — it
+  does **not** wait for CI to pass. If your branch protection rules require
+  status checks, GitHub will reject the merge and the action will log a warning.
+  In that case, consider using GitHub's built-in
+  [auto-merge](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/automatically-merging-a-pull-request)
+  feature on the PR instead.
+</Aside>
+
+## Full example
+
+```yaml
+name: PatchPulse Dependency Bot
+
+on:
+  schedule:
+    - cron: '0 8 * * 1' # Every Monday at 08:00 UTC
+  workflow_dispatch:
+
+jobs:
+  patch-pulse:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: barrymichaeldoyle/patch-pulse/packages/action@action/v0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          update-types: 'patch,minor,major'
+          groups: |
+            {
+              "tanstack": [
+                "@tanstack/router",
+                "@tanstack/start",
+                "@tanstack/react-query"
+              ]
+            }
+          auto-merge: 'patch'
+```

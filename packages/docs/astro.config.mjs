@@ -37,6 +37,13 @@ export default defineConfig({
           ],
         },
         {
+          label: 'GitHub Action',
+          items: [
+            { label: 'Overview', link: '/github-action/overview' },
+            { label: 'Configuration', link: '/github-action/configuration' },
+          ],
+        },
+        {
           label: 'VS Code Extension',
           items: [
             { label: 'Overview', link: '/vscode/overview' },

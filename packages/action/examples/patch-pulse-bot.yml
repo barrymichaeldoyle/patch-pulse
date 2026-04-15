@@ -1,0 +1,62 @@
+# Example: add this file to your repo at .github/workflows/patch-pulse-bot.yml
+#
+# This workflow runs PatchPulse daily and opens one PR per outdated package (or
+# package group). PRs include the version diff, release notes links, and a
+# breaking-change risk assessment.
+#
+# Required repo permissions (Settings → Actions → General → Workflow permissions):
+#   - Read and write permissions
+#   - Allow GitHub Actions to create and approve pull requests
+
+name: PatchPulse Dependency Bot
+
+on:
+  schedule:
+    - cron: '0 8 * * 1' # Every Monday at 08:00 UTC
+  workflow_dispatch: # Allow manual runs from the Actions tab
+
+jobs:
+  patch-pulse:
+    name: Open dependency update PRs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Fetch full history so git operations work correctly
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4 # Remove if your project uses npm or yarn
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm # Change to npm or yarn if needed
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - uses: barrymichaeldoyle/patch-pulse/packages/action@action/v0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+          # Which update types to open PRs for (default: all three)
+          update-types: 'patch,minor,major'
+
+          # Group related packages into a single PR so they update together.
+          # Packages not listed here each get their own PR.
+          groups: |
+            {
+              "tanstack": [
+                "@tanstack/router",
+                "@tanstack/start",
+                "@tanstack/react-query"
+              ]
+            }
+
+          # Automatically merge PRs whose highest update type is at or below
+          # this threshold (after CI passes). Options: patch | minor | none
+          auto-merge: 'patch'

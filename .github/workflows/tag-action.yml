@@ -1,0 +1,59 @@
+name: Tag Action Release
+
+# Creates git tags whenever the action's version number changes on main.
+#
+# Tag strategy (mirrors how actions/checkout, actions/setup-node etc. work):
+#   action/v1.2.3  — immutable, points to this exact release forever
+#   action/v1      — moving, always points to the latest v1.x release
+#
+# Users should pin to the moving major tag for automatic minor/patch updates:
+#   uses: barrymichaeldoyle/patch-pulse/packages/action@action/v1
+#
+# Or pin to an exact release for full reproducibility:
+#   uses: barrymichaeldoyle/patch-pulse/packages/action@action/v1.2.3
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/action/package.json'
+
+jobs:
+  tag:
+    name: Create action version tags
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read action version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./packages/action/package.json').version")
+          MAJOR=$(echo "$VERSION" | cut -d. -f1)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "major=$MAJOR" >> "$GITHUB_OUTPUT"
+
+      - name: Create tags
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          PRECISE_TAG="action/v${{ steps.version.outputs.version }}"
+          MAJOR_TAG="action/v${{ steps.version.outputs.major }}"
+
+          # Skip if the precise tag already exists (e.g. re-run without a version bump)
+          if git ls-remote --tags origin "$PRECISE_TAG" | grep -q "$PRECISE_TAG"; then
+            echo "Tag $PRECISE_TAG already exists — skipping"
+            exit 0
+          fi
+
+          git tag "$PRECISE_TAG"
+          git tag -f "$MAJOR_TAG"
+
+          git push origin "$PRECISE_TAG"
+          git push origin "$MAJOR_TAG" --force
+
+          echo "Tagged $PRECISE_TAG and updated $MAJOR_TAG"

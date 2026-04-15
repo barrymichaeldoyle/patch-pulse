@@ -1,0 +1,104 @@
+---
+title: GitHub Action Overview
+description: Automatically open PRs for outdated npm dependencies on a schedule.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+The Patch Pulse GitHub Action runs on a schedule, detects outdated dependencies using the Patch Pulse CLI, and opens one pull request per package (or package group) — keeping your dependency updates small, reviewable, and easy to revert.
+
+## Key features
+
+- **One PR per package (or group)** — each update is independently reviewable and revertable
+- **Package grouping** — define groups of related packages (e.g. all `@tanstack/*`) that update together in a single PR
+- **Monorepo-aware** — bumps the package across every workspace it appears in, all in one PR
+- **Range-preserving** — if you pin with `^`, the PR writes `^new-version`; exact pins stay exact
+- **Breaking change risk labels** — every PR includes a risk callout (`NONE` / `LOW` / `HIGH`) based on the update type
+- **Release notes links** — the PR body links directly to GitHub releases for each updated package
+- **Auto-merge** — optionally auto-merge patch (or patch + minor) PRs once CI passes
+- **No stale PR pile-up** — one branch per group (`patch-pulse/<name>`), re-used on each run; the PR body updates in place if the branch already has an open PR
+
+## How it works
+
+1. The action runs `npx patch-pulse --json --hide-clean` in your repository
+2. Outdated packages are collected and grouped according to your configuration
+3. For each group, a branch `patch-pulse/<group-name>` is created from your default branch
+4. Version strings are bumped in every affected `package.json`, preserving the existing range prefix
+5. The branch is pushed and a pull request is opened (or the existing one is updated)
+
+## Quick start
+
+Add the following workflow to your repository at `.github/workflows/patch-pulse-bot.yml`:
+
+```yaml
+name: PatchPulse Dependency Bot
+
+on:
+  schedule:
+    - cron: '0 8 * * 1' # Every Monday at 08:00 UTC
+  workflow_dispatch:
+
+jobs:
+  patch-pulse:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4 # remove if using npm / yarn
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: barrymichaeldoyle/patch-pulse/packages/action@action/v0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+<Aside type="tip">
+  Make sure your repository's workflow permissions allow GitHub Actions to
+  create pull requests. Go to **Settings → Actions → General → Workflow
+  permissions** and enable **Allow GitHub Actions to create and approve pull
+  requests**.
+</Aside>
+
+## Example PR
+
+For a minor update to a single package the action opens a PR like this:
+
+> **chore(deps): update `zod` 3.22.0 → 3.24.0 (minor)**
+>
+> ### Breaking Change Risk: LOW
+>
+> > [!NOTE]
+> > Minor updates add backwards-compatible features. Review the release notes before merging.
+>
+> | Package | From     | To                                                                 | Type     |
+> | ------- | -------- | ------------------------------------------------------------------ | -------- |
+> | `zod`   | `3.22.0` | [`3.24.0`](https://github.com/colinhacks/zod/releases/tag/v3.24.0) | 🟡 MINOR |
+>
+> #### Release Notes
+>
+> - [`zod` releases](https://github.com/colinhacks/zod/releases)
+
+See [Configuration](./configuration) for grouping related packages, filtering update types, and enabling auto-merge.
+
+## Versioning
+
+The action follows the same tag convention used by `actions/checkout`, `actions/setup-node`, and other official actions:
+
+| Ref              | Behaviour                                                                                                                                               |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@action/v0`     | **Recommended.** Moving tag — always the latest `v1.x` release. You get new features and fixes automatically, but breaking changes (a `v2`) are opt-in. |
+| `@action/v0.2.3` | Exact pin — nothing changes until you update the ref yourself. Use this in environments that require full reproducibility.                              |
+| `@main`          | Unreleased HEAD — avoid in production. Useful only for testing unreleased changes.                                                                      |
+
+A `v2` will only be cut if a change would break existing workflow configurations. Additive changes (new inputs, new behaviour behind a flag) stay in `v1`.

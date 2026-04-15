@@ -1,0 +1,20 @@
+{
+  "name": "@patch-pulse/action",
+  "version": "0.1.0",
+  "description": "GitHub Action that automatically opens PRs for outdated npm dependencies",
+  "private": true,
+  "license": "MIT",
+  "author": {
+    "name": "Barry Michael Doyle",
+    "email": "barry@barrymichaeldoyle.com"
+  },
+  "scripts": {
+    "build": "node scripts/build.cjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@actions/github": "^6.0.1",
+    "@patch-pulse/shared": "workspace:*"
+  }
+}
