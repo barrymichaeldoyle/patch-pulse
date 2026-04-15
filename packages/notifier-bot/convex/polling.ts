@@ -229,10 +229,12 @@ export const checkForUpdates = internalAction({
         if (batch.length > 0) batches.push(batch);
 
         let allBatchesSent = true;
+        const header =
+          updates.length === 1
+            ? `📦 *${pendingByLine.get(updates[0])?.name ?? 'package'} update*`
+            : `📦 *${updates.length} npm package updates*`;
         for (const batchLines of batches) {
-          const text =
-            `📦 *${updates.length} npm package update${updates.length === 1 ? '' : 's'}*\n\n` +
-            batchLines.join('\n');
+          const text = `${header}\n\n` + batchLines.join('\n');
           let messageTs: string | undefined;
           try {
             ({ ts: messageTs } = await chatPostMessage(
