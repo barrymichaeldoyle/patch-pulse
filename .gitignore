@@ -8,9 +8,6 @@ lib/
 out/
 *.tsbuildinfo
 
-# GitHub Actions pre-built dist must be committed
-!packages/action/dist/
-
 # environment
 .env
 .env.*
