@@ -1,5 +1,11 @@
 # patch-pulse
 
+## 4.0.3
+
+### Patch Changes
+
+- Add blank line between project groups in CLI output for improved readability
+
 ## 4.0.2
 
 ### Patch Changes

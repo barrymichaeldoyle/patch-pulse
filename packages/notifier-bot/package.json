@@ -21,6 +21,6 @@
   },
   "devDependencies": {
     "@edge-runtime/vm": "5.0.0",
-    "convex-test": "0.0.48"
+    "convex-test": "0.0.49"
   }
 }

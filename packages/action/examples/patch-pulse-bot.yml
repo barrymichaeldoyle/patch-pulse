@@ -24,14 +24,14 @@ jobs:
       pull-requests: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # Fetch full history so git operations work correctly
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v4 # Remove if your project uses npm or yarn
+      - uses: pnpm/action-setup@v6 # Remove if your project uses npm or yarn
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: pnpm # Change to npm or yarn if needed

@@ -172,7 +172,7 @@ export async function runCli({
 
       let scannedCount = 0;
 
-      for (const project of filteredProjects) {
+      for (const [projectIndex, project] of filteredProjects.entries()) {
         const projectDependencies: DependencyInfo[] = [];
         const sectionResults: SectionResult[] = [];
 
@@ -192,6 +192,9 @@ export async function runCli({
         let projectSpinner: ProgressSpinner | null = null;
 
         if (!jsonOutput && !bufferAll) {
+          if (projectIndex > 0) {
+            console.log();
+          }
           console.log(
             formatProjectHeader(project.displayName, project.relativePath),
           );
