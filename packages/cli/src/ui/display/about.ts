@@ -2,7 +2,9 @@ import { ansi } from '../ansi';
 import { createCenteredBox } from '../createCenteredBox';
 import {
   CLI_REPO_URL,
+  DISCORD_BOT_URL,
   DOCS_URL,
+  GITHUB_ACTION_DOCS_URL,
   ISSUES_URL,
   SLACK_BOT_URL,
   SPONSORS_URL,
@@ -20,6 +22,8 @@ ${ansi.cyanBold('Repo:')}      ${ansi.white(ansi.link('barrymichaeldoyle/patch-p
 ${ansi.cyanBold('Issues:')}    ${ansi.white(ansi.link('Report a bug or request a feature', ISSUES_URL))}
 ${ansi.cyanBold('Sponsors:')}  ${ansi.white(ansi.link('Support development on GitHub Sponsors', SPONSORS_URL))}
 ${ansi.cyanBold('Slack Bot:')} ${ansi.white(ansi.link('Add the Patch Pulse Slack bot to your workspace', SLACK_BOT_URL))}
+${ansi.cyanBold('Discord Bot:')} ${ansi.white(ansi.link('Add the Patch Pulse Discord bot to your server', DISCORD_BOT_URL))}
+${ansi.cyanBold('GitHub Action:')} ${ansi.white(ansi.link('Read the Patch Pulse GitHub Action docs', GITHUB_ACTION_DOCS_URL))}
 
 ${ansi.gray('Tip:')}
   ${ansi.white('Use --json for scripts, --project <name-or-path> to focus one workspace,')}

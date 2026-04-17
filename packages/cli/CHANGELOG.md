@@ -1,5 +1,11 @@
 # patch-pulse
 
+## 4.0.4
+
+### Patch Changes
+
+- Update the CLI help and about output to include links for the Discord bot and GitHub Action docs, and refresh the CLI README ecosystem links to match.
+
 ## 4.0.3
 
 ### Patch Changes

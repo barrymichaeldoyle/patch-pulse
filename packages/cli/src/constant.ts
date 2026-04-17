@@ -23,7 +23,10 @@ export const CONFIG_FILENAMES: readonly string[] = [
 
 const ROOT_REPO_URL = 'https://github.com/barrymichaeldoyle/patch-pulse';
 export const DOCS_URL = 'https://barrymichaeldoyle.github.io/patch-pulse/';
+export const GITHUB_ACTION_DOCS_URL = `${DOCS_URL}github-action/overview/`;
 export const CLI_REPO_URL = `${ROOT_REPO_URL}/tree/main/packages/cli`;
 export const ISSUES_URL = `${ROOT_REPO_URL}/issues`;
 export const SPONSORS_URL = 'https://github.com/sponsors/barrymichaeldoyle';
 export const SLACK_BOT_URL = 'https://grand-yak-92.convex.site/slack/install';
+export const DISCORD_BOT_URL =
+  'https://grand-yak-92.convex.site/discord/install';

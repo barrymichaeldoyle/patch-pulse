@@ -39,6 +39,7 @@
     "editor.formatOnSave": true
   },
   "cSpell.words": [
+    "barrymichaeldoyle",
     "esbuild",
     "llms",
     "npmhelp",
@@ -48,6 +49,7 @@
     "oxfmt",
     "oxlint",
     "patchpulse",
+    "patchpulserc",
     "Updateable",
     "vitest"
   ]

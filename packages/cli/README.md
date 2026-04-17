@@ -139,11 +139,25 @@ Get notified in Slack whenever a package you depend on releases a new version.
 
 > **Help us reach the Slack Marketplace!** We need at least 5 active workspace installs before Slack will approve PatchPulse for the official Marketplace. If the bot looks useful to you, installing it now is a huge help — it's free and takes about 30 seconds.
 
+## Discord Bot
+
+Get notified in Discord whenever a package you depend on releases a new version.
+
+[Add to Discord](https://grand-yak-92.convex.site/discord/install)
+
+## GitHub Action
+
+Automate dependency update pull requests on a schedule with the Patch Pulse GitHub Action.
+
+[Read the GitHub Action docs](https://barrymichaeldoyle.github.io/patch-pulse/github-action/overview/)
+
 ## Ecosystem
 
 - **🔧 CLI Tool** (this repo) - Check dependencies from terminal
 - **⚡ VSCode Extension** ([@PatchPulse/vscode-extension](https://github.com/PatchPulse/vscode-extension)) - Get updates in your editor _(Coming soon)_
 - **🤖 Slack Bot** ([Add to Workspace](https://grand-yak-92.convex.site/slack/install)) - Get notified in Slack
+- **💬 Discord Bot** ([Add to Server](https://grand-yak-92.convex.site/discord/install)) - Get notified in Discord
+- **⚙️ GitHub Action** ([Docs](https://barrymichaeldoyle.github.io/patch-pulse/github-action/overview/)) - Open dependency update PRs automatically
 
 ## Troubleshooting
 
