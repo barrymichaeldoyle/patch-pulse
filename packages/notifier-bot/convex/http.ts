@@ -8,6 +8,8 @@ import {
 import { npmTrack, npmUntrack, listPackages, help } from './slack/commands';
 import { slackEvents } from './slack/events';
 import { slackInteractions } from './slack/interactions';
+import { discordInstall, discordRegisterCommands } from './discord/oauth';
+import { discordInteractions } from './discord/commands';
 
 const http = httpRouter();
 
@@ -69,6 +71,24 @@ http.route({
   path: '/slack/interactions',
   method: 'POST',
   handler: slackInteractions,
+});
+
+http.route({
+  path: '/discord/install',
+  method: 'GET',
+  handler: discordInstall,
+});
+
+http.route({
+  path: '/discord/interactions',
+  method: 'POST',
+  handler: discordInteractions,
+});
+
+http.route({
+  path: '/discord/register-commands',
+  method: 'POST',
+  handler: discordRegisterCommands,
 });
 
 export default http;

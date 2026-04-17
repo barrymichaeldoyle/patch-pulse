@@ -2,6 +2,8 @@
 
 <a href="https://grand-yak-92.convex.site/slack/install"><img alt="Add to Slack" height="40" src="https://platform.slack-edge.com/img/add_to_slack.png" srcset="https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x"></a>
 
+[Add to Discord](https://grand-yak-92.convex.site/discord/install)
+
 > **Help us reach the Slack Marketplace!** We need at least 5 active workspace installs before Slack will approve PatchPulse for the official Marketplace. If the bot looks useful to you, installing it now is a huge help — it's free and takes about 30 seconds.
 
 This package contains the Convex-powered notifier backend for Patch Pulse.
@@ -9,28 +11,31 @@ This package contains the Convex-powered notifier backend for Patch Pulse.
 It currently supports:
 
 - Slack workspace subscriptions
+- Discord server subscriptions
 - npm package polling
-- Multi-channel Slack tracking per workspace
+- Multi-channel Slack and Discord tracking
 - Delayed GitHub metadata enrichment and AI release summaries
 
 More detailed docs live here:
 
+- [`docs/discord.md`](./docs/discord.md): Discord install flow, slash commands, and channel behavior
 - [`docs/slack.md`](./docs/slack.md): Slack install flow, slash commands, list formatting, and channel behavior
 - [`docs/architecture.md`](./docs/architecture.md): schema, polling flow, metadata enrichment, and implementation notes
-- [`docs/deployment.md`](./docs/deployment.md): environment variables, Slack endpoint setup, and deployment checks
-- [`docs/runbook.md`](./docs/runbook.md): troubleshooting common Slack, polling, and `/npmlist` issues
+- [`docs/deployment.md`](./docs/deployment.md): environment variables, Slack and Discord endpoint setup, and deployment checks
+- [`docs/runbook.md`](./docs/runbook.md): troubleshooting common Slack, Discord, polling, and `/npmlist` issues
 
 ## What This Package Does
 
-The notifier stores tracked packages, Slack workspace details, and per-channel subscriptions in Convex.
+The notifier stores tracked packages, subscriber details for Slack workspaces and Discord servers, and per-channel subscriptions in Convex.
 
 An hourly cron checks tracked packages for updates. When a newer version is found:
 
 1. The package record is updated in Convex.
 2. GitHub repo metadata is stored on the package when it can be derived from npm metadata.
-3. Matching subscribers are grouped by Slack target channel.
+3. Matching subscribers are grouped by delivery target.
 4. Slack notifications are sent to the relevant channel or the workspace default channel.
-5. If upstream metadata is incomplete, Patch Pulse retries later, updates the original post with release links, and adds an AI summary in the thread when the evidence is strong enough.
+5. Discord notifications are sent to the explicit subscribed channel.
+6. If upstream metadata is incomplete, Patch Pulse retries later, updates the original Slack post with release links, and adds an AI summary in the thread when the evidence is strong enough.
 
 ## Slack Summary
 
@@ -50,6 +55,24 @@ Examples:
 - `/npmuntrack react #frontend`
 - `/npmlist`
 
+## Discord Summary
+
+Discord tracking is channel-based:
+
+- A Discord server has no default channel.
+- Every subscription targets an explicit channel.
+- A subscription is effectively scoped by `(guild, package, channel)`.
+- `/npmlist` groups subscriptions by channel.
+
+Examples:
+
+- `/npmtrack package:react`
+- `/npmtrack package:react channel:#frontend`
+- `/npmtrack package:react filter:minor`
+- `/npmuntrack package:react`
+- `/npmuntrack package:react channel:#frontend`
+- `/npmlist`
+
 ## Development
 
 Useful commands from this package directory:
@@ -63,4 +86,4 @@ Useful commands from this package directory:
 - `/npmlist` does not perform live npm lookups. It uses stored package metadata so the response stays fast.
 - GitHub links in `/npmlist` appear after polling has enriched a package with repo metadata.
 - Update notifications can include richer release links because polling already fetches npm manifests during the update check.
-- Patch Pulse uses status reactions on the original Slack post: `⏳` queued/pending, `📝` summary added, `⚠️` no trustworthy release details found after retries, `❌` processing failed.
+- Slack-only enrichment uses status reactions on the original Slack post: `⏳` queued/pending, `📝` summary added, `⚠️` no trustworthy release details found after retries, `❌` processing failed.

@@ -2,6 +2,61 @@
 
 This document is for debugging common notifier issues.
 
+## Discord App Install Fails
+
+Symptoms:
+
+- `/discord/install` redirects, but the guild is not stored
+- Discord OAuth completes, but the success page shows an error
+
+Checks:
+
+- verify `DISCORD_CLIENT_ID`
+- verify `DISCORD_APPLICATION_ID`
+- verify `DISCORD_BOT_TOKEN`
+- inspect logs around [`convex/discord/oauth.ts`](../convex/discord/oauth.ts)
+
+Likely causes:
+
+- missing env vars
+- incorrect install link configuration
+
+## Discord Slash Commands Do Not Appear
+
+Symptoms:
+
+- the bot is installed, but `/npmtrack` and `/npmlist` are unavailable in Discord
+
+Checks:
+
+- run `curl -X POST -H "x-patchpulse-secret: $DISCORD_REGISTER_COMMANDS_SECRET" https://grand-yak-92.convex.site/discord/register-commands`
+- inspect logs around [`convex/discord/oauth.ts`](../convex/discord/oauth.ts)
+- verify `DISCORD_APPLICATION_ID`, `DISCORD_CLIENT_ID`, and `DISCORD_BOT_TOKEN`
+
+Explanation:
+
+- Discord slash commands must be registered before they appear
+- global command registration can take some time to propagate
+
+## Discord Interaction Verification Fails
+
+Symptoms:
+
+- Discord marks the interactions endpoint invalid
+- slash commands fail immediately
+
+Checks:
+
+- verify `DISCORD_PUBLIC_KEY`
+- verify Discord Interactions Endpoint URL points to `/discord/interactions`
+- inspect logs around [`convex/discord/commands.ts`](../convex/discord/commands.ts) and [`convex/discord/verify.ts`](../convex/discord/verify.ts)
+
+Likely causes:
+
+- wrong public key
+- wrong endpoint URL
+- stale deployment
+
 ## Slack App Install Fails
 
 Symptoms:
@@ -73,6 +128,18 @@ Checks:
 - inspect `subscriptions.channelId` and `channelName`
 - remember that missing `channelId` means “workspace default channel”
 
+## Wrong Discord Channel Used
+
+Symptoms:
+
+- notifications go to a different Discord channel than expected
+
+Checks:
+
+- inspect `subscriptions.channelId` and `channelName`
+- remember that Discord has no default channel fallback
+- verify the command was run with the intended `channel` option
+
 ## `/npmuntrack` Removes Too Much
 
 Expected behavior:
@@ -91,6 +158,7 @@ Checks:
 - verify the cron in [`convex/crons.ts`](../convex/crons.ts) is deployed
 - inspect logs from [`convex/polling.ts`](../convex/polling.ts)
 - verify update threshold filters like `minor` or `major`
+- if the subscriber is Discord, inspect bot API errors for missing channel access
 
 ## Release Summary Stays At `⏳`
 
@@ -144,6 +212,9 @@ Checks:
 ## Useful Files
 
 - [`convex/http.ts`](../convex/http.ts)
+- [`convex/discord/oauth.ts`](../convex/discord/oauth.ts)
+- [`convex/discord/commands.ts`](../convex/discord/commands.ts)
+- [`convex/discord/verify.ts`](../convex/discord/verify.ts)
 - [`convex/slack/oauth.ts`](../convex/slack/oauth.ts)
 - [`convex/slack/commands.ts`](../convex/slack/commands.ts)
 - [`convex/slack/events.ts`](../convex/slack/events.ts)

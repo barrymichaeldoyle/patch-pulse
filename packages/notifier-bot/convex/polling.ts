@@ -11,12 +11,14 @@ import { internal } from './_generated/api';
 import { Id } from './_generated/dataModel';
 import { extractGitHubRepoUrl } from './slack/links';
 import { formatUpdateLine } from './slack/format';
+import { formatUpdateLine as formatDiscordUpdateLine } from './discord/format';
 import {
   chatPostMessage,
   conversationsFindByName,
   PrivateChannelError,
   reactionsAdd,
 } from './slack/api';
+import { sendChannelMessage, DiscordMissingAccessError } from './discord/api';
 
 const UPDATE_TYPE_RANK: Record<UpdateType, number> = {
   patch: 0,
@@ -49,6 +51,8 @@ export const checkForUpdates = internalAction({
     };
     type DestinationEntry = {
       lines: string[];
+      discordLines: string[];
+      packageNames: string[];
       stamps: Array<{
         subscriptionId: Id<'subscriptions'>;
         newVersion: string;
@@ -98,6 +102,13 @@ export const checkForUpdates = internalAction({
           updateType,
           manifest,
         );
+        const discordLine = formatDiscordUpdateLine(
+          pkg.name,
+          pkg.currentVersion,
+          version,
+          updateType,
+          manifest,
+        );
 
         await ctx.runMutation(internal.packages.upsertVersion, {
           name: pkg.name,
@@ -130,6 +141,8 @@ export const checkForUpdates = internalAction({
             channelMap.get(key) ??
             ({
               lines: [] as string[],
+              discordLines: [] as string[],
+              packageNames: [] as string[],
               stamps: [] as Array<{
                 subscriptionId: Id<'subscriptions'>;
                 newVersion: string;
@@ -137,6 +150,8 @@ export const checkForUpdates = internalAction({
               pendingByLine: new Map<string, PendingPackageInfo>(),
             } satisfies DestinationEntry);
           entry.lines.push(line);
+          entry.discordLines.push(discordLine);
+          entry.packageNames.push(pkg.name);
           entry.stamps.push({ subscriptionId: sub._id, newVersion: version });
           entry.pendingByLine.set(line, {
             name: pkg.name,
@@ -161,6 +176,72 @@ export const checkForUpdates = internalAction({
         subscriberId,
       });
       if (!subscriber?.active) continue;
+
+      if (subscriber.type === 'discord') {
+        for (const [
+          key,
+          { discordLines, stamps, packageNames },
+        ] of channelMap) {
+          if (!key.startsWith('channel:')) continue;
+          const targetChannelId = key.slice('channel:'.length);
+
+          const header =
+            discordLines.length === 1
+              ? `📦 **${packageNames[0] ?? 'package'} update**`
+              : `📦 **${discordLines.length} npm package updates**`;
+
+          const DISCORD_CHAR_LIMIT = 1800;
+          const batches: string[][] = [];
+          let batch: string[] = [];
+          let batchLen = header.length + 2;
+          for (const dl of discordLines) {
+            if (
+              batch.length > 0 &&
+              batchLen + dl.length + 1 > DISCORD_CHAR_LIMIT
+            ) {
+              batches.push(batch);
+              batch = [];
+              batchLen = 0;
+            }
+            batch.push(dl);
+            batchLen += dl.length + 1;
+          }
+          if (batch.length > 0) batches.push(batch);
+
+          let allBatchesSent = true;
+          for (const batchLines of batches) {
+            try {
+              await sendChannelMessage(
+                targetChannelId,
+                `${header}\n\n${batchLines.join('\n')}`,
+              );
+            } catch (error) {
+              allBatchesSent = false;
+              if (error instanceof DiscordMissingAccessError) {
+                console.warn(
+                  `Discord: missing access for channel ${targetChannelId}`,
+                );
+              } else {
+                console.error(
+                  `Discord: error sending to ${targetChannelId}:`,
+                  error,
+                );
+              }
+              break;
+            }
+          }
+
+          if (allBatchesSent && batches.length > 0) {
+            for (const { subscriptionId, newVersion } of stamps) {
+              await ctx.runMutation(
+                internal.subscriptions.updateLastNotifiedVersion,
+                { subscriptionId, version: newVersion },
+              );
+            }
+          }
+        }
+        continue;
+      }
 
       const details = await ctx.runQuery(internal.subscribers.getSlackDetails, {
         subscriberId,
