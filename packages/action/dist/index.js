@@ -27765,6 +27765,8 @@ async function composePrBody(group) {
 }
 
 // src/main.ts
+var VALID_UPDATE_TYPES = ['patch', 'minor', 'major'];
+var VALID_AUTO_MERGE = ['none', 'patch', 'minor'];
 var UPDATE_TYPE_RANK2 = {
   patch: 0,
   minor: 1,
@@ -27775,6 +27777,16 @@ var AUTO_MERGE_THRESHOLD = {
   patch: 0,
   minor: 1,
 };
+function parseJsonInput(inputName, raw) {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new Error(
+      `Invalid JSON in '${inputName}' input: ${raw}
+Please check that it is valid JSON.`,
+    );
+  }
+}
 function shouldAutoMerge(updateType, autoMerge) {
   return (
     UPDATE_TYPE_RANK2[updateType] <= (AUTO_MERGE_THRESHOLD[autoMerge] ?? -1)
@@ -27801,6 +27813,7 @@ async function processGroup({
   teamReviewers,
   canCreateNewPr,
   cwd,
+  dryRun,
 }) {
   const { owner, repo, defaultBranch } = repoContext;
   core.info(`
@@ -27838,6 +27851,11 @@ Processing: ${group.name} (${group.highestUpdateType})`);
   if (!hasExistingOpenPr && !canCreateNewPr) {
     core.info(`  Skipping \u2014 open PR limit reached`);
     return false;
+  }
+  if (dryRun) {
+    const action = hasExistingOpenPr ? 'update PR' : 'open PR';
+    core.info(`  [DRY RUN] Would ${action} for branch \`${group.branchName}\``);
+    return !hasExistingOpenPr;
   }
   await setupBranch({ branchName: group.branchName, defaultBranch, cwd });
   const touchedFiles = await bumpVersions(group.packages);
@@ -27940,21 +27958,47 @@ async function run() {
     const teamReviewersRaw = core.getInput('team-reviewers') || '[]';
     const commitPrefix =
       core.getInput('commit-message-prefix') || 'chore(deps):';
+    const dryRun = core.getInput('dry-run') === 'true';
     const updateTypes = updateTypesRaw.split(',').map((s) => s.trim());
-    const groups = JSON.parse(groupsRaw);
+    const invalidTypes = updateTypes.filter(
+      (t) => !VALID_UPDATE_TYPES.includes(t),
+    );
+    if (invalidTypes.length > 0) {
+      throw new Error(
+        `Invalid value(s) in 'update-types': ${invalidTypes.join(', ')}. Allowed values: patch, minor, major`,
+      );
+    }
+    if (!VALID_AUTO_MERGE.includes(autoMerge)) {
+      throw new Error(
+        `Invalid value for 'auto-merge': ${autoMerge}. Allowed values: none, patch, minor`,
+      );
+    }
     const maxOpenPrs = parseInt(maxOpenPrsInput, 10);
-    const ignoreList = JSON.parse(ignoreRaw);
-    const assignees = JSON.parse(assigneesRaw);
-    const reviewers = JSON.parse(reviewersRaw);
-    const teamReviewers = JSON.parse(teamReviewersRaw);
+    if (isNaN(maxOpenPrs) || maxOpenPrs < 0) {
+      throw new Error(
+        `Invalid value for 'max-open-prs': ${maxOpenPrsInput}. Must be a non-negative integer (0 = unlimited).`,
+      );
+    }
+    const groups = parseJsonInput('groups', groupsRaw);
+    const ignoreList = parseJsonInput('ignore', ignoreRaw);
+    const assignees = parseJsonInput('assignees', assigneesRaw);
+    const reviewers = parseJsonInput('reviewers', reviewersRaw);
+    const teamReviewers = parseJsonInput('team-reviewers', teamReviewersRaw);
     const cwd =
       workingDirectoryInput === '.' ? process.cwd() : workingDirectoryInput;
+    if (dryRun) {
+      core.info(
+        'DRY RUN mode enabled \u2014 no branches, commits, or PRs will be created',
+      );
+    }
     const octokit = github.getOctokit(githubToken);
     const { owner, repo } = github.context.repo;
     const { data: repoData } = await octokit.rest.repos.get({ owner, repo });
     const defaultBranch = repoData.default_branch;
     const repoContext = { owner, repo, defaultBranch };
-    await configureGit(cwd, owner, repo, githubToken);
+    if (!dryRun) {
+      await configureGit(cwd, owner, repo, githubToken);
+    }
     const { data: allOpenPrs } = await octokit.rest.pulls.list({
       owner,
       repo,
@@ -27996,6 +28040,7 @@ async function run() {
         teamReviewers,
         canCreateNewPr,
         cwd,
+        dryRun,
       });
       if (created) newPrsCreated++;
     }
