@@ -10,21 +10,28 @@ The Patch Pulse GitHub Action runs on a schedule, detects outdated dependencies 
 ## Key features
 
 - **One PR per package (or group)** — each update is independently reviewable and revertable
+- **Lockfile updates** — automatically runs your package manager's install after bumping versions, so the lockfile is always in sync
 - **Package grouping** — define groups of related packages (e.g. all `@tanstack/*`) that update together in a single PR
 - **Monorepo-aware** — bumps the package across every workspace it appears in, all in one PR
 - **Range-preserving** — if you pin with `^`, the PR writes `^new-version`; exact pins stay exact
+- **Ignore list** — exclude packages or glob patterns (`@types/*`) from ever getting a PR
+- **PR limit** — caps the number of open patch-pulse PRs so your queue never gets overwhelming
 - **Breaking change risk labels** — every PR includes a risk callout (`NONE` / `LOW` / `HIGH`) based on the update type
 - **Release notes links** — the PR body links directly to GitHub releases for each updated package
-- **Auto-merge** — optionally auto-merge patch (or patch + minor) PRs once CI passes
-- **No stale PR pile-up** — one branch per group (`patch-pulse/<name>`), re-used on each run; the PR body updates in place if the branch already has an open PR
+- **Respects closed PRs** — if you close a PR without merging, the action won't re-open it until you delete the branch
+- **Auto-merge** — optionally enable GitHub's native auto-merge so PRs squash-merge automatically once all required CI checks pass
+- **Assignees & reviewers** — configure who gets assigned or requested for review on every opened PR
+- **Configurable commit prefix** — use `chore(deps):`, `deps:`, or whatever fits your project's commit convention
+- **No stale PR pile-up** — one branch per group (`patch-pulse/<name>`), updated in place each run
 
 ## How it works
 
 1. The action runs `npx patch-pulse --json --hide-clean` in your repository
-2. Outdated packages are collected and grouped according to your configuration
+2. Outdated packages are filtered by your ignore list and grouped
 3. For each group, a branch `patch-pulse/<group-name>` is created from your default branch
 4. Version strings are bumped in every affected `package.json`, preserving the existing range prefix
-5. The branch is pushed and a pull request is opened (or the existing one is updated)
+5. The package manager's install command runs to update the lockfile
+6. The branch is pushed and a pull request is opened (or the existing one is updated)
 
 ## Quick start
 
@@ -97,8 +104,8 @@ The action follows the same tag convention used by `actions/checkout`, `actions/
 
 | Ref              | Behaviour                                                                                                                                               |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@action/v0`     | **Recommended.** Moving tag — always the latest `v1.x` release. You get new features and fixes automatically, but breaking changes (a `v2`) are opt-in. |
-| `@action/v0.2.3` | Exact pin — nothing changes until you update the ref yourself. Use this in environments that require full reproducibility.                              |
+| `@action/v0`     | **Recommended.** Moving tag — always the latest `v0.x` release. You get new features and fixes automatically, but breaking changes (a `v1`) are opt-in. |
+| `@action/v0.1.0` | Exact pin — nothing changes until you update the ref yourself. Use this in environments that require full reproducibility.                              |
 | `@main`          | Unreleased HEAD — avoid in production. Useful only for testing unreleased changes.                                                                      |
 
-A `v2` will only be cut if a change would break existing workflow configurations. Additive changes (new inputs, new behaviour behind a flag) stay in `v1`.
+A new major tag will only be cut if a change would break existing workflow configurations. Additive changes (new inputs, new behaviour behind a flag) stay in the same major.

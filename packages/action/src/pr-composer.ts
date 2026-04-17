@@ -8,19 +8,22 @@ const UPDATE_TYPE_BADGE: Record<UpdateType, string> = {
   major: '🔴 MAJOR',
 };
 
-export function composePrTitle(group: PackageGroup): string {
+export function composePrTitle(
+  group: PackageGroup,
+  prefix = 'chore(deps):',
+): string {
   const { packages, highestUpdateType, name } = group;
 
   if (packages.length === 1) {
     const pkg = packages[0];
-    return `chore(deps): update \`${pkg.packageName}\` ${pkg.currentVersion} → ${pkg.latestVersion} (${pkg.updateType})`;
+    return `${prefix} update \`${pkg.packageName}\` ${pkg.currentVersion} → ${pkg.latestVersion} (${pkg.updateType})`;
   }
 
   // For groups, show the version only when all packages converge on the same target
   const uniqueTargets = [...new Set(packages.map((p) => p.latestVersion))];
   const versionSuffix =
     uniqueTargets.length === 1 ? ` → ${uniqueTargets[0]}` : '';
-  return `chore(deps): update ${name} packages${versionSuffix} (${highestUpdateType})`;
+  return `${prefix} update ${name} packages${versionSuffix} (${highestUpdateType})`;
 }
 
 export async function composePrBody(group: PackageGroup): Promise<string> {

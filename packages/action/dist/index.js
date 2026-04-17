@@ -12351,7 +12351,7 @@ var require_mock_client = __commonJS({
     module2,
   ) {
     'use strict';
-    var { promisify: promisify3 } = require('util');
+    var { promisify: promisify4 } = require('util');
     var Client = require_client();
     var { buildMockDispatch } = require_mock_utils();
     var {
@@ -12393,7 +12393,7 @@ var require_mock_client = __commonJS({
         return new MockInterceptor(opts, this[kDispatches]);
       }
       async [kClose]() {
-        await promisify3(this[kOriginalClose])();
+        await promisify4(this[kOriginalClose])();
         this[kConnected] = 0;
         this[kMockAgent][Symbols.kClients].delete(this[kOrigin]);
       }
@@ -12409,7 +12409,7 @@ var require_mock_pool = __commonJS({
     module2,
   ) {
     'use strict';
-    var { promisify: promisify3 } = require('util');
+    var { promisify: promisify4 } = require('util');
     var Pool = require_pool();
     var { buildMockDispatch } = require_mock_utils();
     var {
@@ -12451,7 +12451,7 @@ var require_mock_pool = __commonJS({
         return new MockInterceptor(opts, this[kDispatches]);
       }
       async [kClose]() {
-        await promisify3(this[kOriginalClose])();
+        await promisify4(this[kOriginalClose])();
         this[kConnected] = 0;
         this[kMockAgent][Symbols.kClients].delete(this[kOrigin]);
       }
@@ -22207,7 +22207,7 @@ var require_exec = __commonJS({
     exports2.getExecOutput = exports2.exec = void 0;
     var string_decoder_1 = require('string_decoder');
     var tr = __importStar(require_toolrunner());
-    function exec3(commandLine, args, options) {
+    function exec4(commandLine, args, options) {
       return __awaiter(this, void 0, void 0, function* () {
         const commandArgs = tr.argStringToArray(commandLine);
         if (commandArgs.length === 0) {
@@ -22219,7 +22219,7 @@ var require_exec = __commonJS({
         return runner.exec();
       });
     }
-    exports2.exec = exec3;
+    exports2.exec = exec4;
     function getExecOutput(commandLine, args, options) {
       var _a, _b;
       return __awaiter(this, void 0, void 0, function* () {
@@ -22260,7 +22260,7 @@ var require_exec = __commonJS({
           ),
           { stdout: stdOutListener, stderr: stdErrListener },
         );
-        const exitCode = yield exec3(
+        const exitCode = yield exec4(
           commandLine,
           args,
           Object.assign(Object.assign({}, options), { listeners }),
@@ -22378,17 +22378,17 @@ var require_platform = __commonJS({
       exports2.platform =
         void 0;
     var os_1 = __importDefault(require('os'));
-    var exec3 = __importStar(require_exec());
+    var exec4 = __importStar(require_exec());
     var getWindowsInfo = () =>
       __awaiter(void 0, void 0, void 0, function* () {
-        const { stdout: version } = yield exec3.getExecOutput(
+        const { stdout: version } = yield exec4.getExecOutput(
           'powershell -command "(Get-CimInstance -ClassName Win32_OperatingSystem).Version"',
           void 0,
           {
             silent: true,
           },
         );
-        const { stdout: name } = yield exec3.getExecOutput(
+        const { stdout: name } = yield exec4.getExecOutput(
           'powershell -command "(Get-CimInstance -ClassName Win32_OperatingSystem).Caption"',
           void 0,
           {
@@ -22403,7 +22403,7 @@ var require_platform = __commonJS({
     var getMacOsInfo = () =>
       __awaiter(void 0, void 0, void 0, function* () {
         var _a, _b, _c, _d;
-        const { stdout } = yield exec3.getExecOutput('sw_vers', void 0, {
+        const { stdout } = yield exec4.getExecOutput('sw_vers', void 0, {
           silent: true,
         });
         const version =
@@ -22428,7 +22428,7 @@ var require_platform = __commonJS({
       });
     var getLinuxInfo = () =>
       __awaiter(void 0, void 0, void 0, function* () {
-        const { stdout } = yield exec3.getExecOutput(
+        const { stdout } = yield exec4.getExecOutput(
           'lsb_release',
           ['-i', '-r', '-s'],
           {
@@ -27478,6 +27478,31 @@ function groupPackages({ cliOutput, groups, updateTypes }) {
   });
 }
 
+// src/ignore-filter.ts
+function matchesPattern(packageName, pattern) {
+  if (!pattern.includes('*')) return packageName === pattern;
+  const regex = new RegExp(
+    '^' +
+      pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') +
+      '$',
+  );
+  return regex.test(packageName);
+}
+function applyIgnoreList(groups, ignoreList) {
+  if (ignoreList.length === 0) return groups;
+  return groups
+    .map((group) => ({
+      ...group,
+      packages: group.packages.filter(
+        (pkg) =>
+          !ignoreList.some((pattern) =>
+            matchesPattern(pkg.packageName, pattern),
+          ),
+      ),
+    }))
+    .filter((group) => group.packages.length > 0);
+}
+
 // src/version-bumper.ts
 var import_promises = require('fs/promises');
 
@@ -27536,12 +27561,48 @@ async function bumpVersions(packages) {
   return touchedFiles;
 }
 
-// src/branch-manager.ts
+// src/lockfile-updater.ts
 var import_child_process2 = require('child_process');
 var import_util2 = require('util');
+
+// src/detect-package-manager.ts
+var import_fs = require('fs');
+var import_path = require('path');
+function detectPackageManager(cwd) {
+  if ((0, import_fs.existsSync)((0, import_path.join)(cwd, 'pnpm-lock.yaml')))
+    return 'pnpm';
+  if ((0, import_fs.existsSync)((0, import_path.join)(cwd, 'yarn.lock')))
+    return 'yarn';
+  if (
+    (0, import_fs.existsSync)((0, import_path.join)(cwd, 'bun.lockb')) ||
+    (0, import_fs.existsSync)((0, import_path.join)(cwd, 'bun.lock'))
+  )
+    return 'bun';
+  return 'npm';
+}
+
+// src/lockfile-updater.ts
 var execAsync2 = (0, import_util2.promisify)(import_child_process2.exec);
+var INSTALL_COMMANDS = {
+  pnpm: 'pnpm install --no-frozen-lockfile',
+  yarn: 'yarn install',
+  bun: 'bun install',
+  npm: 'npm install',
+};
+async function updateLockfile(cwd) {
+  const pm = detectPackageManager(cwd);
+  await execAsync2(INSTALL_COMMANDS[pm], {
+    cwd,
+    maxBuffer: 50 * 1024 * 1024,
+  });
+}
+
+// src/branch-manager.ts
+var import_child_process3 = require('child_process');
+var import_util3 = require('util');
+var execAsync3 = (0, import_util3.promisify)(import_child_process3.exec);
 async function git(args, cwd) {
-  const { stdout } = await execAsync2(`git ${args}`, { cwd });
+  const { stdout } = await execAsync3(`git ${args}`, { cwd });
   return stdout.trim();
 }
 async function configureGit(cwd, owner, repo, token) {
@@ -27635,16 +27696,16 @@ var UPDATE_TYPE_BADGE = {
   minor: '\u{1F7E1} MINOR',
   major: '\u{1F534} MAJOR',
 };
-function composePrTitle(group) {
+function composePrTitle(group, prefix = 'chore(deps):') {
   const { packages, highestUpdateType, name } = group;
   if (packages.length === 1) {
     const pkg = packages[0];
-    return `chore(deps): update \`${pkg.packageName}\` ${pkg.currentVersion} \u2192 ${pkg.latestVersion} (${pkg.updateType})`;
+    return `${prefix} update \`${pkg.packageName}\` ${pkg.currentVersion} \u2192 ${pkg.latestVersion} (${pkg.updateType})`;
   }
   const uniqueTargets = [...new Set(packages.map((p) => p.latestVersion))];
   const versionSuffix =
     uniqueTargets.length === 1 ? ` \u2192 ${uniqueTargets[0]}` : '';
-  return `chore(deps): update ${name} packages${versionSuffix} (${highestUpdateType})`;
+  return `${prefix} update ${name} packages${versionSuffix} (${highestUpdateType})`;
 }
 async function composePrBody(group) {
   const { packages, highestUpdateType } = group;
@@ -27715,11 +27776,32 @@ var AUTO_MERGE_THRESHOLD = {
   minor: 1,
 };
 function shouldAutoMerge(updateType, autoMerge) {
-  const updateRank = UPDATE_TYPE_RANK2[updateType];
-  const threshold = AUTO_MERGE_THRESHOLD[autoMerge] ?? -1;
-  return updateRank <= threshold;
+  return (
+    UPDATE_TYPE_RANK2[updateType] <= (AUTO_MERGE_THRESHOLD[autoMerge] ?? -1)
+  );
 }
-async function processGroup({ group, octokit, repoContext, autoMerge, cwd }) {
+async function enableNativeAutoMerge(octokit, pullRequestNodeId) {
+  await octokit.graphql(
+    `mutation($id: ID!) {
+      enablePullRequestAutoMerge(input: { pullRequestId: $id, mergeMethod: SQUASH }) {
+        clientMutationId
+      }
+    }`,
+    { id: pullRequestNodeId },
+  );
+}
+async function processGroup({
+  group,
+  octokit,
+  repoContext,
+  autoMerge,
+  commitPrefix,
+  assignees,
+  reviewers,
+  teamReviewers,
+  canCreateNewPr,
+  cwd,
+}) {
   const { owner, repo, defaultBranch } = repoContext;
   core.info(`
 Processing: ${group.name} (${group.highestUpdateType})`);
@@ -27728,30 +27810,55 @@ Processing: ${group.name} (${group.highestUpdateType})`);
       `  ${pkg.packageName}: ${pkg.currentVersion} \u2192 ${pkg.latestVersion}`,
     );
   }
-  const { data: existingPrs } = await octokit.rest.pulls.list({
+  const { data: openPrs } = await octokit.rest.pulls.list({
     owner,
     repo,
     head: `${owner}:${group.branchName}`,
     state: 'open',
   });
+  const hasExistingOpenPr = openPrs.length > 0;
+  if (!hasExistingOpenPr) {
+    const { data: closedPrs } = await octokit.rest.pulls.list({
+      owner,
+      repo,
+      head: `${owner}:${group.branchName}`,
+      state: 'closed',
+    });
+    const wasRejected = closedPrs.some((pr2) => pr2.merged_at === null);
+    if (wasRejected) {
+      core.info(
+        `  Skipping \u2014 a PR for this group was previously closed without merging`,
+      );
+      core.info(
+        `  Delete the \`${group.branchName}\` branch to allow re-creation`,
+      );
+      return false;
+    }
+  }
+  if (!hasExistingOpenPr && !canCreateNewPr) {
+    core.info(`  Skipping \u2014 open PR limit reached`);
+    return false;
+  }
   await setupBranch({ branchName: group.branchName, defaultBranch, cwd });
   const touchedFiles = await bumpVersions(group.packages);
   if (touchedFiles.length === 0) {
     core.info(`  No files changed \u2014 skipping`);
-    return;
+    return false;
   }
+  core.info(`  Updating lockfile...`);
+  await updateLockfile(cwd);
   const packageList = group.packages
     .map((p) => `${p.packageName}@${p.latestVersion}`)
     .join(', ');
   await commitAndPush({
     branchName: group.branchName,
-    message: `chore(deps): update ${packageList}`,
+    message: `${commitPrefix} update ${packageList}`,
     cwd,
   });
-  const title = composePrTitle(group);
+  const title = composePrTitle(group, commitPrefix);
   const body = await composePrBody(group);
-  if (existingPrs.length > 0) {
-    const pr2 = existingPrs[0];
+  if (hasExistingOpenPr) {
+    const pr2 = openPrs[0];
     core.info(`  Updating existing PR #${pr2.number}`);
     await octokit.rest.pulls.update({
       owner,
@@ -27760,7 +27867,7 @@ Processing: ${group.name} (${group.highestUpdateType})`);
       title,
       body,
     });
-    return;
+    return false;
   }
   core.info(`  Creating PR: ${title}`);
   const { data: pr } = await octokit.rest.pulls.create({
@@ -27780,19 +27887,44 @@ Processing: ${group.name} (${group.highestUpdateType})`);
       labels: ['patch-pulse', `${group.highestUpdateType}-update`],
     });
   } catch {}
-  if (shouldAutoMerge(group.highestUpdateType, autoMerge)) {
+  if (assignees.length > 0) {
     try {
-      await octokit.rest.pulls.merge({
+      await octokit.rest.issues.addAssignees({
+        owner,
+        repo,
+        issue_number: pr.number,
+        assignees,
+      });
+    } catch (error) {
+      core.warning(`  Could not add assignees: ${String(error)}`);
+    }
+  }
+  if (reviewers.length > 0 || teamReviewers.length > 0) {
+    try {
+      await octokit.rest.pulls.requestReviewers({
         owner,
         repo,
         pull_number: pr.number,
-        merge_method: 'squash',
+        reviewers,
+        team_reviewers: teamReviewers,
       });
-      core.info(`  Auto-merged PR #${pr.number}`);
     } catch (error) {
-      core.warning(`  Could not auto-merge PR #${pr.number}: ${String(error)}`);
+      core.warning(`  Could not request reviewers: ${String(error)}`);
     }
   }
+  if (shouldAutoMerge(group.highestUpdateType, autoMerge)) {
+    try {
+      await enableNativeAutoMerge(octokit, pr.node_id);
+      core.info(
+        `  Enabled auto-merge on PR #${pr.number} (will merge once CI passes)`,
+      );
+    } catch (error) {
+      core.warning(
+        `  Could not enable auto-merge on PR #${pr.number}: ${String(error)}. Ensure auto-merge is allowed in your repository settings.`,
+      );
+    }
+  }
+  return true;
 }
 async function run() {
   try {
@@ -27801,8 +27933,20 @@ async function run() {
     const groupsRaw = core.getInput('groups') || '{}';
     const autoMerge = core.getInput('auto-merge') || 'none';
     const workingDirectoryInput = core.getInput('working-directory') || '.';
+    const maxOpenPrsInput = core.getInput('max-open-prs') || '10';
+    const ignoreRaw = core.getInput('ignore') || '[]';
+    const assigneesRaw = core.getInput('assignees') || '[]';
+    const reviewersRaw = core.getInput('reviewers') || '[]';
+    const teamReviewersRaw = core.getInput('team-reviewers') || '[]';
+    const commitPrefix =
+      core.getInput('commit-message-prefix') || 'chore(deps):';
     const updateTypes = updateTypesRaw.split(',').map((s) => s.trim());
     const groups = JSON.parse(groupsRaw);
+    const maxOpenPrs = parseInt(maxOpenPrsInput, 10);
+    const ignoreList = JSON.parse(ignoreRaw);
+    const assignees = JSON.parse(assigneesRaw);
+    const reviewers = JSON.parse(reviewersRaw);
+    const teamReviewers = JSON.parse(teamReviewersRaw);
     const cwd =
       workingDirectoryInput === '.' ? process.cwd() : workingDirectoryInput;
     const octokit = github.getOctokit(githubToken);
@@ -27811,6 +27955,17 @@ async function run() {
     const defaultBranch = repoData.default_branch;
     const repoContext = { owner, repo, defaultBranch };
     await configureGit(cwd, owner, repo, githubToken);
+    const { data: allOpenPrs } = await octokit.rest.pulls.list({
+      owner,
+      repo,
+      state: 'open',
+      per_page: 100,
+    });
+    const openPatchPulseBranches = new Set(
+      allOpenPrs
+        .filter((pr) => pr.head.ref.startsWith('patch-pulse/'))
+        .map((pr) => pr.head.ref),
+    );
     core.info('Running PatchPulse to detect outdated packages...');
     const cliOutput = await detectUpdates({ cwd });
     if (cliOutput.summary.outdated === 0) {
@@ -27820,10 +27975,29 @@ async function run() {
     core.info(
       `Found ${cliOutput.summary.outdated} outdated package(s) across ${cliOutput.summary.projectCount} project(s)`,
     );
-    const packageGroups = groupPackages({ cliOutput, groups, updateTypes });
-    core.info(`Grouped into ${packageGroups.length} PR(s)`);
+    let packageGroups = groupPackages({ cliOutput, groups, updateTypes });
+    packageGroups = applyIgnoreList(packageGroups, ignoreList);
+    core.info(`Processing ${packageGroups.length} update group(s)`);
+    let newPrsCreated = 0;
     for (const group of packageGroups) {
-      await processGroup({ group, octokit, repoContext, autoMerge, cwd });
+      const alreadyHasOpenPr = openPatchPulseBranches.has(group.branchName);
+      const underLimit =
+        maxOpenPrs <= 0 ||
+        openPatchPulseBranches.size + newPrsCreated < maxOpenPrs;
+      const canCreateNewPr = alreadyHasOpenPr || underLimit;
+      const created = await processGroup({
+        group,
+        octokit,
+        repoContext,
+        autoMerge,
+        commitPrefix,
+        assignees,
+        reviewers,
+        teamReviewers,
+        canCreateNewPr,
+        cwd,
+      });
+      if (created) newPrsCreated++;
     }
     core.info('\nDone!');
   } catch (error) {

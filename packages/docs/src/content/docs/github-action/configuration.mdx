@@ -1,34 +1,44 @@
 ---
 title: GitHub Action Configuration
-description: Inputs, grouping, auto-merge, and update type filtering for the PatchPulse GitHub Action.
+description: All inputs for the PatchPulse GitHub Action — grouping, ignore lists, auto-merge, PR limits, and more.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
 ## Inputs
 
-| Input               | Required | Default             | Description                                                                       |
-| ------------------- | -------- | ------------------- | --------------------------------------------------------------------------------- |
-| `github-token`      | Yes      | —                   | GitHub token with `contents: write` and `pull-requests: write` permissions        |
-| `update-types`      | No       | `patch,minor,major` | Comma-separated list of update types to open PRs for                              |
-| `groups`            | No       | `{}`                | JSON object grouping related packages into a single PR                            |
-| `auto-merge`        | No       | `none`              | Auto-merge PRs at or below this level: `patch`, `minor`, or `none`                |
-| `working-directory` | No       | `.`                 | Directory to run patch-pulse in (useful if the repo root is not the project root) |
+| Input                   | Required | Default             | Description                                                                       |
+| ----------------------- | -------- | ------------------- | --------------------------------------------------------------------------------- |
+| `github-token`          | Yes      | —                   | GitHub token with `contents: write` and `pull-requests: write` permissions        |
+| `update-types`          | No       | `patch,minor,major` | Comma-separated list of update types to open PRs for                              |
+| `groups`                | No       | `{}`                | JSON object grouping related packages into a single PR                            |
+| `ignore`                | No       | `[]`                | JSON array of package names or glob patterns to skip                              |
+| `max-open-prs`          | No       | `10`                | Maximum open patch-pulse PRs at any time (`0` = unlimited)                        |
+| `auto-merge`            | No       | `none`              | Auto-merge PRs at or below this level once CI passes: `patch`, `minor`, or `none` |
+| `assignees`             | No       | `[]`                | JSON array of GitHub usernames to assign to opened PRs                            |
+| `reviewers`             | No       | `[]`                | JSON array of GitHub usernames to request as reviewers                            |
+| `team-reviewers`        | No       | `[]`                | JSON array of team slugs to request as reviewers                                  |
+| `commit-message-prefix` | No       | `chore(deps):`      | Prefix used in commit messages and PR titles                                      |
+| `working-directory`     | No       | `.`                 | Directory to run patch-pulse in                                                   |
+
+---
 
 ## Filtering update types
 
-By default the action opens PRs for all three update types. You can narrow this — for example, to only open PRs for minor and major updates (and handle patches via auto-merge separately):
+By default the action opens PRs for all three update types. Narrow it down with `update-types`:
 
 ```yaml
 - uses: barrymichaeldoyle/patch-pulse/packages/action@action/v0
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
-    update-types: 'minor,major'
+    update-types: 'minor,major' # patch updates are skipped entirely
 ```
+
+---
 
 ## Grouping related packages
 
-Some packages are tightly coupled and should always update together. Use the `groups` input to define these relationships:
+Some packages are tightly coupled and must always update together. Use `groups` to define these relationships — when at least one package in a group is outdated, all packages in the group are bumped in a single branch and PR.
 
 ```yaml
 - uses: barrymichaeldoyle/patch-pulse/packages/action@action/v0
@@ -49,33 +59,100 @@ Some packages are tightly coupled and should always update together. Use the `gr
       }
 ```
 
-When at least one package in a group is outdated, the action creates a single branch `patch-pulse/<group-name>` and bumps all outdated packages in that group together. The PR's risk level reflects the **highest** update type across the group.
+The PR's risk level reflects the **highest** update type across all packages in the group. Packages not listed in any group each get their own branch and PR.
 
-<Aside type="note">
-  Packages not listed in any group each get their own branch and PR.
-</Aside>
+---
 
-## Auto-merge
+## Ignoring packages
 
-Enable auto-merge to have the action immediately squash-merge PRs once it opens them, without waiting for a human review. This works best for patch updates that you trust implicitly.
+Use `ignore` to permanently exclude packages from ever getting a PR. Supports exact names and `*` glob patterns:
 
 ```yaml
 - uses: barrymichaeldoyle/patch-pulse/packages/action@action/v0
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
-    auto-merge: 'patch' # or 'minor' to also auto-merge minor updates
+    ignore: '["some-internal-package", "@types/*", "eslint-*"]'
 ```
 
-The threshold is inclusive: `auto-merge: minor` auto-merges both patch and minor PRs; major PRs always require manual review.
+<Aside type="note">
+  The ignore list is also respected by the PatchPulse CLI's `skip`
+  configuration. Packages skipped in `patchpulse.json` are filtered out before
+  the action even sees them.
+</Aside>
+
+---
+
+## Limiting open PRs
+
+The `max-open-prs` input prevents your queue from being flooded on a first run or after a long gap. Once the limit is reached, no new PRs are opened until existing ones are merged or closed. Existing patch-pulse PRs are always updated regardless of the limit.
+
+```yaml
+- uses: barrymichaeldoyle/patch-pulse/packages/action@action/v0
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    max-open-prs: '5' # open at most 5 patch-pulse PRs at a time
+```
+
+Set to `'0'` to disable the limit entirely.
+
+---
+
+## Auto-merge
+
+When `auto-merge` is set, the action enables GitHub's native auto-merge on the PR. The PR will squash-merge automatically once **all required status checks pass** — it does not merge immediately.
+
+```yaml
+- uses: barrymichaeldoyle/patch-pulse/packages/action@action/v0
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    auto-merge: 'patch' # also accepts 'minor' to include minor updates
+```
+
+The threshold is inclusive: `auto-merge: minor` enables auto-merge for both patch and minor PRs. Major PRs always require manual review.
 
 <Aside type="caution">
-  Auto-merge calls the GitHub merge API immediately after the PR is created — it
-  does **not** wait for CI to pass. If your branch protection rules require
-  status checks, GitHub will reject the merge and the action will log a warning.
-  In that case, consider using GitHub's built-in
-  [auto-merge](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/automatically-merging-a-pull-request)
-  feature on the PR instead.
+  Auto-merge must be enabled in your repository settings before the action can
+  use it (**Settings → General → Allow auto-merge**). If it is not enabled, the
+  action will log a warning and continue without failing.
 </Aside>
+
+---
+
+## Respecting closed PRs
+
+If you close a patch-pulse PR without merging (rejecting the update), the action will not re-open it on the next run. To allow a PR to be re-created, delete the `patch-pulse/<group-name>` branch from your repository.
+
+---
+
+## Assignees and reviewers
+
+```yaml
+- uses: barrymichaeldoyle/patch-pulse/packages/action@action/v0
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    assignees: '["alice"]'
+    reviewers: '["bob", "carol"]'
+    team-reviewers: '["my-org/frontend-team"]'
+```
+
+All three are applied to every newly opened PR. Failures (e.g. the user isn't a collaborator) are logged as warnings and do not fail the action.
+
+---
+
+## Commit message prefix
+
+If your project uses a different commit convention, override the prefix:
+
+```yaml
+- uses: barrymichaeldoyle/patch-pulse/packages/action@action/v0
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    commit-message-prefix: 'deps:'
+```
+
+This affects both the git commit message and the PR title.
+
+---
 
 ## Full example
 
@@ -119,5 +196,9 @@ jobs:
                 "@tanstack/react-query"
               ]
             }
+          ignore: '["@types/*"]'
+          max-open-prs: '10'
           auto-merge: 'patch'
+          assignees: '["your-github-username"]'
+          reviewers: '["your-github-username"]'
 ```

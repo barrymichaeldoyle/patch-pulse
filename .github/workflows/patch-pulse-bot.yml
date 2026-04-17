@@ -1,0 +1,41 @@
+name: PatchPulse Dependency Bot
+
+on:
+  schedule:
+    - cron: '0 4 * * *' # Every day at 04:00 UTC (06:00 GMT+2)
+  workflow_dispatch:
+
+jobs:
+  patch-pulse:
+    name: Open dependency update PRs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build action
+        run: pnpm --filter @patch-pulse/action build
+
+      - uses: ./packages/action
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          update-types: 'patch,minor,major'
+          auto-merge: 'patch'
+          assignees: '["barrymichaeldoyle"]'
+          reviewers: '["barrymichaeldoyle"]'
+          commit-message-prefix: 'chore(deps):'

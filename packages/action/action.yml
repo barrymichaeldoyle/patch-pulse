@@ -18,14 +18,42 @@ inputs:
     description: 'JSON object mapping group names to arrays of package names that should be updated together'
     required: false
     default: '{}'
+  ignore:
+    description: 'JSON array of package names or glob patterns to never open PRs for (e.g. ["lodash", "@types/*"])'
+    required: false
+    default: '[]'
   auto-merge:
-    description: 'Automatically merge PRs at or below this update type (patch, minor, or none)'
+    description: 'Automatically merge PRs at or below this update type once CI passes (patch, minor, or none)'
     required: false
     default: 'none'
+  max-open-prs:
+    description: 'Maximum number of open patch-pulse PRs at any time. 0 = unlimited.'
+    required: false
+    default: '10'
+  assignees:
+    description: 'JSON array of GitHub usernames to assign to opened PRs (e.g. ["alice", "bob"])'
+    required: false
+    default: '[]'
+  reviewers:
+    description: 'JSON array of GitHub usernames to request as reviewers (e.g. ["alice", "bob"])'
+    required: false
+    default: '[]'
+  team-reviewers:
+    description: 'JSON array of team slugs to request as reviewers (e.g. ["my-org/frontend"])'
+    required: false
+    default: '[]'
+  commit-message-prefix:
+    description: 'Prefix for commit messages and PR titles'
+    required: false
+    default: 'chore(deps):'
   working-directory:
     description: 'Working directory to run patch-pulse in'
     required: false
     default: '.'
+  dry-run:
+    description: 'Log what would happen without making any changes (no branches, commits, or PRs)'
+    required: false
+    default: 'false'
 
 runs:
   using: 'node20'

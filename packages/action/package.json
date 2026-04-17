@@ -10,7 +10,9 @@
   },
   "scripts": {
     "build": "node scripts/build.cjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@actions/core": "^1.11.1",

@@ -19,12 +19,13 @@ What you expected to happen.
 **Project**
 
 - [ ] CLI
+- [ ] GitHub Action
 - [ ] Slack bot
 - [ ] VS Code extension
 
 **Environment**
 
-- Tool (Slack bot / CLI / VS Code extension):
+- Tool (CLI / GitHub Action / Slack bot / VS Code extension):
 - Version (if applicable):
 - OS (if applicable):
 

@@ -1,8 +1,8 @@
 # Example: add this file to your repo at .github/workflows/patch-pulse-bot.yml
 #
-# This workflow runs PatchPulse daily and opens one PR per outdated package (or
-# package group). PRs include the version diff, release notes links, and a
-# breaking-change risk assessment.
+# This workflow runs PatchPulse weekly and opens one PR per outdated package (or
+# package group). PRs include the version diff, release notes links, a
+# breaking-change risk assessment, and a fully updated lockfile.
 #
 # Required repo permissions (Settings → Actions → General → Workflow permissions):
 #   - Read and write permissions
@@ -57,6 +57,20 @@ jobs:
               ]
             }
 
-          # Automatically merge PRs whose highest update type is at or below
-          # this threshold (after CI passes). Options: patch | minor | none
+          # Never open PRs for these packages (supports * wildcards)
+          ignore: '["some-internal-package", "@types/*"]'
+
+          # Cap the number of open patch-pulse PRs (default: 10, 0 = unlimited)
+          max-open-prs: '10'
+
+          # Auto-merge PRs once CI passes for updates at or below this level
+          # Options: patch | minor | none
           auto-merge: 'patch'
+
+          # Who gets assigned and requested for review on new PRs
+          assignees: '["your-github-username"]'
+          reviewers: '["your-github-username"]'
+
+          # Use a different commit/PR title prefix if your project doesn't use
+          # conventional commits
+          commit-message-prefix: 'chore(deps):'
