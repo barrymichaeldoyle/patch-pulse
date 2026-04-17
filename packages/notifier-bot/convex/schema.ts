@@ -16,6 +16,14 @@ export default defineSchema({
     active: v.boolean(),
   }).index('by_identifier', ['identifier']),
 
+  discordSubscriberDetails: defineTable({
+    subscriberId: v.id('subscribers'),
+    guildId: v.string(),
+    guildName: v.string(),
+  })
+    .index('by_subscriber', ['subscriberId'])
+    .index('by_guild_id', ['guildId']),
+
   slackSubscriberDetails: defineTable({
     subscriberId: v.id('subscribers'),
     accessToken: v.string(),

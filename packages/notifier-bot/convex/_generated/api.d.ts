@@ -10,6 +10,11 @@
 
 import type * as aiSummary from "../aiSummary.js";
 import type * as crons from "../crons.js";
+import type * as discord_api from "../discord/api.js";
+import type * as discord_commands from "../discord/commands.js";
+import type * as discord_format from "../discord/format.js";
+import type * as discord_oauth from "../discord/oauth.js";
+import type * as discord_verify from "../discord/verify.js";
 import type * as http from "../http.js";
 import type * as packages from "../packages.js";
 import type * as polling from "../polling.js";
@@ -36,6 +41,11 @@ import type {
 declare const fullApi: ApiFromModules<{
   aiSummary: typeof aiSummary;
   crons: typeof crons;
+  "discord/api": typeof discord_api;
+  "discord/commands": typeof discord_commands;
+  "discord/format": typeof discord_format;
+  "discord/oauth": typeof discord_oauth;
+  "discord/verify": typeof discord_verify;
   http: typeof http;
   packages: typeof packages;
   polling: typeof polling;

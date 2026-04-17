@@ -1,0 +1,57 @@
+---
+title: Discord Bot
+description: Get Discord notifications for new package releases in your server channels.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import AddToDiscordButton from '../../components/AddToDiscordButton.astro';
+
+The Patch Pulse Discord Bot notifies your server whenever a package you depend on releases a new version.
+
+<AddToDiscordButton href="https://grand-yak-92.convex.site/discord/install" />
+
+<Aside type="note">
+  Discord currently gets the base release notification flow. GitHub link
+  backfill and AI-generated release summaries remain Slack-only for now.
+</Aside>
+
+## How it works
+
+Once installed, the bot monitors packages you care about and sends a Discord message when a new version is published to the npm registry.
+
+Discord tracking is channel-based:
+
+- every subscription targets an explicit channel
+- the same package can be tracked in multiple channels
+- filters can be set to patch, minor, or major updates
+
+## Slash commands
+
+Use these commands in your server:
+
+- `/npmtrack package:react`
+- `/npmtrack package:react channel:#frontend`
+- `/npmtrack package:react filter:minor`
+- `/npmuntrack package:react`
+- `/npmuntrack package:react channel:#frontend`
+- `/npmlist`
+
+Command responses are ephemeral, while update notifications are posted into the subscribed channel.
+
+## Install and setup
+
+To add Patch Pulse to your server:
+
+- open [grand-yak-92.convex.site/discord/install](https://grand-yak-92.convex.site/discord/install)
+- choose the target server
+- approve the requested permissions
+
+If you are self-hosting Patch Pulse rather than using the hosted bot, the Discord app setup and environment configuration live in the notifier package docs, not the public user docs site.
+
+## Slack vs Discord
+
+Slack and Discord support the same core package tracking model, but there are a few operational differences:
+
+- Slack has a workspace default channel; Discord does not
+- Slack receives delayed GitHub link backfill and AI summaries; Discord currently does not
+- Discord commands use typed slash-command options instead of Slack's free-text command parsing

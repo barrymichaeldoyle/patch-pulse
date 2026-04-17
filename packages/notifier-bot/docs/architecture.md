@@ -12,6 +12,7 @@ Primary tables:
 
 - `packages`
 - `subscribers`
+- `discordSubscriberDetails`
 - `slackSubscriberDetails`
 - `subscriptions`
 - `pendingReleaseChecks`
@@ -36,7 +37,19 @@ Important fields:
 
 Stores top-level subscriber identities.
 
-Today this is mainly Slack workspaces.
+This now includes:
+
+- Slack workspaces
+- Discord guilds
+
+`subscribers.type` determines which detail table and delivery path apply.
+
+### `discordSubscriberDetails`
+
+Stores Discord-specific connection details:
+
+- guild ID
+- guild name
 
 ### `slackSubscriberDetails`
 
@@ -76,7 +89,7 @@ Important fields:
 - `retryCount`
 - `packages`
 
-Each package entry tracks two independent concerns:
+These rows are currently Slack-only. Each package entry tracks two independent concerns:
 
 - whether the original Slack line still needs GitHub link backfill
 - whether an AI summary for that package is still pending
@@ -98,6 +111,26 @@ Pattern:
 
 This keeps slash commands responsive while still allowing async work.
 
+### Discord Commands
+
+Defined in:
+
+- [`convex/discord/commands.ts`](../convex/discord/commands.ts)
+- [`convex/discord/oauth.ts`](../convex/discord/oauth.ts)
+
+Pattern:
+
+1. Discord hits `/discord/interactions`.
+2. The HTTP handler verifies the Ed25519 signature.
+3. It immediately returns a deferred ephemeral interaction response.
+4. The real work is scheduled via Convex.
+5. The deferred reply is edited with the final result.
+
+Discord install and command registration also use:
+
+- `GET /discord/install`
+- `POST /discord/register-commands`
+
 ### Polling
 
 Defined in:
@@ -112,21 +145,22 @@ The poller:
 3. determines whether an update is available
 4. stores the newest version
 5. stores GitHub repo metadata when available
-6. groups matching subscriptions by Slack target channel
-7. sends one notification per `(workspace, channel)` target
-8. adds a pending reaction and queues an enrichment job for the posted Slack message
+6. groups matching subscriptions by subscriber-specific target
+7. sends one notification per target channel
+8. for Slack, adds a pending reaction and queues an enrichment job for the posted message
+9. for Discord, sends the base notification only
 
 ## Metadata Enrichment
 
 The notifier uses a two-stage enrichment flow.
 
-Stage 1 happens during polling:
+Stage 1 happens during polling for both Slack and Discord:
 
 - polling fetches npm metadata anyway
 - if a GitHub repo URL can be derived from `repository`, it is normalized and stored on `packages.githubRepoUrl`
 - the outgoing Slack message includes the best release links available at send time
 
-Stage 2 happens in [`convex/releaseChecks.ts`](../convex/releaseChecks.ts):
+Stage 2 happens in [`convex/releaseChecks.ts`](../convex/releaseChecks.ts) for Slack only:
 
 - the notifier retries on a backoff schedule: `1h`, `3h`, `6h`, `12h`, `24h`
 - each retry re-fetches npm metadata and structured GitHub evidence
@@ -182,6 +216,7 @@ Test stack:
 
 Recommended places to update docs:
 
+- user-facing Discord behavior: [`docs/discord.md`](./discord.md)
 - user-facing Slack behavior: [`docs/slack.md`](./slack.md)
 - internal implementation notes: [`docs/architecture.md`](./architecture.md)
 - deployment/configuration: [`docs/deployment.md`](./deployment.md)

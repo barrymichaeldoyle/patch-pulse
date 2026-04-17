@@ -51,6 +51,7 @@ export default defineConfig({
           ],
         },
         { label: 'Slack Bot', link: '/slack-bot' },
+        { label: 'Discord Bot', link: '/discord-bot' },
       ],
     }),
   ],
