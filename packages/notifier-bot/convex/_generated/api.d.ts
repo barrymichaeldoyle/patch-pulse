@@ -9,6 +9,7 @@
  */
 
 import type * as aiSummary from "../aiSummary.js";
+import type * as async from "../async.js";
 import type * as crons from "../crons.js";
 import type * as discord_api from "../discord/api.js";
 import type * as discord_commands from "../discord/commands.js";
@@ -40,6 +41,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   aiSummary: typeof aiSummary;
+  async: typeof async;
   crons: typeof crons;
   "discord/api": typeof discord_api;
   "discord/commands": typeof discord_commands;
