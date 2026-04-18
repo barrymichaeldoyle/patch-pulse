@@ -7,6 +7,7 @@ import {
 import { internal } from './_generated/api';
 import { type Doc } from './_generated/dataModel';
 import { fetchNpmPackageManifest } from '@patch-pulse/shared';
+import { getTimeoutMs, withTimeout } from './async';
 import { summarizeReleaseEvidence } from './aiSummary';
 import { collectReleaseEvidence } from './releaseEvidence';
 import { formatUpdateLine } from './slack/format';
@@ -66,6 +67,13 @@ const STATUS_REACTIONS = {
   pending: 'hourglass_flowing_sand',
   ready: 'memo',
 } as const;
+const RELEASE_CHECK_PENDING_COMMENT =
+  '⏳ Looking up release notes and drafting a short summary. This usually clears once npm or GitHub metadata catches up.';
+const NPM_MANIFEST_TIMEOUT_MS = getTimeoutMs('NPM_MANIFEST_TIMEOUT_MS', 8_000);
+const RELEASE_EVIDENCE_TIMEOUT_MS = getTimeoutMs(
+  'RELEASE_EVIDENCE_TIMEOUT_MS',
+  15_000,
+);
 
 type ReleaseCheckPackage = Doc<'pendingReleaseChecks'>['packages'][number];
 
@@ -80,6 +88,9 @@ function buildThreadSummaryText(
     (pkg) => pkg.summaryStatus === 'ready' && pkg.summaryText,
   );
   if (readyPackages.length === 0) return null;
+  const abandonedCount = packages.filter(
+    (pkg) => pkg.summaryStatus === 'abandoned',
+  ).length;
 
   const body = readyPackages
     .map((pkg) => {
@@ -94,7 +105,21 @@ function buildThreadSummaryText(
     })
     .join('\n');
 
-  return `📝 *Release summary*\n\n${body}`;
+  return (
+    `📝 *Release summary*\n\n${body}` +
+    (abandonedCount > 0
+      ? `\n\n_Still missing summary evidence for ${abandonedCount} update${abandonedCount === 1 ? '' : 's'}._`
+      : '')
+  );
+}
+
+function buildThreadFallbackText(packages: ReleaseCheckPackage[]): string {
+  const packageCount = packages.length;
+  return (
+    `⚠️ I couldn't assemble enough public release evidence to generate an AI summary ` +
+    `for ${packageCount} update${packageCount === 1 ? '' : 's'}. ` +
+    'The links in the main message are still the best available signal right now.'
+  );
 }
 
 async function syncStatusReaction(args: {
@@ -103,8 +128,9 @@ async function syncStatusReaction(args: {
   messageTs: string;
   previousReaction: string | undefined;
   nextStatus: keyof typeof STATUS_REACTIONS;
-}): Promise<string> {
+}): Promise<string | undefined> {
   const nextReaction = STATUS_REACTIONS[args.nextStatus];
+  let currentReaction = args.previousReaction;
 
   if (args.previousReaction && args.previousReaction !== nextReaction) {
     try {
@@ -114,12 +140,13 @@ async function syncStatusReaction(args: {
         args.messageTs,
         args.previousReaction,
       );
+      currentReaction = undefined;
     } catch (error) {
       console.warn('failed to remove Slack reaction:', error);
     }
   }
 
-  if (args.previousReaction !== nextReaction) {
+  if (currentReaction !== nextReaction) {
     try {
       await reactionsAdd(
         args.accessToken,
@@ -127,12 +154,13 @@ async function syncStatusReaction(args: {
         args.messageTs,
         nextReaction,
       );
+      currentReaction = nextReaction;
     } catch (error) {
       console.warn('failed to add Slack reaction:', error);
     }
   }
 
-  return nextReaction;
+  return currentReaction;
 }
 
 export const create = internalMutation({
@@ -175,6 +203,16 @@ export const saveProgress = internalMutation({
   },
 });
 
+export const saveCommentTs = internalMutation({
+  args: {
+    checkId: v.id('pendingReleaseChecks'),
+    commentTs: v.string(),
+  },
+  handler: async (ctx, { checkId, commentTs }) => {
+    await ctx.db.patch(checkId, { commentTs });
+  },
+});
+
 export const remove = internalMutation({
   args: { checkId: v.id('pendingReleaseChecks') },
   handler: async (ctx, { checkId }) => {
@@ -205,6 +243,27 @@ export const retry = internalAction({
     const isFinalAttempt = typeof nextDelayMs === 'undefined';
     const updatedPackages: ReleaseCheckPackage[] = [];
 
+    if (!commentTs) {
+      try {
+        const response = await chatPostMessage(
+          details.accessToken,
+          check.channelId,
+          RELEASE_CHECK_PENDING_COMMENT,
+          check.messageTs,
+        );
+        commentTs = response.ts;
+        await ctx.runMutation(internal.releaseChecks.saveCommentTs, {
+          checkId,
+          commentTs,
+        });
+      } catch (error) {
+        console.error(
+          'failed to post Slack release-check progress reply:',
+          error,
+        );
+      }
+    }
+
     for (const currentPackage of check.packages) {
       let pkg = { ...currentPackage };
       if (!packageNeedsWork(pkg)) {
@@ -214,10 +273,17 @@ export const retry = internalAction({
 
       let manifest;
       try {
-        manifest = await fetchNpmPackageManifest(pkg.name, {
-          userAgent: 'patch-pulse-notifier-bot',
-        });
-      } catch {
+        manifest = await withTimeout(
+          fetchNpmPackageManifest(pkg.name, {
+            userAgent: 'patch-pulse-notifier-bot',
+          }),
+          {
+            label: `npm manifest lookup (${pkg.name})`,
+            timeoutMs: NPM_MANIFEST_TIMEOUT_MS,
+          },
+        );
+      } catch (error) {
+        console.warn(`failed to fetch npm manifest for ${pkg.name}:`, error);
         if (isFinalAttempt) {
           if (pkg.lineStatus === 'pending') pkg.lineStatus = 'abandoned';
           if (pkg.summaryStatus === 'pending') pkg.summaryStatus = 'abandoned';
@@ -245,19 +311,27 @@ export const retry = internalAction({
 
       if (pkg.summaryStatus === 'pending') {
         try {
-          const evidence = await collectReleaseEvidence(
-            manifest,
-            pkg.fromVersion,
-            pkg.toVersion,
+          const evidence = await withTimeout(
+            collectReleaseEvidence(manifest, pkg.fromVersion, pkg.toVersion),
+            {
+              label: `release evidence lookup (${pkg.name})`,
+              timeoutMs: RELEASE_EVIDENCE_TIMEOUT_MS,
+            },
           );
           if (!evidence.shouldRetry) {
-            const summary = await summarizeReleaseEvidence({
-              packageName: pkg.name,
-              fromVersion: pkg.fromVersion,
-              toVersion: pkg.toVersion,
-              updateType: pkg.updateType,
-              evidence,
-            });
+            const summary = await withTimeout(
+              summarizeReleaseEvidence({
+                packageName: pkg.name,
+                fromVersion: pkg.fromVersion,
+                toVersion: pkg.toVersion,
+                updateType: pkg.updateType,
+                evidence,
+              }),
+              {
+                label: `release summary generation (${pkg.name})`,
+                timeoutMs: RELEASE_EVIDENCE_TIMEOUT_MS,
+              },
+            );
             if (summary) {
               pkg.summaryStatus = 'ready';
               pkg.summaryText = summary.summary;
@@ -320,6 +394,29 @@ export const retry = internalAction({
     }
 
     const hasPendingWork = updatedPackages.some(packageNeedsWork);
+    if (!hasPendingWork && !threadSummary) {
+      const fallbackText = buildThreadFallbackText(updatedPackages);
+      try {
+        if (commentTs) {
+          await chatUpdateMessage(
+            details.accessToken,
+            check.channelId,
+            commentTs,
+            fallbackText,
+          );
+        } else {
+          await chatPostMessage(
+            details.accessToken,
+            check.channelId,
+            fallbackText,
+            check.messageTs,
+          );
+        }
+      } catch (error) {
+        console.error('failed to post Slack summary fallback reply:', error);
+      }
+    }
+
     const nextReaction = await syncStatusReaction({
       accessToken: details.accessToken,
       channelId: check.channelId,

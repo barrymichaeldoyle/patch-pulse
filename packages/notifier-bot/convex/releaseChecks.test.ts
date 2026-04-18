@@ -90,6 +90,11 @@ describe('releaseChecks.retry', () => {
       text: string;
       threadTs?: string;
     }> = [];
+    const updatedMessages: Array<{
+      channel: string;
+      text: string;
+      ts: string;
+    }> = [];
     const reactionAdds: string[] = [];
 
     vi.stubGlobal(
@@ -130,6 +135,18 @@ describe('releaseChecks.retry', () => {
           return slackOk(body.thread_ts ? '333.444' : MESSAGE_TS);
         }
 
+        if (url === 'https://slack.com/api/chat.update') {
+          const body = JSON.parse(
+            typeof init?.body === 'string' ? init.body : '{}',
+          );
+          updatedMessages.push({
+            channel: body.channel,
+            text: body.text,
+            ts: body.ts,
+          });
+          return slackOk();
+        }
+
         if (url === 'https://slack.com/api/reactions.add') {
           const body = JSON.parse(
             typeof init?.body === 'string' ? init.body : '{}',
@@ -138,10 +155,7 @@ describe('releaseChecks.retry', () => {
           return slackOk();
         }
 
-        if (
-          url === 'https://slack.com/api/reactions.remove' ||
-          url === 'https://slack.com/api/chat.update'
-        ) {
+        if (url === 'https://slack.com/api/reactions.remove') {
           return slackOk();
         }
 
@@ -163,8 +177,12 @@ describe('releaseChecks.retry', () => {
 
     await t.finishAllScheduledFunctions(() => vi.runAllTimers());
 
-    // Thread reply should have been posted with the summary
-    const threadReply = postedMessages.find((m) => m.threadTs === MESSAGE_TS);
+    const pendingReply = postedMessages.find((m) => m.threadTs === MESSAGE_TS);
+    expect(pendingReply).toBeDefined();
+    expect(pendingReply?.text).toContain('Looking up release notes');
+
+    // Thread reply should have been updated with the summary
+    const threadReply = updatedMessages.find((m) => m.ts === '333.444');
     expect(threadReply).toBeDefined();
     expect(threadReply?.text).toContain('📝 *Release summary*');
     expect(threadReply?.text).toContain(
@@ -183,6 +201,11 @@ describe('releaseChecks.retry', () => {
 
   it('abandons all packages and removes the record after all retries exhaust without evidence', async () => {
     const postedMessages: Array<{ channel: string; text: string }> = [];
+    const updatedMessages: Array<{
+      channel: string;
+      text: string;
+      ts: string;
+    }> = [];
     const reactionAdds: string[] = [];
 
     vi.stubGlobal(
@@ -207,6 +230,18 @@ describe('releaseChecks.retry', () => {
           return slackOk();
         }
 
+        if (url === 'https://slack.com/api/chat.update') {
+          const body = JSON.parse(
+            typeof init?.body === 'string' ? init.body : '{}',
+          );
+          updatedMessages.push({
+            channel: body.channel,
+            text: body.text,
+            ts: body.ts,
+          });
+          return slackOk();
+        }
+
         if (url === 'https://slack.com/api/reactions.add') {
           const body = JSON.parse(
             typeof init?.body === 'string' ? init.body : '{}',
@@ -215,10 +250,7 @@ describe('releaseChecks.retry', () => {
           return slackOk();
         }
 
-        if (
-          url === 'https://slack.com/api/reactions.remove' ||
-          url === 'https://slack.com/api/chat.update'
-        ) {
+        if (url === 'https://slack.com/api/reactions.remove') {
           return slackOk();
         }
 
@@ -240,9 +272,14 @@ describe('releaseChecks.retry', () => {
 
     await t.finishAllScheduledFunctions(() => vi.runAllTimers());
 
-    // No thread reply — nothing to summarize
-    const threadReplies = postedMessages.filter((m) => 'thread_ts' in m);
-    expect(threadReplies).toHaveLength(0);
+    expect(postedMessages[0]?.text).toContain('Looking up release notes');
+    expect(
+      updatedMessages.some((message) =>
+        message.text.includes(
+          "couldn't assemble enough public release evidence",
+        ),
+      ),
+    ).toBe(true);
 
     // Final reaction should be warning (abandoned)
     expect(reactionAdds).toContain('warning');
@@ -255,6 +292,7 @@ describe('releaseChecks.retry', () => {
 
   it('abandons without a summary when OPENAI_API_KEY is absent', async () => {
     const postedMessages: Array<{ threadTs?: string }> = [];
+    const updatedMessages: Array<{ text: string; ts: string }> = [];
     const reactionAdds: string[] = [];
 
     vi.stubGlobal(
@@ -284,6 +322,14 @@ describe('releaseChecks.retry', () => {
           return slackOk();
         }
 
+        if (url === 'https://slack.com/api/chat.update') {
+          const body = JSON.parse(
+            typeof init?.body === 'string' ? init.body : '{}',
+          );
+          updatedMessages.push({ text: body.text, ts: body.ts });
+          return slackOk();
+        }
+
         if (url === 'https://slack.com/api/reactions.add') {
           const body = JSON.parse(
             typeof init?.body === 'string' ? init.body : '{}',
@@ -292,10 +338,7 @@ describe('releaseChecks.retry', () => {
           return slackOk();
         }
 
-        if (
-          url === 'https://slack.com/api/reactions.remove' ||
-          url === 'https://slack.com/api/chat.update'
-        ) {
+        if (url === 'https://slack.com/api/reactions.remove') {
           return slackOk();
         }
 
@@ -317,11 +360,17 @@ describe('releaseChecks.retry', () => {
 
     await t.finishAllScheduledFunctions(() => vi.runAllTimers());
 
-    // No thread reply despite evidence being available
     const threadReplies = postedMessages.filter(
       (m) => m.threadTs === MESSAGE_TS,
     );
-    expect(threadReplies).toHaveLength(0);
+    expect(threadReplies).toHaveLength(1);
+    expect(
+      updatedMessages.some((message) =>
+        message.text.includes(
+          "couldn't assemble enough public release evidence",
+        ),
+      ),
+    ).toBe(true);
 
     // Ends in abandoned state
     expect(reactionAdds).toContain('warning');
@@ -336,6 +385,7 @@ describe('releaseChecks.retry', () => {
       text: string;
       threadTs?: string;
     }> = [];
+    const updatedMessages: Array<{ text: string; ts: string }> = [];
     const reactionAdds: string[] = [];
     const openAiModelsUsed: string[] = [];
 
@@ -383,6 +433,14 @@ describe('releaseChecks.retry', () => {
           return slackOk(body.thread_ts ? '555.666' : MESSAGE_TS);
         }
 
+        if (url === 'https://slack.com/api/chat.update') {
+          const body = JSON.parse(
+            typeof init?.body === 'string' ? init.body : '{}',
+          );
+          updatedMessages.push({ text: body.text, ts: body.ts });
+          return slackOk();
+        }
+
         if (url === 'https://slack.com/api/reactions.add') {
           const body = JSON.parse(
             typeof init?.body === 'string' ? init.body : '{}',
@@ -391,10 +449,7 @@ describe('releaseChecks.retry', () => {
           return slackOk();
         }
 
-        if (
-          url === 'https://slack.com/api/reactions.remove' ||
-          url === 'https://slack.com/api/chat.update'
-        ) {
+        if (url === 'https://slack.com/api/reactions.remove') {
           return slackOk();
         }
 
@@ -420,8 +475,8 @@ describe('releaseChecks.retry', () => {
     expect(openAiModelsUsed).toContain('gpt-5-nano');
     expect(openAiModelsUsed).toContain('gpt-5-mini');
 
-    // Thread reply should contain the mini model's summary
-    const threadReply = postedMessages.find((m) => m.threadTs === MESSAGE_TS);
+    expect(postedMessages.some((m) => m.threadTs === MESSAGE_TS)).toBe(true);
+    const threadReply = updatedMessages.find((m) => m.ts === '555.666');
     expect(threadReply).toBeDefined();
     expect(threadReply?.text).toContain(
       'Compiler ships by default; hydration fixes included.',
@@ -441,6 +496,7 @@ describe('releaseChecks.retry', () => {
       text: string;
       threadTs?: string;
     }> = [];
+    const updatedMessages: Array<{ text: string; ts: string }> = [];
     const reactionAdds: string[] = [];
 
     // First retry: 2 release-tag lookups + 4 compare combinations = 6 GitHub calls, all 404.
@@ -488,6 +544,14 @@ describe('releaseChecks.retry', () => {
           return slackOk(body.thread_ts ? '444.555' : MESSAGE_TS);
         }
 
+        if (url === 'https://slack.com/api/chat.update') {
+          const body = JSON.parse(
+            typeof init?.body === 'string' ? init.body : '{}',
+          );
+          updatedMessages.push({ text: body.text, ts: body.ts });
+          return slackOk();
+        }
+
         if (url === 'https://slack.com/api/reactions.add') {
           const body = JSON.parse(
             typeof init?.body === 'string' ? init.body : '{}',
@@ -496,10 +560,7 @@ describe('releaseChecks.retry', () => {
           return slackOk();
         }
 
-        if (
-          url === 'https://slack.com/api/reactions.remove' ||
-          url === 'https://slack.com/api/chat.update'
-        ) {
+        if (url === 'https://slack.com/api/reactions.remove') {
           return slackOk();
         }
 
@@ -524,8 +585,8 @@ describe('releaseChecks.retry', () => {
     // GitHub was hit on both attempts
     expect(githubCallCount).toBeGreaterThan(6);
 
-    // Thread reply should have been posted with the summary from the second attempt
-    const threadReply = postedMessages.find((m) => m.threadTs === MESSAGE_TS);
+    expect(postedMessages.some((m) => m.threadTs === MESSAGE_TS)).toBe(true);
+    const threadReply = updatedMessages.find((m) => m.ts === '444.555');
     expect(threadReply).toBeDefined();
     expect(threadReply?.text).toContain('Ships the compiler; fixes hydration.');
 
@@ -534,6 +595,95 @@ describe('releaseChecks.retry', () => {
     expect(reactionAdds).not.toContain('warning');
 
     // Record cleaned up after successful resolution
+    const check = await t.query(internal.releaseChecks.get, { checkId });
+    expect(check).toBeNull();
+  });
+
+  it('abandons cleanly when the OpenAI summary request never resolves', async () => {
+    const postedMessages: Array<{ text: string; threadTs?: string }> = [];
+    const updatedMessages: Array<{ text: string; ts: string }> = [];
+    const reactionAdds: string[] = [];
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url =
+          typeof input === 'string'
+            ? input
+            : input instanceof URL
+              ? input.toString()
+              : input.url;
+
+        if (url.startsWith('https://registry.npmjs.org/'))
+          return npmManifestResponse();
+        if (url.includes('/releases/tags/v19.0.0'))
+          return githubReleaseResponse();
+        if (url.includes('/releases/tags/')) return json404();
+        if (url.includes('/compare/v18.2.0...v19.0.0'))
+          return githubCompareResponse();
+        if (url.includes('/compare/')) return json404();
+
+        if (url === 'https://api.openai.com/v1/responses') {
+          return new Promise<Response>(() => {});
+        }
+
+        if (url === 'https://slack.com/api/chat.postMessage') {
+          const body = JSON.parse(
+            typeof init?.body === 'string' ? init.body : '{}',
+          );
+          postedMessages.push({ text: body.text, threadTs: body.thread_ts });
+          return slackOk(body.thread_ts ? '777.888' : MESSAGE_TS);
+        }
+
+        if (url === 'https://slack.com/api/chat.update') {
+          const body = JSON.parse(
+            typeof init?.body === 'string' ? init.body : '{}',
+          );
+          updatedMessages.push({ text: body.text, ts: body.ts });
+          return slackOk();
+        }
+
+        if (url === 'https://slack.com/api/reactions.add') {
+          const body = JSON.parse(
+            typeof init?.body === 'string' ? init.body : '{}',
+          );
+          reactionAdds.push(body.name);
+          return slackOk();
+        }
+
+        if (url === 'https://slack.com/api/reactions.remove') {
+          return slackOk();
+        }
+
+        throw new Error(`Unhandled fetch: ${url}`);
+      }),
+    );
+    vi.stubEnv('OPENAI_API_KEY', 'test-key');
+    vi.stubEnv('OPENAI_SUMMARY_TIMEOUT_MS', '1');
+
+    const t = convexTest(schema, modules);
+    const subscriberId = await seedWorkspace(t);
+
+    const checkId = await t.mutation(internal.releaseChecks.create, {
+      subscriberId,
+      channelId: CHANNEL_ID,
+      messageTs: MESSAGE_TS,
+      fullText: BASE_PACKAGE.originalLine,
+      packages: [BASE_PACKAGE],
+    });
+
+    await t.finishAllScheduledFunctions(() => vi.runAllTimers());
+
+    expect(postedMessages.some((m) => m.threadTs === MESSAGE_TS)).toBe(true);
+    expect(
+      updatedMessages.some((message) =>
+        message.text.includes(
+          "couldn't assemble enough public release evidence",
+        ),
+      ),
+    ).toBe(true);
+    expect(reactionAdds).toContain('warning');
+
     const check = await t.query(internal.releaseChecks.get, { checkId });
     expect(check).toBeNull();
   });

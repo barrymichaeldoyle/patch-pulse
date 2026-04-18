@@ -88,9 +88,13 @@ export default defineSchema({
     channelName: v.optional(v.string()), // Human-readable channel name (e.g. frontend)
     userId: v.optional(v.string()), // Slack user ID — set for DM subscriptions (no channelId)
   })
-    .index('by_package', ['packageId'])
     .index('by_subscriber', ['subscriberId'])
     .index('by_package_and_subscriber', ['packageId', 'subscriberId'])
+    .index('by_package_subscriber_channel', [
+      'packageId',
+      'subscriberId',
+      'channelId',
+    ])
     .index('by_package_subscriber_user', [
       'packageId',
       'subscriberId',

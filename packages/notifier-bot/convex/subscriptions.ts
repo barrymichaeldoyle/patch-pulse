@@ -21,7 +21,9 @@ export const getSubscribersOfPackage = internalQuery({
   handler: async (ctx, { packageId }) => {
     return await ctx.db
       .query('subscriptions')
-      .withIndex('by_package', (q) => q.eq('packageId', packageId))
+      .withIndex('by_package_and_subscriber', (q) =>
+        q.eq('packageId', packageId),
+      )
       .collect();
   },
 });
@@ -56,13 +58,17 @@ export const exists = internalQuery({
   },
   handler: async (ctx, { packageId, subscriberId, channelId, userId }) => {
     if (channelId) {
-      const subs = await ctx.db
-        .query('subscriptions')
-        .withIndex('by_package_and_subscriber', (q) =>
-          q.eq('packageId', packageId).eq('subscriberId', subscriberId),
-        )
-        .collect();
-      return subs.find((s) => s.channelId === channelId) ?? null;
+      return (
+        (await ctx.db
+          .query('subscriptions')
+          .withIndex('by_package_subscriber_channel', (q) =>
+            q
+              .eq('packageId', packageId)
+              .eq('subscriberId', subscriberId)
+              .eq('channelId', channelId),
+          )
+          .first()) ?? null
+      );
     }
 
     return (
@@ -120,15 +126,16 @@ export const remove = internalMutation({
   },
   handler: async (ctx, { packageId, subscriberId, channelId, userId }) => {
     if (channelId) {
-      const subs = await ctx.db
+      const sub = await ctx.db
         .query('subscriptions')
-        .withIndex('by_package_and_subscriber', (q) =>
-          q.eq('packageId', packageId).eq('subscriberId', subscriberId),
+        .withIndex('by_package_subscriber_channel', (q) =>
+          q
+            .eq('packageId', packageId)
+            .eq('subscriberId', subscriberId)
+            .eq('channelId', channelId),
         )
-        .collect();
-      for (const sub of subs.filter((s) => s.channelId === channelId)) {
-        await ctx.db.delete(sub._id);
-      }
+        .first();
+      if (sub) await ctx.db.delete(sub._id);
       return;
     }
 

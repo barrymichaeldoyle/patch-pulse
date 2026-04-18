@@ -1,4 +1,5 @@
 import { type NpmPackageManifest } from '@patch-pulse/shared';
+import { getTimeoutMs, withTimeout } from './async';
 import { extractGitHubRepoUrl } from './slack/links';
 
 type GitHubRelease = {
@@ -37,6 +38,10 @@ type GitHubRepoRef = {
   owner: string;
   repo: string;
 };
+const GITHUB_RELEASE_TIMEOUT_MS = getTimeoutMs(
+  'GITHUB_RELEASE_TIMEOUT_MS',
+  8_000,
+);
 
 function parseGitHubRepoRef(repoUrl: string): GitHubRepoRef | null {
   try {
@@ -74,9 +79,15 @@ function buildGitHubHeaders(): HeadersInit {
 }
 
 async function fetchGitHubJson<T>(path: string): Promise<T | null> {
-  const response = await fetch(`https://api.github.com${path}`, {
-    headers: buildGitHubHeaders(),
-  });
+  const response = await withTimeout(
+    fetch(`https://api.github.com${path}`, {
+      headers: buildGitHubHeaders(),
+    }),
+    {
+      label: `GitHub API request (${path})`,
+      timeoutMs: GITHUB_RELEASE_TIMEOUT_MS,
+    },
+  );
 
   if (response.status === 404) return null;
 

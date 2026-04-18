@@ -80,10 +80,6 @@ export const checkForUpdates = internalAction({
       const version = getNpmLatestVersion(manifest);
       if (!version) continue;
 
-      await ctx.runMutation(internal.packages.touchLastChecked, {
-        packageId: pkg._id,
-      });
-
       const { status } = getDependencyStatus({
         packageName: pkg.name,
         currentVersion: pkg.currentVersion,
@@ -165,6 +161,10 @@ export const checkForUpdates = internalAction({
           channelMap.set(key, entry);
           updatesBySubscriber.set(sub.subscriberId, channelMap);
         }
+      } else {
+        await ctx.runMutation(internal.packages.touchLastChecked, {
+          packageId: pkg._id,
+        });
       }
     }
 

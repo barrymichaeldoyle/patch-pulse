@@ -672,7 +672,7 @@ export async function chatPostMessage(
   if (!data.ok) {
     if (data.error === 'not_in_channel') {
       await conversationsJoin(token, channel);
-      return chatPostMessage(token, channel, text);
+      return chatPostMessage(token, channel, text, threadTs);
     }
     throw new Error(`Slack error: ${data.error}`);
   }
