@@ -60,6 +60,7 @@ const VALID_FLAGS = [
   '--hide-clean',
   '--expand',
   '--fail',
+  '--no-peer-deps',
 ];
 
 export async function runCli({
@@ -205,6 +206,10 @@ export async function runCli({
         }
 
         for (const key of PACKAGE_JSON_DEPENDENCY_FIELDS) {
+          if (key === 'peerDependencies' && config.ignorePeerDeps) {
+            continue;
+          }
+
           const value = project.sections[key];
           if (!value) {
             continue;

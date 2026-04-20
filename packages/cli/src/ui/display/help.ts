@@ -35,6 +35,7 @@ ${ansi.cyanBoldUnderline('🔧 Configuration Options:')}
   ${ansi.white('--project <name|path>')}    ${ansi.gray('Limit the scan output to one project in a monorepo')}
   ${ansi.white('-i, --interactive')}        ${ansi.gray('Show interactive update prompt after summary')}
   ${ansi.white('--no-interactive')}         ${ansi.gray('Skip update prompt after summary (default)')}
+  ${ansi.white('--no-peer-deps')}           ${ansi.gray('Exclude peerDependencies from the scan')}
   ${ansi.white('--hide-clean')}             ${ansi.gray('Hide clean projects in monorepos')}
   ${ansi.white('--expand')}                 ${ansi.gray('Show full output for every project in monorepos')}
   ${ansi.white('--fail')}                   ${ansi.gray('Exit with code 1 if any outdated packages are found')}
@@ -46,7 +47,8 @@ ${ansi.cyanBoldUnderline('📁 Configuration File:')}
     ${ansi.gray('"skip": ["lodash", "@types/*", "test-*"],')}
     ${ansi.gray('"ignorePaths": ["packages/cli/e2e"],')}
     ${ansi.gray('"packageManager": "npm",')}
-    ${ansi.gray('"interactive": true')}
+    ${ansi.gray('"interactive": true,')}
+    ${ansi.gray('"ignorePeerDeps": true')}
   ${ansi.gray('}')}
 
 ${ansi.cyanBoldUnderline('📝 Description:')}
@@ -74,6 +76,7 @@ ${ansi.cyanBoldUnderline('💡 Examples:')}
   ${ansi.white('npx patch-pulse --expand')}                 ${ansi.gray('# Show full monorepo output including clean projects')}
   ${ansi.white('npx patch-pulse --fail')}                   ${ansi.gray('# Exit 1 if any outdated packages found (useful in CI)')}
   ${ansi.white('npx patch-pulse --json --fail')}            ${ansi.gray('# Machine-readable output + non-zero exit for CI scripts')}
+  ${ansi.white('npx patch-pulse --no-peer-deps')}          ${ansi.gray('# Exclude peerDependencies from the scan')}
 
 ${ansi.cyanBoldUnderline('🔗 Links:')}
   ${ansi.blue('📚 Docs:')}      ${ansi.white(ansi.link('barrymichaeldoyle.github.io/patch-pulse', DOCS_URL))}

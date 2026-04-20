@@ -19,7 +19,8 @@ The CLI supports a configuration file for persistent settings. Use `patchpulse.j
   "skip": ["lodash", "@types/*", "test-*"],
   "ignorePaths": ["packages/cli/e2e"],
   "packageManager": "pnpm",
-  "interactive": true
+  "interactive": true,
+  "ignorePeerDeps": true
 }
 ```
 
@@ -98,6 +99,20 @@ Enable the interactive update prompt automatically after every run.
   "interactive": true
 }
 ```
+
+---
+
+### `ignorePeerDeps`
+
+Exclude `peerDependencies` from the scan entirely. Useful for published libraries where peer dep ranges are intentionally broad and not something you manage directly.
+
+```json
+{
+  "ignorePeerDeps": true
+}
+```
+
+Can also be set via the [`--no-peer-deps`](../commands#--no-peer-deps) CLI flag.
 
 ---
 

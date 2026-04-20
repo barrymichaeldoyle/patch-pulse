@@ -148,3 +148,15 @@ npx patch-pulse --json --fail
   Combine `--json` and `--fail` for machine-readable output with a non-zero exit
   code when updates are available.
 </Aside>
+
+---
+
+### `--no-peer-deps`
+
+Exclude `peerDependencies` from the scan. Useful for published libraries where peer dep ranges are intentionally broad and not something you manage directly.
+
+```bash
+npx patch-pulse --no-peer-deps
+```
+
+Can also be set persistently via [`ignorePeerDeps`](../configuration#ignorePeerDeps) in your config file.

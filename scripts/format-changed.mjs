@@ -48,6 +48,19 @@ function fail(message, detail = '') {
   process.exit(1);
 }
 
+function writeOutput(output, stream) {
+  if (typeof output === 'string' && output.length > 0) {
+    stream.write(output);
+  }
+}
+
+function isNoTargetError(result) {
+  const combinedOutput = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+  return combinedOutput.includes(
+    'Expected at least one target file. All matched files may have been excluded by ignore rules.',
+  );
+}
+
 function parseNullSeparated(output) {
   return output.split('\0').filter(Boolean);
 }
@@ -97,10 +110,14 @@ if (files.length === 0) {
   process.exit(0);
 }
 
-const format = run('pnpm', ['exec', 'oxfmt', '--write', ...files], {
-  stdio: 'inherit',
-});
+const format = run('pnpm', ['exec', 'oxfmt', '--write', ...files]);
+
+writeOutput(format.stdout, process.stdout);
+writeOutput(format.stderr, process.stderr);
 
 if (format.status !== 0) {
+  if (isNoTargetError(format)) {
+    process.exit(0);
+  }
   process.exit(format.status ?? 1);
 }
