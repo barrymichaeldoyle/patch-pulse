@@ -77,7 +77,10 @@ Use `ignore` to permanently exclude packages from ever getting a PR. Supports ex
 <Aside type="note">
   The ignore list is also respected by the PatchPulse CLI's `skip`
   configuration. Packages skipped in `patchpulse.json` are filtered out before
-  the action even sees them.
+  the action even sees them. Setting [`ignorePeerDeps:
+  true`](../../cli/configuration#ignorePeerDeps) in `patchpulse.json` has the
+  same effect — peer dependencies are excluded from the CLI output and will
+  never trigger a PR.
 </Aside>
 
 ---

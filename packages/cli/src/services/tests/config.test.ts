@@ -82,6 +82,28 @@ describe('Configuration Service', () => {
       consoleSpy.mockRestore();
     });
 
+    it('should read ignorePeerDeps from file config', () => {
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(join).mockReturnValue('/test/patchpulse.json');
+      vi.mocked(readFileSync).mockReturnValue(
+        JSON.stringify({ ignorePeerDeps: true }),
+      );
+
+      const result = readConfigFile('/test');
+      expect(result).toEqual({ ignorePeerDeps: true });
+    });
+
+    it('should ignore non-boolean ignorePeerDeps from file config', () => {
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(join).mockReturnValue('/test/patchpulse.json');
+      vi.mocked(readFileSync).mockReturnValue(
+        JSON.stringify({ ignorePeerDeps: 'yes' }),
+      );
+
+      const result = readConfigFile('/test');
+      expect(result?.ignorePeerDeps).toBeUndefined();
+    });
+
     it('should ignore unsupported package manager values from file config', () => {
       vi.mocked(existsSync).mockReturnValue(true);
       vi.mocked(join).mockReturnValue('/test/patchpulse.json');
@@ -133,6 +155,16 @@ describe('Configuration Service', () => {
       const result = parseCliConfig(args);
 
       expect(result).toEqual({});
+    });
+
+    it('should parse --no-peer-deps flag', () => {
+      const result = parseCliConfig(['--no-peer-deps']);
+      expect(result).toEqual({ ignorePeerDeps: true });
+    });
+
+    it('should not set ignorePeerDeps when --no-peer-deps is absent', () => {
+      const result = parseCliConfig([]);
+      expect(result.ignorePeerDeps).toBeUndefined();
     });
   });
 
@@ -190,6 +222,24 @@ describe('Configuration Service', () => {
         includePaths: ['dist/special'],
         interactive: false,
       });
+    });
+
+    it('CLI ignorePeerDeps takes precedence over file config', () => {
+      const result = mergeConfigs(
+        { ignorePeerDeps: false },
+        { ignorePeerDeps: true },
+      );
+      expect(result.ignorePeerDeps).toBe(true);
+    });
+
+    it('file ignorePeerDeps is used when CLI does not set it', () => {
+      const result = mergeConfigs({ ignorePeerDeps: true }, {});
+      expect(result.ignorePeerDeps).toBe(true);
+    });
+
+    it('ignorePeerDeps is undefined when neither config sets it', () => {
+      const result = mergeConfigs(null, {});
+      expect(result.ignorePeerDeps).toBeUndefined();
     });
   });
 

@@ -9,6 +9,7 @@ export interface PatchPulseConfig {
   includePaths?: string[];
   packageManager?: PackageManager;
   interactive?: boolean;
+  ignorePeerDeps?: boolean;
 }
 
 /**
@@ -95,6 +96,11 @@ export function parseCliConfig(args: string[]): PatchPulseConfig {
     config.interactive = false;
   }
 
+  // Parse ignorePeerDeps flag
+  if (args.includes('--no-peer-deps')) {
+    config.ignorePeerDeps = true;
+  }
+
   return config;
 }
 
@@ -160,6 +166,13 @@ export function mergeConfigs(
     merged.interactive = fileConfig.interactive;
   }
 
+  // Handle ignorePeerDeps (CLI takes precedence)
+  if (cliConfig.ignorePeerDeps !== undefined) {
+    merged.ignorePeerDeps = cliConfig.ignorePeerDeps;
+  } else if (fileConfig?.ignorePeerDeps !== undefined) {
+    merged.ignorePeerDeps = fileConfig.ignorePeerDeps;
+  }
+
   return merged;
 }
 
@@ -198,6 +211,10 @@ function validateConfig(config: any): PatchPulseConfig {
 
   if (typeof config.interactive === 'boolean') {
     validated.interactive = config.interactive;
+  }
+
+  if (typeof config.ignorePeerDeps === 'boolean') {
+    validated.ignorePeerDeps = config.ignorePeerDeps;
   }
 
   return validated;

@@ -1,5 +1,11 @@
 # patch-pulse
 
+## 4.1.0
+
+### Minor Changes
+
+- Add `--no-peer-deps` CLI flag and `ignorePeerDeps` config option to exclude `peerDependencies` from the scan. Useful for published libraries where peer dep ranges are intentionally broad and not something you manage directly.
+
 ## 4.0.4
 
 ### Patch Changes
