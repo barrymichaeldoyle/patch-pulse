@@ -32,6 +32,13 @@ export type ReleaseEvidence = {
     label: 'release' | 'compare';
     url: string;
   }>;
+  diagnostics: {
+    githubRepoUrl?: string;
+    matchedCompareTag?: string;
+    matchedReleaseTag?: string;
+    triedCompareTags: string[];
+    triedReleaseTags: string[];
+  };
 };
 
 type GitHubRepoRef = {
@@ -65,8 +72,26 @@ function trimText(text: string | null | undefined, maxLength: number): string {
     : `${normalized.slice(0, maxLength - 1)}…`;
 }
 
-function normalizeTagCandidates(version: string): string[] {
-  return Array.from(new Set([`v${version}`, version]));
+function normalizeTagCandidates(
+  packageName: string,
+  version: string,
+): string[] {
+  const unscopedName = packageName.includes('/')
+    ? (packageName.split('/').at(-1) ?? packageName)
+    : packageName;
+
+  return Array.from(
+    new Set([
+      `v${version}`,
+      version,
+      `${packageName}@${version}`,
+      `${unscopedName}@${version}`,
+      `${packageName}_v${version}`,
+      `${unscopedName}_v${version}`,
+      `${packageName}-v${version}`,
+      `${unscopedName}-v${version}`,
+    ]),
+  );
 }
 
 function buildGitHubHeaders(): HeadersInit {
@@ -125,6 +150,7 @@ function collectChangedFiles(compare: GitHubCompare | null): string[] {
 }
 
 export async function collectReleaseEvidence(
+  packageName: string,
   manifest: NpmPackageManifest,
   fromVersion: string,
   toVersion: string,
@@ -136,6 +162,10 @@ export async function collectReleaseEvidence(
       commitTitles: [],
       changedFiles: [],
       sourceLinks: [],
+      diagnostics: {
+        triedCompareTags: [],
+        triedReleaseTags: [],
+      },
     };
   }
 
@@ -146,26 +176,42 @@ export async function collectReleaseEvidence(
       commitTitles: [],
       changedFiles: [],
       sourceLinks: [],
+      diagnostics: {
+        githubRepoUrl,
+        triedCompareTags: [],
+        triedReleaseTags: [],
+      },
     };
   }
 
+  const releaseTagsTried = normalizeTagCandidates(packageName, toVersion);
+  let matchedReleaseTag: string | undefined;
   let release: GitHubRelease | null = null;
-  for (const tag of normalizeTagCandidates(toVersion)) {
+  for (const tag of releaseTagsTried) {
     release = await fetchGitHubJson<GitHubRelease>(
       `/repos/${repo.owner}/${repo.repo}/releases/tags/${encodeURIComponent(tag)}`,
     );
-    if (release) break;
+    if (release) {
+      matchedReleaseTag = tag;
+      break;
+    }
   }
 
   let compare: GitHubCompare | null = null;
-  const fromTags = normalizeTagCandidates(fromVersion);
-  const toTags = normalizeTagCandidates(toVersion);
+  const fromTags = normalizeTagCandidates(packageName, fromVersion);
+  const toTags = normalizeTagCandidates(packageName, toVersion);
+  const compareRangesTried: string[] = [];
+  let matchedCompareTag: string | undefined;
   for (const fromTag of fromTags) {
     for (const toTag of toTags) {
+      compareRangesTried.push(`${fromTag}...${toTag}`);
       compare = await fetchGitHubJson<GitHubCompare>(
         `/repos/${repo.owner}/${repo.repo}/compare/${encodeURIComponent(fromTag)}...${encodeURIComponent(toTag)}`,
       );
-      if (compare) break;
+      if (compare) {
+        matchedCompareTag = `${fromTag}...${toTag}`;
+        break;
+      }
     }
     if (compare) break;
   }
@@ -195,5 +241,12 @@ export async function collectReleaseEvidence(
     commitTitles,
     changedFiles,
     sourceLinks,
+    diagnostics: {
+      githubRepoUrl,
+      matchedCompareTag,
+      matchedReleaseTag,
+      triedCompareTags: compareRangesTried,
+      triedReleaseTags: releaseTagsTried,
+    },
   };
 }

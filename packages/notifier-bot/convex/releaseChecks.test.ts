@@ -199,6 +199,137 @@ describe('releaseChecks.retry', () => {
     expect(check).toBeNull();
   });
 
+  it('finds package-specific monorepo tags when plain semver tags do not exist', async () => {
+    const updatedMessages: Array<{ text: string; ts: string }> = [];
+    const openAiInputs: string[] = [];
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url =
+          typeof input === 'string'
+            ? input
+            : input instanceof URL
+              ? input.toString()
+              : input.url;
+
+        if (url.startsWith('https://registry.npmjs.org/')) {
+          return jsonOk({
+            'dist-tags': { latest: '1.167.50' },
+            repository: {
+              type: 'git',
+              url: 'git+https://github.com/TanStack/router.git',
+              directory: 'packages/react-start',
+            },
+            versions: { '1.167.49': {}, '1.167.50': {} },
+          });
+        }
+
+        if (url.includes('/releases/tags/v1.167.50')) return json404();
+        if (
+          url.includes('/releases/tags/%40tanstack%2Freact-start%401.167.50')
+        ) {
+          return jsonOk({
+            html_url:
+              'https://github.com/TanStack/router/releases/tag/@tanstack/react-start@1.167.50',
+            body: 'Fixes React Start route preloading and request state hydration issues.',
+            tag_name: '@tanstack/react-start@1.167.50',
+            name: '@tanstack/react-start 1.167.50',
+          });
+        }
+        if (url.includes('/releases/tags/')) return json404();
+
+        if (
+          url.includes(
+            '/compare/%40tanstack%2Freact-start%401.167.49...%40tanstack%2Freact-start%401.167.50',
+          )
+        ) {
+          return jsonOk({
+            html_url:
+              'https://github.com/TanStack/router/compare/@tanstack/react-start@1.167.49...@tanstack/react-start@1.167.50',
+            commits: [
+              {
+                commit: {
+                  message: 'Stabilize request hydration for React Start',
+                },
+              },
+            ],
+            files: [{ filename: 'packages/react-start/src/server.ts' }],
+          });
+        }
+        if (url.includes('/compare/')) return json404();
+
+        if (url === 'https://api.openai.com/v1/responses') {
+          const body = JSON.parse(
+            typeof init?.body === 'string' ? init.body : '{}',
+          );
+          openAiInputs.push(JSON.stringify(body.input));
+          return jsonOk({
+            output_text:
+              'Stabilizes React Start request hydration and route preloading behavior.',
+          });
+        }
+
+        if (url === 'https://slack.com/api/chat.postMessage') {
+          const body = JSON.parse(
+            typeof init?.body === 'string' ? init.body : '{}',
+          );
+          return slackOk(body.thread_ts ? '333.444' : MESSAGE_TS);
+        }
+
+        if (url === 'https://slack.com/api/chat.update') {
+          const body = JSON.parse(
+            typeof init?.body === 'string' ? init.body : '{}',
+          );
+          updatedMessages.push({ text: body.text, ts: body.ts });
+          return slackOk();
+        }
+
+        if (
+          url === 'https://slack.com/api/reactions.add' ||
+          url === 'https://slack.com/api/reactions.remove'
+        ) {
+          return slackOk();
+        }
+
+        throw new Error(`Unhandled fetch: ${url}`);
+      }),
+    );
+    vi.stubEnv('OPENAI_API_KEY', 'test-key');
+
+    const t = convexTest(schema, modules);
+    const subscriberId = await seedWorkspace(t);
+
+    const checkId = await t.mutation(internal.releaseChecks.create, {
+      subscriberId,
+      channelId: CHANNEL_ID,
+      messageTs: MESSAGE_TS,
+      fullText: '• @tanstack/react-start 1.167.49 → 1.167.50 [patch]',
+      packages: [
+        {
+          ...BASE_PACKAGE,
+          name: '@tanstack/react-start',
+          fromVersion: '1.167.49',
+          toVersion: '1.167.50',
+          updateType: 'patch',
+          originalLine: '• @tanstack/react-start 1.167.49 → 1.167.50 [patch]',
+        },
+      ],
+    });
+
+    await t.finishAllScheduledFunctions(() => vi.runAllTimers());
+
+    expect(
+      updatedMessages.some((message) =>
+        message.text.includes('📝 *Release summary*'),
+      ),
+    ).toBe(true);
+    expect(openAiInputs.join('\n')).toContain('@tanstack/react-start@1.167.50');
+
+    const check = await t.query(internal.releaseChecks.get, { checkId });
+    expect(check).toBeNull();
+  });
+
   it('abandons all packages and removes the record after all retries exhaust without evidence', async () => {
     const postedMessages: Array<{ channel: string; text: string }> = [];
     const updatedMessages: Array<{
@@ -276,7 +407,7 @@ describe('releaseChecks.retry', () => {
     expect(
       updatedMessages.some((message) =>
         message.text.includes(
-          "couldn't assemble enough public release evidence",
+          'public release notes or compare data were too thin to summarize safely.',
         ),
       ),
     ).toBe(true);
@@ -367,7 +498,7 @@ describe('releaseChecks.retry', () => {
     expect(
       updatedMessages.some((message) =>
         message.text.includes(
-          "couldn't assemble enough public release evidence",
+          'AI summaries are disabled because `OPENAI_API_KEY` is not configured.',
         ),
       ),
     ).toBe(true);
@@ -678,7 +809,7 @@ describe('releaseChecks.retry', () => {
     expect(
       updatedMessages.some((message) =>
         message.text.includes(
-          "couldn't assemble enough public release evidence",
+          'release evidence was found, but AI summary generation timed out.',
         ),
       ),
     ).toBe(true);

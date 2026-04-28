@@ -8,6 +8,31 @@ export const getAll = internalQuery({
   },
 });
 
+export const getDueForCheck = internalQuery({
+  args: {
+    beforeTs: v.number(),
+    limit: v.number(),
+  },
+  handler: async (ctx, { beforeTs, limit }) => {
+    const due = await ctx.db
+      .query('packages')
+      .withIndex('by_last_checked', (q) => q.lt('lastChecked', beforeTs))
+      .take(limit);
+
+    if (due.length >= limit) {
+      return due;
+    }
+
+    // Legacy fallback for packages created before lastChecked existed.
+    const neverChecked = await ctx.db
+      .query('packages')
+      .filter((q) => q.eq(q.field('lastChecked'), undefined))
+      .take(limit - due.length);
+
+    return [...due, ...neverChecked];
+  },
+});
+
 export const getByName = internalQuery({
   args: { name: v.string() },
   handler: async (ctx, { name }) => {
@@ -24,8 +49,13 @@ export const upsertVersion = internalMutation({
     version: v.string(),
     ecosystem: v.optional(v.string()),
     githubRepoUrl: v.optional(v.string()),
+    checkedAt: v.optional(v.number()),
   },
-  handler: async (ctx, { name, version, ecosystem, githubRepoUrl }) => {
+  handler: async (
+    ctx,
+    { name, version, ecosystem, githubRepoUrl, checkedAt },
+  ) => {
+    const timestamp = checkedAt ?? Date.now();
     const existing = await ctx.db
       .query('packages')
       .withIndex('by_name', (q) => q.eq('name', name))
@@ -34,7 +64,7 @@ export const upsertVersion = internalMutation({
     if (existing) {
       await ctx.db.patch(existing._id, {
         currentVersion: version,
-        lastChecked: Date.now(),
+        lastChecked: timestamp,
         githubRepoUrl,
       });
       return existing._id;
@@ -44,7 +74,7 @@ export const upsertVersion = internalMutation({
       name,
       currentVersion: version,
       ecosystem: ecosystem ?? 'npm',
-      lastChecked: Date.now(),
+      lastChecked: timestamp,
       githubRepoUrl,
     });
   },
@@ -88,9 +118,12 @@ export const ensureExists = internalMutation({
 });
 
 export const touchLastChecked = internalMutation({
-  args: { packageId: v.id('packages') },
-  handler: async (ctx, { packageId }) => {
-    await ctx.db.patch(packageId, { lastChecked: Date.now() });
+  args: {
+    packageId: v.id('packages'),
+    checkedAt: v.optional(v.number()),
+  },
+  handler: async (ctx, { packageId, checkedAt }) => {
+    await ctx.db.patch(packageId, { lastChecked: checkedAt ?? Date.now() });
   },
 });
 

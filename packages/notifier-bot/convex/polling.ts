@@ -25,6 +25,7 @@ const UPDATE_TYPE_RANK: Record<UpdateType, number> = {
   minor: 1,
   major: 2,
 };
+const PACKAGE_CHECK_BATCH_SIZE = 100;
 
 function meetsThreshold(
   updateType: UpdateType,
@@ -36,8 +37,6 @@ function meetsThreshold(
 export const checkForUpdates = internalAction({
   args: {},
   handler: async (ctx) => {
-    const packages = await ctx.runQuery(internal.packages.getAll);
-
     // Collect updates: subscriberId → destination key → { lines, subscription stamps to write after send }
     // Key format: "channel:<id>" | "dm:<userId>" | "default" (legacy fallback)
     type PendingPackageInfo = {
@@ -65,106 +64,130 @@ export const checkForUpdates = internalAction({
       Map<string, DestinationEntry>
     >();
 
-    for (const pkg of packages) {
-      let manifest: NpmPackageManifest | undefined;
+    const runStartedAt = Date.now() + 1;
 
-      try {
-        manifest = await fetchNpmPackageManifest(pkg.name, {
-          userAgent: 'patch-pulse-notifier-bot',
-        });
-      } catch {
-        console.error(`failed to fetch npm data for ${pkg.name}`);
-        continue;
-      }
-
-      const version = getNpmLatestVersion(manifest);
-      if (!version) continue;
-
-      const { status } = getDependencyStatus({
-        packageName: pkg.name,
-        currentVersion: pkg.currentVersion,
-        latestVersion: version,
+    while (true) {
+      const packages = await ctx.runQuery(internal.packages.getDueForCheck, {
+        beforeTs: runStartedAt,
+        limit: PACKAGE_CHECK_BATCH_SIZE,
       });
+      if (packages.length === 0) break;
 
-      if (status === 'update-available') {
-        const updateType = getUpdateType({
-          current: pkg.currentVersion,
-          latest: version,
-        });
-        const line = formatUpdateLine(
-          pkg.name,
-          pkg.currentVersion,
-          version,
-          updateType,
-          manifest,
-        );
-        const discordLine = formatDiscordUpdateLine(
-          pkg.name,
-          pkg.currentVersion,
-          version,
-          updateType,
-          manifest,
-        );
+      for (const pkg of packages) {
+        let manifest: NpmPackageManifest | undefined;
 
-        await ctx.runMutation(internal.packages.upsertVersion, {
-          name: pkg.name,
-          version,
-          githubRepoUrl: extractGitHubRepoUrl(manifest),
-        });
-
-        console.log(
-          `updated ${pkg.name} from ${pkg.currentVersion} to ${version}`,
-        );
-
-        const subscriptions = await ctx.runQuery(
-          internal.subscriptions.getSubscribersOfPackage,
-          { packageId: pkg._id },
-        );
-
-        for (const sub of subscriptions) {
-          const threshold = sub.minUpdateType ?? 'patch';
-          if (!meetsThreshold(updateType, threshold)) continue;
-
-          if (!sub.channelId && !sub.userId) continue;
-          const key = sub.channelId
-            ? `channel:${sub.channelId}`
-            : `dm:${sub.userId}`;
-
-          const channelMap =
-            updatesBySubscriber.get(sub.subscriberId) ??
-            new Map<string, DestinationEntry>();
-          const entry =
-            channelMap.get(key) ??
-            ({
-              lines: [] as string[],
-              discordLines: [] as string[],
-              packageNames: [] as string[],
-              stamps: [] as Array<{
-                subscriptionId: Id<'subscriptions'>;
-                newVersion: string;
-              }>,
-              pendingByLine: new Map<string, PendingPackageInfo>(),
-            } satisfies DestinationEntry);
-          entry.lines.push(line);
-          entry.discordLines.push(discordLine);
-          entry.packageNames.push(pkg.name);
-          entry.stamps.push({ subscriptionId: sub._id, newVersion: version });
-          entry.pendingByLine.set(line, {
-            name: pkg.name,
-            fromVersion: pkg.currentVersion,
-            toVersion: version,
-            updateType,
-            originalLine: line,
-            lineStatus: extractGitHubRepoUrl(manifest) ? 'resolved' : 'pending',
-            summaryStatus: 'pending',
+        try {
+          manifest = await fetchNpmPackageManifest(pkg.name, {
+            userAgent: 'patch-pulse-notifier-bot',
           });
-          channelMap.set(key, entry);
-          updatesBySubscriber.set(sub.subscriberId, channelMap);
+        } catch {
+          console.error(`failed to fetch npm data for ${pkg.name}`);
+          await ctx.runMutation(internal.packages.touchLastChecked, {
+            packageId: pkg._id,
+            checkedAt: runStartedAt,
+          });
+          continue;
         }
-      } else {
-        await ctx.runMutation(internal.packages.touchLastChecked, {
-          packageId: pkg._id,
+
+        const version = getNpmLatestVersion(manifest);
+        if (!version) {
+          await ctx.runMutation(internal.packages.touchLastChecked, {
+            packageId: pkg._id,
+            checkedAt: runStartedAt,
+          });
+          continue;
+        }
+
+        const { status } = getDependencyStatus({
+          packageName: pkg.name,
+          currentVersion: pkg.currentVersion,
+          latestVersion: version,
         });
+
+        if (status === 'update-available') {
+          const updateType = getUpdateType({
+            current: pkg.currentVersion,
+            latest: version,
+          });
+          const line = formatUpdateLine(
+            pkg.name,
+            pkg.currentVersion,
+            version,
+            updateType,
+            manifest,
+          );
+          const discordLine = formatDiscordUpdateLine(
+            pkg.name,
+            pkg.currentVersion,
+            version,
+            updateType,
+            manifest,
+          );
+
+          await ctx.runMutation(internal.packages.upsertVersion, {
+            name: pkg.name,
+            version,
+            githubRepoUrl: extractGitHubRepoUrl(manifest),
+            checkedAt: runStartedAt,
+          });
+
+          console.log(
+            `updated ${pkg.name} from ${pkg.currentVersion} to ${version}`,
+          );
+
+          const subscriptions = await ctx.runQuery(
+            internal.subscriptions.getSubscribersOfPackage,
+            { packageId: pkg._id },
+          );
+
+          for (const sub of subscriptions) {
+            const threshold = sub.minUpdateType ?? 'patch';
+            if (!meetsThreshold(updateType, threshold)) continue;
+
+            if (!sub.channelId && !sub.userId) continue;
+            const key = sub.channelId
+              ? `channel:${sub.channelId}`
+              : `dm:${sub.userId}`;
+
+            const channelMap =
+              updatesBySubscriber.get(sub.subscriberId) ??
+              new Map<string, DestinationEntry>();
+            const entry =
+              channelMap.get(key) ??
+              ({
+                lines: [] as string[],
+                discordLines: [] as string[],
+                packageNames: [] as string[],
+                stamps: [] as Array<{
+                  subscriptionId: Id<'subscriptions'>;
+                  newVersion: string;
+                }>,
+                pendingByLine: new Map<string, PendingPackageInfo>(),
+              } satisfies DestinationEntry);
+            entry.lines.push(line);
+            entry.discordLines.push(discordLine);
+            entry.packageNames.push(pkg.name);
+            entry.stamps.push({ subscriptionId: sub._id, newVersion: version });
+            entry.pendingByLine.set(line, {
+              name: pkg.name,
+              fromVersion: pkg.currentVersion,
+              toVersion: version,
+              updateType,
+              originalLine: line,
+              lineStatus: extractGitHubRepoUrl(manifest)
+                ? 'resolved'
+                : 'pending',
+              summaryStatus: 'pending',
+            });
+            channelMap.set(key, entry);
+            updatesBySubscriber.set(sub.subscriberId, channelMap);
+          }
+        } else {
+          await ctx.runMutation(internal.packages.touchLastChecked, {
+            packageId: pkg._id,
+            checkedAt: runStartedAt,
+          });
+        }
       }
     }
 

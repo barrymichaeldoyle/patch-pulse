@@ -1,5 +1,9 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
+import {
+  pendingPackageValidator,
+  pendingPackageFields,
+} from './releaseCheckState';
 
 export default defineSchema({
   packages: defineTable({
@@ -8,7 +12,9 @@ export default defineSchema({
     ecosystem: v.string(),
     lastChecked: v.optional(v.number()),
     githubRepoUrl: v.optional(v.string()),
-  }).index('by_name', ['name']),
+  })
+    .index('by_name', ['name'])
+    .index('by_last_checked', ['lastChecked']),
 
   subscribers: defineTable({
     type: v.string(), // "slack" | "discord"
@@ -42,39 +48,15 @@ export default defineSchema({
     retryCount: v.number(),
     commentTs: v.optional(v.string()),
     currentReaction: v.optional(v.string()),
-    packages: v.array(
-      v.object({
-        name: v.string(),
-        fromVersion: v.string(),
-        toVersion: v.string(),
-        updateType: v.union(
-          v.literal('patch'),
-          v.literal('minor'),
-          v.literal('major'),
-        ),
-        originalLine: v.string(),
-        lineStatus: v.union(
-          v.literal('pending'),
-          v.literal('resolved'),
-          v.literal('abandoned'),
-        ),
-        summaryStatus: v.union(
-          v.literal('pending'),
-          v.literal('ready'),
-          v.literal('abandoned'),
-        ),
-        summaryText: v.optional(v.string()),
-        sourceLinks: v.optional(
-          v.array(
-            v.object({
-              label: v.string(),
-              url: v.string(),
-            }),
-          ),
-        ),
-      }),
-    ),
+    // Deprecated storage for older records; new writes use pendingReleaseCheckPackages.
+    packages: v.optional(v.array(pendingPackageValidator)),
   }),
+
+  pendingReleaseCheckPackages: defineTable({
+    checkId: v.id('pendingReleaseChecks'),
+    packageIndex: v.number(),
+    ...pendingPackageFields,
+  }).index('by_check_id_and_package_index', ['checkId', 'packageIndex']),
 
   subscriptions: defineTable({
     packageId: v.id('packages'),

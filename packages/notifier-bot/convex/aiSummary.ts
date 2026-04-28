@@ -10,6 +10,29 @@ const OPENAI_SUMMARY_TIMEOUT_MS = getTimeoutMs(
   15_000,
 );
 
+export type SummaryFailureReason =
+  | 'missing-openai-key'
+  | 'insufficient-public-evidence'
+  | 'openai-timeout'
+  | 'openai-error';
+
+export type ReleaseSummaryResult =
+  | {
+      status: 'ready';
+      model: string;
+      summary: string;
+    }
+  | {
+      status: 'abandoned';
+      reason: SummaryFailureReason;
+      detail: string;
+    }
+  | {
+      status: 'retryable-error';
+      reason: Extract<SummaryFailureReason, 'openai-timeout' | 'openai-error'>;
+      detail: string;
+    };
+
 function buildSummaryPrompt(args: {
   packageName: string;
   fromVersion: string;
@@ -108,19 +131,56 @@ export async function summarizeReleaseEvidence(args: {
   toVersion: string;
   updateType: UpdateType;
   evidence: ReleaseEvidence;
-}): Promise<{ model: string; summary: string } | null> {
+}): Promise<ReleaseSummaryResult> {
   const prompt = buildSummaryPrompt(args);
 
-  if (!process.env.OPENAI_API_KEY) return null;
+  if (!process.env.OPENAI_API_KEY) {
+    return {
+      status: 'abandoned',
+      reason: 'missing-openai-key',
+      detail: 'OPENAI_API_KEY is not configured for the notifier runtime.',
+    };
+  }
+
+  const errors: string[] = [];
+  let sawTimeout = false;
+  let sawInsufficient = false;
 
   for (const model of [
     process.env.OPENAI_SUMMARY_NANO_MODEL ?? DEFAULT_NANO_MODEL,
     process.env.OPENAI_SUMMARY_MINI_MODEL ?? DEFAULT_MINI_MODEL,
   ]) {
-    const summary = await callOpenAiSummary(model, prompt);
-    if (!summary || summary === 'INSUFFICIENT') continue;
-    return { model, summary };
+    try {
+      const summary = await callOpenAiSummary(model, prompt);
+      if (!summary || summary === 'INSUFFICIENT') {
+        sawInsufficient = true;
+        continue;
+      }
+
+      return { status: 'ready', model, summary };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      errors.push(`${model}: ${message}`);
+      if (message.includes('timed out')) {
+        sawTimeout = true;
+      }
+    }
   }
 
-  return null;
+  if (sawInsufficient && errors.length === 0) {
+    return {
+      status: 'abandoned',
+      reason: 'insufficient-public-evidence',
+      detail:
+        'OpenAI declined to summarize because the provided release evidence was insufficient.',
+    };
+  }
+
+  return {
+    status: errors.length > 0 ? 'retryable-error' : 'abandoned',
+    reason: sawTimeout ? 'openai-timeout' : 'openai-error',
+    detail:
+      errors.join(' | ') ||
+      'OpenAI summary generation did not return a usable result.',
+  };
 }

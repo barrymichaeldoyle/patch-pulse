@@ -3,12 +3,21 @@ import {
   internalAction,
   internalMutation,
   internalQuery,
+  type MutationCtx,
+  type QueryCtx,
 } from './_generated/server';
 import { internal } from './_generated/api';
 import { type Doc } from './_generated/dataModel';
 import { fetchNpmPackageManifest } from '@patch-pulse/shared';
 import { getTimeoutMs, withTimeout } from './async';
-import { summarizeReleaseEvidence } from './aiSummary';
+import {
+  summarizeReleaseEvidence,
+  type SummaryFailureReason,
+} from './aiSummary';
+import {
+  pendingPackageValidator,
+  type PendingReleaseCheckPackage,
+} from './releaseCheckState';
 import { collectReleaseEvidence } from './releaseEvidence';
 import { formatUpdateLine } from './slack/format';
 import {
@@ -26,41 +35,6 @@ const RETRY_DELAYS_MS = [
   24 * 60 * 60 * 1000,
 ] as const;
 
-const lineStatusValidator = v.union(
-  v.literal('pending'),
-  v.literal('resolved'),
-  v.literal('abandoned'),
-);
-
-const summaryStatusValidator = v.union(
-  v.literal('pending'),
-  v.literal('ready'),
-  v.literal('abandoned'),
-);
-
-const pendingPackageValidator = v.object({
-  name: v.string(),
-  fromVersion: v.string(),
-  toVersion: v.string(),
-  updateType: v.union(
-    v.literal('patch'),
-    v.literal('minor'),
-    v.literal('major'),
-  ),
-  originalLine: v.string(),
-  lineStatus: lineStatusValidator,
-  summaryStatus: summaryStatusValidator,
-  summaryText: v.optional(v.string()),
-  sourceLinks: v.optional(
-    v.array(
-      v.object({
-        label: v.string(),
-        url: v.string(),
-      }),
-    ),
-  ),
-});
-
 const STATUS_REACTIONS = {
   abandoned: 'warning',
   failed: 'x',
@@ -75,22 +49,134 @@ const RELEASE_EVIDENCE_TIMEOUT_MS = getTimeoutMs(
   15_000,
 );
 
-type ReleaseCheckPackage = Doc<'pendingReleaseChecks'>['packages'][number];
+type PendingReleaseCheckRecord = Omit<
+  Doc<'pendingReleaseChecks'>,
+  'packages'
+> & {
+  packages: PendingReleaseCheckPackage[];
+};
 
-function packageNeedsWork(pkg: ReleaseCheckPackage): boolean {
+async function listPackagesByCheckId(
+  ctx: QueryCtx | MutationCtx,
+  checkId: Doc<'pendingReleaseChecks'>['_id'],
+): Promise<PendingReleaseCheckPackage[]> {
+  const rows = await ctx.db
+    .query('pendingReleaseCheckPackages')
+    .withIndex('by_check_id_and_package_index', (q) => q.eq('checkId', checkId))
+    .collect();
+
+  return rows.map(
+    ({ _creationTime, _id, checkId: _checkId, packageIndex, ...pkg }) => pkg,
+  );
+}
+
+async function replacePackagesForCheck(
+  ctx: MutationCtx,
+  checkId: Doc<'pendingReleaseChecks'>['_id'],
+  packages: PendingReleaseCheckPackage[],
+) {
+  const existing = await ctx.db
+    .query('pendingReleaseCheckPackages')
+    .withIndex('by_check_id_and_package_index', (q) => q.eq('checkId', checkId))
+    .collect();
+
+  for (const doc of existing) {
+    await ctx.db.delete(doc._id);
+  }
+
+  for (const [packageIndex, pkg] of packages.entries()) {
+    await ctx.db.insert('pendingReleaseCheckPackages', {
+      checkId,
+      packageIndex,
+      ...pkg,
+    });
+  }
+}
+
+async function deletePackagesForCheck(
+  ctx: MutationCtx,
+  checkId: Doc<'pendingReleaseChecks'>['_id'],
+) {
+  const existing = await ctx.db
+    .query('pendingReleaseCheckPackages')
+    .withIndex('by_check_id_and_package_index', (q) => q.eq('checkId', checkId))
+    .collect();
+
+  for (const doc of existing) {
+    await ctx.db.delete(doc._id);
+  }
+}
+
+function packageNeedsWork(pkg: PendingReleaseCheckPackage): boolean {
   return pkg.lineStatus === 'pending' || pkg.summaryStatus === 'pending';
 }
 
+function logReleaseCheckEvent(event: string, details: Record<string, unknown>) {
+  console.log(
+    JSON.stringify({
+      scope: 'release-check',
+      event,
+      ...details,
+    }),
+  );
+}
+
+function summarizeFailureReasons(
+  packages: PendingReleaseCheckPackage[],
+): Array<{
+  count: number;
+  reason: SummaryFailureReason | 'npm-manifest-unavailable';
+}> {
+  const counts = new Map<
+    SummaryFailureReason | 'npm-manifest-unavailable',
+    number
+  >();
+
+  for (const pkg of packages) {
+    if (pkg.summaryStatus !== 'abandoned' || !pkg.summaryFailureReason) {
+      continue;
+    }
+    counts.set(
+      pkg.summaryFailureReason,
+      (counts.get(pkg.summaryFailureReason) ?? 0) + 1,
+    );
+  }
+
+  return Array.from(counts.entries()).map(([reason, count]) => ({
+    reason,
+    count,
+  }));
+}
+
+function formatFailureReasonLine(args: {
+  count: number;
+  reason: SummaryFailureReason | 'npm-manifest-unavailable';
+}): string {
+  const prefix = `${args.count} update${args.count === 1 ? '' : 's'}`;
+  switch (args.reason) {
+    case 'missing-openai-key':
+      return `• ${prefix}: AI summaries are disabled because \`OPENAI_API_KEY\` is not configured.`;
+    case 'insufficient-public-evidence':
+      return `• ${prefix}: public release notes or compare data were too thin to summarize safely.`;
+    case 'openai-timeout':
+      return `• ${prefix}: release evidence was found, but AI summary generation timed out.`;
+    case 'openai-error':
+      return `• ${prefix}: release evidence was found, but AI summary generation failed.`;
+    case 'npm-manifest-unavailable':
+      return `• ${prefix}: npm package metadata could not be fetched reliably enough to summarize.`;
+  }
+}
+
 function buildThreadSummaryText(
-  packages: ReleaseCheckPackage[],
+  packages: PendingReleaseCheckPackage[],
 ): string | null {
   const readyPackages = packages.filter(
     (pkg) => pkg.summaryStatus === 'ready' && pkg.summaryText,
   );
   if (readyPackages.length === 0) return null;
-  const abandonedCount = packages.filter(
-    (pkg) => pkg.summaryStatus === 'abandoned',
-  ).length;
+  const failureLines = summarizeFailureReasons(packages).map(
+    formatFailureReasonLine,
+  );
 
   const body = readyPackages
     .map((pkg) => {
@@ -107,19 +193,24 @@ function buildThreadSummaryText(
 
   return (
     `📝 *Release summary*\n\n${body}` +
-    (abandonedCount > 0
-      ? `\n\n_Still missing summary evidence for ${abandonedCount} update${abandonedCount === 1 ? '' : 's'}._`
+    (failureLines.length > 0
+      ? `\n\n_Not summarized:_\n${failureLines.join('\n')}`
       : '')
   );
 }
 
-function buildThreadFallbackText(packages: ReleaseCheckPackage[]): string {
+function buildThreadFallbackText(
+  packages: PendingReleaseCheckPackage[],
+): string {
   const packageCount = packages.length;
-  return (
-    `⚠️ I couldn't assemble enough public release evidence to generate an AI summary ` +
-    `for ${packageCount} update${packageCount === 1 ? '' : 's'}. ` +
-    'The links in the main message are still the best available signal right now.'
+  const failureLines = summarizeFailureReasons(packages).map(
+    formatFailureReasonLine,
   );
+  const intro = `⚠️ I couldn't finish AI summaries for ${packageCount} update${packageCount === 1 ? '' : 's'}.`;
+
+  return failureLines.length > 0
+    ? `${intro}\n${failureLines.join('\n')}\nThe links in the main message are still the best available signal right now.`
+    : `${intro} The links in the main message are still the best available signal right now.`;
 }
 
 async function syncStatusReaction(args: {
@@ -173,10 +264,14 @@ export const create = internalMutation({
   },
   handler: async (ctx, args) => {
     const checkId = await ctx.db.insert('pendingReleaseChecks', {
-      ...args,
+      subscriberId: args.subscriberId,
+      channelId: args.channelId,
+      messageTs: args.messageTs,
+      fullText: args.fullText,
       retryCount: 0,
       currentReaction: STATUS_REACTIONS.pending,
     });
+    await replacePackagesForCheck(ctx, checkId, args.packages);
     await ctx.scheduler.runAfter(0, internal.releaseChecks.retry, { checkId });
     return checkId;
   },
@@ -185,7 +280,14 @@ export const create = internalMutation({
 export const get = internalQuery({
   args: { checkId: v.id('pendingReleaseChecks') },
   handler: async (ctx, { checkId }) => {
-    return await ctx.db.get(checkId);
+    const check = await ctx.db.get(checkId);
+    if (!check) return null;
+
+    const packages = await listPackagesByCheckId(ctx, checkId);
+    return {
+      ...check,
+      packages: packages.length > 0 ? packages : (check.packages ?? []),
+    } satisfies PendingReleaseCheckRecord;
   },
 });
 
@@ -199,7 +301,13 @@ export const saveProgress = internalMutation({
     currentReaction: v.optional(v.string()),
   },
   handler: async (ctx, { checkId, ...patch }) => {
-    await ctx.db.patch(checkId, patch);
+    await ctx.db.patch(checkId, {
+      fullText: patch.fullText,
+      retryCount: patch.retryCount,
+      commentTs: patch.commentTs,
+      currentReaction: patch.currentReaction,
+    });
+    await replacePackagesForCheck(ctx, checkId, patch.packages);
   },
 });
 
@@ -216,6 +324,7 @@ export const saveCommentTs = internalMutation({
 export const remove = internalMutation({
   args: { checkId: v.id('pendingReleaseChecks') },
   handler: async (ctx, { checkId }) => {
+    await deletePackagesForCheck(ctx, checkId);
     await ctx.db.delete(checkId);
   },
 });
@@ -223,7 +332,7 @@ export const remove = internalMutation({
 export const retry = internalAction({
   args: { checkId: v.id('pendingReleaseChecks') },
   handler: async (ctx, { checkId }) => {
-    const check: Doc<'pendingReleaseChecks'> | null = await ctx.runQuery(
+    const check: PendingReleaseCheckRecord | null = await ctx.runQuery(
       internal.releaseChecks.get,
       { checkId },
     );
@@ -241,7 +350,7 @@ export const retry = internalAction({
     let commentTs = check.commentTs;
     const nextDelayMs = RETRY_DELAYS_MS[check.retryCount];
     const isFinalAttempt = typeof nextDelayMs === 'undefined';
-    const updatedPackages: ReleaseCheckPackage[] = [];
+    const updatedPackages: PendingReleaseCheckPackage[] = [];
 
     if (!commentTs) {
       try {
@@ -286,8 +395,18 @@ export const retry = internalAction({
         console.warn(`failed to fetch npm manifest for ${pkg.name}:`, error);
         if (isFinalAttempt) {
           if (pkg.lineStatus === 'pending') pkg.lineStatus = 'abandoned';
-          if (pkg.summaryStatus === 'pending') pkg.summaryStatus = 'abandoned';
+          if (pkg.summaryStatus === 'pending') {
+            pkg.summaryStatus = 'abandoned';
+            pkg.summaryFailureReason = 'npm-manifest-unavailable';
+            pkg.summaryFailureDetail =
+              error instanceof Error ? error.message : String(error);
+          }
         }
+        logReleaseCheckEvent('npm-manifest-failed', {
+          isFinalAttempt,
+          packageName: pkg.name,
+          retryCount: check.retryCount,
+        });
         updatedPackages.push(pkg);
         continue;
       }
@@ -312,14 +431,25 @@ export const retry = internalAction({
       if (pkg.summaryStatus === 'pending') {
         try {
           const evidence = await withTimeout(
-            collectReleaseEvidence(manifest, pkg.fromVersion, pkg.toVersion),
+            collectReleaseEvidence(
+              pkg.name,
+              manifest,
+              pkg.fromVersion,
+              pkg.toVersion,
+            ),
             {
               label: `release evidence lookup (${pkg.name})`,
               timeoutMs: RELEASE_EVIDENCE_TIMEOUT_MS,
             },
           );
+          logReleaseCheckEvent('release-evidence-collected', {
+            diagnostics: evidence.diagnostics,
+            packageName: pkg.name,
+            retryCount: check.retryCount,
+            shouldRetry: evidence.shouldRetry,
+          });
           if (!evidence.shouldRetry) {
-            const summary = await withTimeout(
+            const summaryResult = await withTimeout(
               summarizeReleaseEvidence({
                 packageName: pkg.name,
                 fromVersion: pkg.fromVersion,
@@ -332,22 +462,47 @@ export const retry = internalAction({
                 timeoutMs: RELEASE_EVIDENCE_TIMEOUT_MS,
               },
             );
-            if (summary) {
+            if (summaryResult.status === 'ready') {
               pkg.summaryStatus = 'ready';
-              pkg.summaryText = summary.summary;
+              pkg.summaryText = summaryResult.summary;
+              pkg.sourceLinks = evidence.sourceLinks;
+              pkg.summaryFailureReason = undefined;
+              pkg.summaryFailureDetail = undefined;
+            } else if (summaryResult.status === 'abandoned') {
+              pkg.summaryStatus = 'abandoned';
+              pkg.summaryFailureReason = summaryResult.reason;
+              pkg.summaryFailureDetail = summaryResult.detail;
               pkg.sourceLinks = evidence.sourceLinks;
             } else if (isFinalAttempt) {
               pkg.summaryStatus = 'abandoned';
+              pkg.summaryFailureReason = summaryResult.reason;
+              pkg.summaryFailureDetail = summaryResult.detail;
+              pkg.sourceLinks = evidence.sourceLinks;
             }
           } else if (isFinalAttempt) {
             pkg.summaryStatus = 'abandoned';
+            pkg.summaryFailureReason = 'insufficient-public-evidence';
+            pkg.summaryFailureDetail =
+              'GitHub release or compare metadata never became rich enough to summarize safely.';
           }
         } catch (error) {
           console.error('failed to build release summary:', error);
           if (isFinalAttempt) {
             pkg.summaryStatus = 'abandoned';
+            const message =
+              error instanceof Error ? error.message : String(error);
+            pkg.summaryFailureReason = message.includes('timed out')
+              ? 'openai-timeout'
+              : 'openai-error';
+            pkg.summaryFailureDetail = message;
           }
         }
+        logReleaseCheckEvent('release-summary-status', {
+          packageName: pkg.name,
+          reason: pkg.summaryFailureReason,
+          retryCount: check.retryCount,
+          status: pkg.summaryStatus,
+        });
       }
 
       updatedPackages.push(pkg);
