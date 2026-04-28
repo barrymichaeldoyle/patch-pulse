@@ -217,8 +217,6 @@ export async function runCli({
 
           const sectionLabel = dependencyTypeLabels[key];
 
-          projectSpinner?.start(`Checking ${sectionLabel.toLowerCase()}...`);
-
           try {
             const dependencyMap = Object.fromEntries(
               value.map((dependency) => [
@@ -226,6 +224,12 @@ export async function runCli({
                 dependency.source.resolvedVersion,
               ]),
             );
+            const totalDependencies = value.length;
+
+            projectSpinner?.start(
+              `Checking ${sectionLabel.toLowerCase()}... (0/${totalDependencies})`,
+            );
+
             const sourceMap = new Map(
               value.map((dependency) => [
                 dependency.packageName,
@@ -236,7 +240,14 @@ export async function runCli({
               dependencyMap,
               sectionLabel,
               config,
-              { silent: !streamInline },
+              {
+                onProgress: ({ completedCount, totalCount }) => {
+                  projectSpinner?.updateMessage(
+                    `Checking ${sectionLabel.toLowerCase()}... (${completedCount}/${totalCount})`,
+                  );
+                },
+                silent: !streamInline,
+              },
             );
 
             projectSpinner?.stop();

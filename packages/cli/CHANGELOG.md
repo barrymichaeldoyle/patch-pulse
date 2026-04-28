@@ -1,5 +1,11 @@
 # patch-pulse
 
+## 4.1.1
+
+### Patch Changes
+
+- Show package-level progress counts during CLI dependency checks.
+
 ## 4.1.0
 
 ### Minor Changes

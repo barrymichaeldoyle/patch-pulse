@@ -15,10 +15,11 @@ export async function checkDependencyVersions(
   category: string,
   config?: PatchPulseConfig,
   options: {
+    onProgress?: (args: { completedCount: number; totalCount: number }) => void;
     silent?: boolean;
   } = {},
 ): Promise<DependencyInfo[]> {
-  const { silent = false } = options;
+  const { onProgress, silent = false } = options;
 
   if (!dependencies || Object.keys(dependencies).length === 0) {
     return [];
@@ -26,7 +27,8 @@ export async function checkDependencyVersions(
 
   const packageNames = Object.keys(dependencies);
   const progress = silent ? null : new ProgressSpinner();
-  progress?.start(`Checking ${packageNames.length} packages...`);
+  const totalCount = packageNames.length;
+  progress?.start(`Checking ${totalCount} packages...`);
 
   const skippedResults: DependencyInfo[] = [];
   const dependenciesToCheck = Object.fromEntries(
@@ -50,6 +52,19 @@ export async function checkDependencyVersions(
   );
 
   let checkedResults: DependencyInfo[] = [];
+  const reportProgress = (completedCount: number): void => {
+    const overallCompletedCount = completedCount + skippedResults.length;
+
+    progress?.updateMessage(
+      `Checking ${totalCount} packages... (${overallCompletedCount}/${totalCount})`,
+    );
+    onProgress?.({
+      completedCount: overallCompletedCount,
+      totalCount,
+    });
+  };
+
+  reportProgress(0);
 
   try {
     checkedResults =
@@ -70,10 +85,8 @@ export async function checkDependencyVersions(
                 );
               }
             },
-            onResolved: ({ completedCount, totalCount }) => {
-              progress?.updateMessage(
-                `Checking ${packageNames.length} packages... (${completedCount + skippedResults.length}/${totalCount + skippedResults.length})`,
-              );
+            onResolved: ({ completedCount }) => {
+              reportProgress(completedCount);
             },
             userAgent: 'patch-pulse-cli',
           })) as DependencyInfo[]);
