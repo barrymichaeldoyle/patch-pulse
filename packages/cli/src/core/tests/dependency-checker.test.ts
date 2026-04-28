@@ -62,4 +62,55 @@ describe('checkDependencyVersions', () => {
 
     expect(process.stdout.write).toHaveBeenCalledWith('\r\x1B[2K');
   });
+
+  it('reports progress counts including skipped packages', async () => {
+    vi.mocked(checkNpmDependencyStatuses).mockImplementation(
+      async (_dependencies, options) => {
+        options?.onResolved?.({
+          completedCount: 1,
+          result: {
+            packageName: 'react',
+            currentVersion: '18.2.0',
+            latestVersion: '19.2.0',
+            isOutdated: true,
+            status: 'update-available',
+            updateType: 'major',
+          },
+          totalCount: 1,
+        });
+
+        return [
+          {
+            packageName: 'react',
+            currentVersion: '18.2.0',
+            latestVersion: '19.2.0',
+            isOutdated: true,
+            status: 'update-available',
+            updateType: 'major',
+          },
+        ];
+      },
+    );
+
+    const onProgress = vi.fn();
+
+    await checkDependencyVersions(
+      {
+        react: '18.2.0',
+        '@types/node': 'latest',
+      },
+      'Dependencies',
+      { skip: ['@types/node'] },
+      { onProgress, silent: true },
+    );
+
+    expect(onProgress).toHaveBeenNthCalledWith(1, {
+      completedCount: 1,
+      totalCount: 2,
+    });
+    expect(onProgress).toHaveBeenNthCalledWith(2, {
+      completedCount: 2,
+      totalCount: 2,
+    });
+  });
 });
