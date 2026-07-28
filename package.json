@@ -7,19 +7,19 @@
     "email": "barry@barrymichaeldoyle.com"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13"
   },
-  "packageManager": "pnpm@10.33.0",
+  "packageManager": "pnpm@11.17.0",
   "devDependencies": {
-    "@changesets/cli": "2.31.0",
-    "@types/node": "25.6.0",
-    "esbuild": "0.28.0",
-    "knip": "6.4.1",
-    "oxfmt": "0.45.0",
-    "oxlint": "1.60.0",
-    "tsx": "4.21.0",
-    "typescript": "6.0.3",
-    "vitest": "4.1.4"
+    "@changesets/cli": "2.31.1",
+    "@types/node": "26.1.2",
+    "esbuild": "0.28.1",
+    "knip": "6.29.0",
+    "oxfmt": "0.61.0",
+    "oxlint": "1.76.0",
+    "tsx": "4.23.1",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
   },
   "scripts": {
     "build:action": "pnpm --filter @patch-pulse/action build",
@@ -33,8 +33,8 @@
     "dev:cli": "pnpm --filter patch-pulse dev",
     "pp": "node --import tsx packages/cli/src/index.ts",
     "dev:vscode-extension": "pnpm --filter patch-pulse-vscode-extension watch",
-    "format": "pnpm exec oxfmt --write . '!packages/docs/.astro/**' '!packages/*/convex/_generated/**' '!packages/action/dist/**'",
-    "format:check": "pnpm exec oxfmt --check . '!packages/docs/.astro/**' '!packages/*/convex/_generated/**' '!packages/action/dist/**'",
+    "format": "pnpm exec oxfmt --write . '!packages/docs/.astro/**' '!convex/_generated/**' '!packages/*/convex/_generated/**' '!packages/action/dist/**'",
+    "format:check": "pnpm exec oxfmt --check . '!packages/docs/.astro/**' '!convex/_generated/**' '!packages/*/convex/_generated/**' '!packages/action/dist/**'",
     "format:changed": "node scripts/format-changed.mjs",
     "format:staged": "node scripts/format-staged.mjs",
     "ci:check": "pnpm lint && pnpm format:check && pnpm knip && pnpm typecheck && pnpm test:shared && pnpm test:cli && pnpm test:notifier && pnpm test:action && pnpm build:cli && pnpm build:action && pnpm build:vscode-extension && pnpm build:docs",

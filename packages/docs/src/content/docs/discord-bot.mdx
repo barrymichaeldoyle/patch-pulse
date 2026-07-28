@@ -3,17 +3,11 @@ title: Discord Bot
 description: Get Discord notifications for new package releases in your server channels.
 ---
 
-import { Aside } from '@astrojs/starlight/components';
 import AddToDiscordButton from '../../components/AddToDiscordButton.astro';
 
 The Patch Pulse Discord Bot notifies your server whenever a package you depend on releases a new version.
 
 <AddToDiscordButton href="https://grand-yak-92.convex.site/discord/install" />
-
-<Aside type="note">
-  Discord currently gets the base release notification flow. GitHub link
-  backfill and AI-generated release summaries remain Slack-only for now.
-</Aside>
 
 ## How it works
 
@@ -53,5 +47,4 @@ If you are self-hosting Patch Pulse rather than using the hosted bot, the Discor
 Slack and Discord support the same core package tracking model, but there are a few operational differences:
 
 - Slack has a workspace default channel; Discord does not
-- Slack receives delayed GitHub link backfill and AI summaries; Discord currently does not
 - Discord commands use typed slash-command options instead of Slack's free-text command parsing

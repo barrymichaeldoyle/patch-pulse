@@ -8,8 +8,6 @@
  * @module
  */
 
-import type * as aiSummary from "../aiSummary.js";
-import type * as async from "../async.js";
 import type * as crons from "../crons.js";
 import type * as discord_api from "../discord/api.js";
 import type * as discord_commands from "../discord/commands.js";
@@ -17,12 +15,10 @@ import type * as discord_format from "../discord/format.js";
 import type * as discord_oauth from "../discord/oauth.js";
 import type * as discord_verify from "../discord/verify.js";
 import type * as http from "../http.js";
-import type * as migrations from "../migrations.js";
 import type * as packages from "../packages.js";
 import type * as polling from "../polling.js";
 import type * as releaseCheckState from "../releaseCheckState.js";
 import type * as releaseChecks from "../releaseChecks.js";
-import type * as releaseEvidence from "../releaseEvidence.js";
 import type * as slack_api from "../slack/api.js";
 import type * as slack_bannerAsset from "../slack/bannerAsset.js";
 import type * as slack_commands from "../slack/commands.js";
@@ -42,8 +38,6 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  aiSummary: typeof aiSummary;
-  async: typeof async;
   crons: typeof crons;
   "discord/api": typeof discord_api;
   "discord/commands": typeof discord_commands;
@@ -51,12 +45,10 @@ declare const fullApi: ApiFromModules<{
   "discord/oauth": typeof discord_oauth;
   "discord/verify": typeof discord_verify;
   http: typeof http;
-  migrations: typeof migrations;
   packages: typeof packages;
   polling: typeof polling;
   releaseCheckState: typeof releaseCheckState;
   releaseChecks: typeof releaseChecks;
-  releaseEvidence: typeof releaseEvidence;
   "slack/api": typeof slack_api;
   "slack/bannerAsset": typeof slack_bannerAsset;
   "slack/commands": typeof slack_commands;

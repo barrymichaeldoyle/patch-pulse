@@ -16,7 +16,6 @@ import {
   chatPostMessage,
   conversationsFindByName,
   PrivateChannelError,
-  reactionsAdd,
 } from './slack/api';
 import { sendChannelMessage, DiscordMissingAccessError } from './discord/api';
 
@@ -39,15 +38,6 @@ export const checkForUpdates = internalAction({
   handler: async (ctx) => {
     // Collect updates: subscriberId → destination key → { lines, subscription stamps to write after send }
     // Key format: "channel:<id>" | "dm:<userId>" | "default" (legacy fallback)
-    type PendingPackageInfo = {
-      name: string;
-      fromVersion: string;
-      toVersion: string;
-      updateType: UpdateType;
-      originalLine: string;
-      lineStatus: 'pending' | 'resolved';
-      summaryStatus: 'pending';
-    };
     type DestinationEntry = {
       lines: string[];
       discordLines: string[];
@@ -56,8 +46,6 @@ export const checkForUpdates = internalAction({
         subscriptionId: Id<'subscriptions'>;
         newVersion: string;
       }>;
-      // Lines for packages that had no GitHub URL at send time, keyed by the line string
-      pendingByLine: Map<string, PendingPackageInfo>;
     };
     const updatesBySubscriber = new Map<
       Id<'subscribers'>,
@@ -162,23 +150,11 @@ export const checkForUpdates = internalAction({
                   subscriptionId: Id<'subscriptions'>;
                   newVersion: string;
                 }>,
-                pendingByLine: new Map<string, PendingPackageInfo>(),
               } satisfies DestinationEntry);
             entry.lines.push(line);
             entry.discordLines.push(discordLine);
             entry.packageNames.push(pkg.name);
             entry.stamps.push({ subscriptionId: sub._id, newVersion: version });
-            entry.pendingByLine.set(line, {
-              name: pkg.name,
-              fromVersion: pkg.currentVersion,
-              toVersion: version,
-              updateType,
-              originalLine: line,
-              lineStatus: extractGitHubRepoUrl(manifest)
-                ? 'resolved'
-                : 'pending',
-              summaryStatus: 'pending',
-            });
             channelMap.set(key, entry);
             updatesBySubscriber.set(sub.subscriberId, channelMap);
           }
@@ -274,7 +250,7 @@ export const checkForUpdates = internalAction({
 
       for (const [
         key,
-        { lines: updates, stamps, pendingByLine },
+        { lines: updates, stamps, packageNames },
       ] of channelMap) {
         const rawTarget = key.startsWith('channel:')
           ? key.slice('channel:'.length)
@@ -335,17 +311,12 @@ export const checkForUpdates = internalAction({
         let allBatchesSent = true;
         const header =
           updates.length === 1
-            ? `📦 *${pendingByLine.get(updates[0])?.name ?? 'package'} update*`
+            ? `📦 *${packageNames[0] ?? 'package'} update*`
             : `📦 *${updates.length} npm package updates*`;
         for (const batchLines of batches) {
           const text = `${header}\n\n` + batchLines.join('\n');
-          let messageTs: string | undefined;
           try {
-            ({ ts: messageTs } = await chatPostMessage(
-              details.accessToken,
-              targetChannel,
-              text,
-            ));
+            await chatPostMessage(details.accessToken, targetChannel, text);
           } catch (error) {
             allBatchesSent = false;
             if (error instanceof PrivateChannelError) {
@@ -356,30 +327,6 @@ export const checkForUpdates = internalAction({
               console.error(`error sending to ${targetChannel}:`, error);
             }
             break;
-          }
-
-          // Schedule metadata enrichment for every package in the batch.
-          const batchPending = batchLines
-            .filter((l) => pendingByLine.has(l))
-            .map((l) => pendingByLine.get(l)!);
-          if (batchPending.length > 0 && messageTs) {
-            try {
-              await reactionsAdd(
-                details.accessToken,
-                targetChannel,
-                messageTs,
-                'hourglass_flowing_sand',
-              );
-            } catch (error) {
-              console.warn('failed to add Slack pending reaction:', error);
-            }
-            await ctx.runMutation(internal.releaseChecks.create, {
-              subscriberId,
-              channelId: targetChannel,
-              messageTs,
-              fullText: text,
-              packages: batchPending,
-            });
           }
         }
 

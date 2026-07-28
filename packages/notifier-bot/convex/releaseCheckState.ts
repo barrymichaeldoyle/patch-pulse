@@ -1,24 +1,9 @@
-import { type Doc } from './_generated/dataModel';
 import { v } from 'convex/values';
 
-export const lineStatusValidator = v.union(
+const lineStatusValidator = v.union(
   v.literal('pending'),
   v.literal('resolved'),
   v.literal('abandoned'),
-);
-
-export const summaryStatusValidator = v.union(
-  v.literal('pending'),
-  v.literal('ready'),
-  v.literal('abandoned'),
-);
-
-export const summaryFailureReasonValidator = v.union(
-  v.literal('missing-openai-key'),
-  v.literal('insufficient-public-evidence'),
-  v.literal('openai-timeout'),
-  v.literal('openai-error'),
-  v.literal('npm-manifest-unavailable'),
 );
 
 export const pendingPackageFields = {
@@ -32,10 +17,11 @@ export const pendingPackageFields = {
   ),
   originalLine: v.string(),
   lineStatus: lineStatusValidator,
-  summaryStatus: summaryStatusValidator,
+  // Legacy fields remain optional until old queued records have drained.
+  summaryStatus: v.optional(v.string()),
   summaryText: v.optional(v.string()),
   summaryFailureDetail: v.optional(v.string()),
-  summaryFailureReason: v.optional(summaryFailureReasonValidator),
+  summaryFailureReason: v.optional(v.string()),
   sourceLinks: v.optional(
     v.array(
       v.object({
@@ -47,8 +33,3 @@ export const pendingPackageFields = {
 };
 
 export const pendingPackageValidator = v.object(pendingPackageFields);
-
-export type PendingReleaseCheckPackage = Omit<
-  Doc<'pendingReleaseCheckPackages'>,
-  '_creationTime' | '_id' | 'checkId' | 'packageIndex'
->;

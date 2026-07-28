@@ -3,9 +3,9 @@ import { internal } from './_generated/api';
 
 const crons = cronJobs();
 
-crons.cron(
+crons.interval(
   'poll npm packages',
-  '0 * * * *',
+  { hours: 6 },
   internal.polling.checkForUpdates,
   {},
 );

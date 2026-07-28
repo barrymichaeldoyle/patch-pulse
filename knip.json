@@ -9,12 +9,13 @@
       "entry": ["scripts/*.cjs"],
       "project": ["src/**/*.ts", "scripts/*.cjs"]
     },
+    "packages/docs": {
+      "ignoreDependencies": ["cookie"]
+    },
     "packages/notifier-bot": {
-      "entry": ["convex/http.ts", "convex/crons.ts"],
       "project": ["convex/**/*.ts", "!convex/_generated/**"]
     },
     "packages/vscode-extension": {
-      "entry": ["src/extension.ts"],
       "project": ["src/**/*.ts"]
     },
     "packages/action": {

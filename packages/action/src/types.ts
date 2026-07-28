@@ -2,7 +2,7 @@ import type { UpdateType } from '@patch-pulse/shared';
 
 export type { UpdateType };
 
-export interface CliDependencySource {
+interface CliDependencySource {
   packageJsonPath: string;
   projectDisplayName: string;
   projectRelativePath: string;
@@ -28,7 +28,7 @@ export interface CliDependency {
   source?: CliDependencySource;
 }
 
-export interface CliProject {
+interface CliProject {
   displayName: string;
   relativePath: string;
   needsAttention: boolean;
@@ -57,7 +57,7 @@ export interface CliOutput {
   };
 }
 
-export interface PackageOccurrence {
+interface PackageOccurrence {
   packageJsonPath: string;
   rawVersion: string;
   section: string;

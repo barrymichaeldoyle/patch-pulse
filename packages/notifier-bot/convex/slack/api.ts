@@ -680,42 +680,23 @@ export async function chatPostMessage(
   return { ts: data.ts as string };
 }
 
-/** Edits an existing Slack message in-place. */
-export async function chatUpdateMessage(
+/** Deletes a message previously posted by the bot. */
+export async function chatDeleteMessage(
   token: string,
   channel: string,
   ts: string,
-  text: string,
 ): Promise<void> {
-  const response = await fetch('https://slack.com/api/chat.update', {
+  const response = await fetch('https://slack.com/api/chat.delete', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ channel, ts, text }),
+    body: JSON.stringify({ channel, ts }),
   });
   const data = await response.json();
-  if (!data.ok) throw new Error(`Slack chat.update error: ${data.error}`);
-}
-
-export async function reactionsAdd(
-  token: string,
-  channel: string,
-  ts: string,
-  name: string,
-): Promise<void> {
-  const response = await fetch('https://slack.com/api/reactions.add', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ channel, timestamp: ts, name }),
-  });
-  const data = await response.json();
-  if (!data.ok && data.error !== 'already_reacted') {
-    throw new Error(`Slack reactions.add error: ${data.error}`);
+  if (!data.ok && data.error !== 'message_not_found') {
+    throw new Error(`Slack chat.delete error: ${data.error}`);
   }
 }
 

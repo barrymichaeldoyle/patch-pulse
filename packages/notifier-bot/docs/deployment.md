@@ -10,7 +10,7 @@ Important pieces:
 
 - Convex functions and schema
 - HTTP endpoints for Slack and Discord installs and commands
-- an hourly polling cron
+- a six-hour polling interval
 
 ## Environment Variables
 
@@ -29,12 +29,7 @@ Discord install flow depends on these environment variables:
 - `DISCORD_BOT_TOKEN`
 - `DISCORD_REGISTER_COMMANDS_SECRET`
 
-AI-powered release summaries additionally support:
-
-- `OPENAI_API_KEY`
-- `OPENAI_SUMMARY_NANO_MODEL` optional override
-- `OPENAI_SUMMARY_MINI_MODEL` optional override
-- `GITHUB_TOKEN` optional, for higher GitHub API rate limits
+GitHub release-link lookups optionally support `GITHUB_TOKEN` for higher API rate limits.
 
 These are read in:
 
@@ -78,7 +73,8 @@ These routes are intended to be configured in Discord as:
 
 ## Polling
 
-The notifier uses an hourly cron defined in [`convex/crons.ts`](../convex/crons.ts):
+The notifier polls every six hours using the interval defined in
+[`convex/crons.ts`](../convex/crons.ts):
 
 - `poll npm packages`
 
@@ -89,7 +85,6 @@ This cron:
 3. stores the latest version
 4. stores GitHub repo metadata when available
 5. delivers notifications grouped by target channel
-6. queues Slack-only release enrichment jobs that can backfill links and post thread summaries later
 
 ## Data Expectations
 
@@ -119,7 +114,6 @@ Tracked packages create:
 - Set `DISCORD_PUBLIC_KEY`
 - Set `DISCORD_BOT_TOKEN`
 - Set `DISCORD_REGISTER_COMMANDS_SECRET`
-- Set `OPENAI_API_KEY` if AI summaries should be enabled
 - Optionally set `GITHUB_TOKEN` if you expect heavier GitHub API usage
 - Confirm Slack app redirect URL matches `SLACK_REDIRECT_URI`
 - Confirm slash command request URLs point to the Convex HTTP endpoints
@@ -136,8 +130,6 @@ Tracked packages create:
 - Run `/npmlist`
 - Verify the default channel and explicit channel grouping
 - Verify update notifications arrive in the expected channels
-- Verify new notifications receive `⏳` while enrichment is pending
-- Verify a thread summary appears and the reaction changes to `📝` when evidence is available
 - Install the Discord app into a test server
 - Run `/npmtrack package:react`
 - Run `/npmtrack package:react channel:#releases`

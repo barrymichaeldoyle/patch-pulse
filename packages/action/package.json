@@ -1,6 +1,6 @@
 {
   "name": "@patch-pulse/action",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "GitHub Action that automatically opens PRs for outdated npm dependencies",
   "private": true,
   "license": "MIT",
@@ -15,8 +15,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@actions/core": "3.0.0",
-    "@actions/github": "9.1.0",
+    "@actions/core": "3.0.1",
+    "@actions/github": "9.1.1",
     "@patch-pulse/shared": "workspace:*"
   }
 }

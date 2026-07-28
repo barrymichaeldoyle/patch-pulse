@@ -1,35 +1,18 @@
 import { v } from 'convex/values';
 import { internalMutation, internalQuery } from './_generated/server';
 
-export const getAll = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    return await ctx.db.query('packages').collect();
-  },
-});
-
 export const getDueForCheck = internalQuery({
   args: {
     beforeTs: v.number(),
     limit: v.number(),
   },
   handler: async (ctx, { beforeTs, limit }) => {
-    const due = await ctx.db
+    // Missing optional values sort before numbers, so this indexed range also
+    // includes legacy packages that have never been checked.
+    return await ctx.db
       .query('packages')
       .withIndex('by_last_checked', (q) => q.lt('lastChecked', beforeTs))
       .take(limit);
-
-    if (due.length >= limit) {
-      return due;
-    }
-
-    // Legacy fallback for packages created before lastChecked existed.
-    const neverChecked = await ctx.db
-      .query('packages')
-      .filter((q) => q.eq(q.field('lastChecked'), undefined))
-      .take(limit - due.length);
-
-    return [...due, ...neverChecked];
   },
 });
 

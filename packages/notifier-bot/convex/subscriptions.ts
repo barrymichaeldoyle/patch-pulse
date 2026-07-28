@@ -21,7 +21,7 @@ export const getSubscribersOfPackage = internalQuery({
   handler: async (ctx, { packageId }) => {
     return await ctx.db
       .query('subscriptions')
-      .withIndex('by_package_and_subscriber', (q) =>
+      .withIndex('by_package_subscriber_channel', (q) =>
         q.eq('packageId', packageId),
       )
       .collect();
@@ -36,7 +36,7 @@ export const getByPackageAndSubscriber = internalQuery({
   handler: async (ctx, { packageId, subscriberId }) => {
     return await ctx.db
       .query('subscriptions')
-      .withIndex('by_package_and_subscriber', (q) =>
+      .withIndex('by_package_subscriber_channel', (q) =>
         q.eq('packageId', packageId).eq('subscriberId', subscriberId),
       )
       .collect();

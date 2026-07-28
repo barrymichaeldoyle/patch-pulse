@@ -14,7 +14,7 @@ It currently supports:
 - Discord server subscriptions
 - npm package polling
 - Multi-channel Slack and Discord tracking
-- Delayed GitHub metadata enrichment and AI release summaries
+- GitHub release links when repository metadata is available
 
 More detailed docs live here:
 
@@ -28,14 +28,13 @@ More detailed docs live here:
 
 The notifier stores tracked packages, subscriber details for Slack workspaces and Discord servers, and per-channel subscriptions in Convex.
 
-An hourly cron checks tracked packages for updates. When a newer version is found:
+A cron checks tracked packages for updates every six hours. When a newer version is found:
 
 1. The package record is updated in Convex.
 2. GitHub repo metadata is stored on the package when it can be derived from npm metadata.
 3. Matching subscribers are grouped by delivery target.
 4. Slack notifications are sent to the relevant channel or the workspace default channel.
 5. Discord notifications are sent to the explicit subscribed channel.
-6. If upstream metadata is incomplete, Patch Pulse retries later, updates the original Slack post with release links, and adds an AI summary in the thread when the evidence is strong enough.
 
 ## Slack Summary
 
@@ -86,4 +85,3 @@ Useful commands from this package directory:
 - `/npmlist` does not perform live npm lookups. It uses stored package metadata so the response stays fast.
 - GitHub links in `/npmlist` appear after polling has enriched a package with repo metadata.
 - Update notifications can include richer release links because polling already fetches npm manifests during the update check.
-- Slack-only enrichment uses status reactions on the original Slack post: `⏳` queued/pending, `📝` summary added, `⚠️` no trustworthy release details found after retries, `❌` processing failed.

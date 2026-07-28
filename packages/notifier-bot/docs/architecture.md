@@ -15,7 +15,6 @@ Primary tables:
 - `discordSubscriberDetails`
 - `slackSubscriberDetails`
 - `subscriptions`
-- `pendingReleaseChecks`
 
 ## Data Model
 
@@ -75,24 +74,9 @@ Important fields:
 
 If `channelId` is missing, the subscription targets the workspace default channel.
 
-### `pendingReleaseChecks`
+### Legacy enrichment tables
 
-Stores delayed enrichment work for a specific Slack notification message.
-
-Important fields:
-
-- `subscriberId`
-- `channelId`
-- `messageTs`
-- `fullText`
-- `commentTs` optional
-- `retryCount`
-- `packages`
-
-These rows are currently Slack-only. Each package entry tracks two independent concerns:
-
-- whether the original Slack line still needs GitHub link backfill
-- whether an AI summary for that package is still pending
+`pendingReleaseChecks` and `pendingReleaseCheckPackages` remain in the schema temporarily so jobs queued before delayed enrichment was removed can clean themselves up safely. New notifications never write to these tables.
 
 ## Request Flow
 
@@ -147,28 +131,15 @@ The poller:
 5. stores GitHub repo metadata when available
 6. groups matching subscriptions by subscriber-specific target
 7. sends one notification per target channel
-8. for Slack, adds a pending reaction and queues an enrichment job for the posted message
-9. for Discord, sends the base notification only
 
-## Metadata Enrichment
+## GitHub Link Handling
 
-The notifier uses a two-stage enrichment flow.
-
-Stage 1 happens during polling for both Slack and Discord:
+GitHub metadata is handled during polling:
 
 - polling fetches npm metadata anyway
 - if a GitHub repo URL can be derived from `repository`, it is normalized and stored on `packages.githubRepoUrl`
 - the outgoing Slack message includes the best release links available at send time
-
-Stage 2 happens in [`convex/releaseChecks.ts`](../convex/releaseChecks.ts) for Slack only:
-
-- the notifier retries on a backoff schedule: `1h`, `3h`, `6h`, `12h`, `24h`
-- each retry re-fetches npm metadata and structured GitHub evidence
-- if the message line can now be improved, the original Slack message is edited in place
-- if the evidence is strong enough, the notifier calls OpenAI to produce a short thread summary
-- the original message reaction reflects overall state: pending, ready, or abandoned
-
-This design handles the common npm-first / GitHub-later case without requiring open-ended web search.
+- notifications are not edited or supplemented after they are posted
 
 ## Link Strategy
 
@@ -183,15 +154,6 @@ Rules:
 - `/npmlist` version links use stored `githubRepoUrl`
 - if no GitHub metadata is available, `/npmlist` shows plain version text
 
-## Release Summaries
-
-AI summarization is intentionally constrained:
-
-- structured evidence is gathered from npm metadata plus GitHub release/compare APIs
-- OpenAI is only used to compress that evidence into short Slack text
-- the model is not expected to discover facts on the open web
-- if the evidence is weak, the summary is skipped rather than guessed
-
 ## Testing
 
 Notifier tests live in:
@@ -204,7 +166,7 @@ Current coverage focuses on:
 - `/npmuntrack` all-channel behavior
 - `/npmlist` formatting and link behavior
 - GitHub metadata persistence during polling
-- delayed enrichment, Slack reactions, and AI summary posting
+- final notification delivery without delayed enrichment
 
 Test stack:
 

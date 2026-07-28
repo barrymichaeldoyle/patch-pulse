@@ -26,9 +26,7 @@ export default defineSchema({
     subscriberId: v.id('subscribers'),
     guildId: v.string(),
     guildName: v.string(),
-  })
-    .index('by_subscriber', ['subscriberId'])
-    .index('by_guild_id', ['guildId']),
+  }).index('by_subscriber', ['subscriberId']),
 
   slackSubscriberDetails: defineTable({
     subscriberId: v.id('subscribers'),
@@ -36,9 +34,7 @@ export default defineSchema({
     botUserId: v.string(),
     teamId: v.string(),
     teamName: v.string(),
-  })
-    .index('by_subscriber', ['subscriberId'])
-    .index('by_team_id', ['teamId']),
+  }).index('by_subscriber', ['subscriberId']),
 
   pendingReleaseChecks: defineTable({
     subscriberId: v.id('subscribers'),
@@ -46,6 +42,7 @@ export default defineSchema({
     messageTs: v.string(),
     fullText: v.string(),
     retryCount: v.number(),
+    // Legacy fields remain optional until old queued enrichment jobs have drained.
     commentTs: v.optional(v.string()),
     currentReaction: v.optional(v.string()),
     // Deprecated storage for older records; new writes use pendingReleaseCheckPackages.
@@ -71,7 +68,6 @@ export default defineSchema({
     userId: v.optional(v.string()), // Slack user ID — set for DM subscriptions (no channelId)
   })
     .index('by_subscriber', ['subscriberId'])
-    .index('by_package_and_subscriber', ['packageId', 'subscriberId'])
     .index('by_package_subscriber_channel', [
       'packageId',
       'subscriberId',

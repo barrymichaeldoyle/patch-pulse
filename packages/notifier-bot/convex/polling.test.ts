@@ -244,103 +244,9 @@ describe('polling', () => {
     expect(postCalls).toHaveLength(0);
   });
 
-  it('adds a pending reaction, posts an AI summary reply, and finishes with a ready reaction', async () => {
-    vi.useFakeTimers();
-
-    const fetchMock = vi.fn(
-      async (input: string | URL | Request, init?: RequestInit) => {
-        const url =
-          typeof input === 'string'
-            ? input
-            : input instanceof URL
-              ? input.toString()
-              : input.url;
-
-        if (url.startsWith('https://registry.npmjs.org/')) {
-          return new Response(
-            JSON.stringify({
-              'dist-tags': { latest: '19.0.0' },
-              repository: 'github:test/react',
-              versions: { '18.2.0': {}, '19.0.0': {} },
-            }),
-            { headers: { 'Content-Type': 'application/json' } },
-          );
-        }
-
-        if (
-          url ===
-          'https://api.github.com/repos/test/react/releases/tags/v19.0.0'
-        ) {
-          return new Response(
-            JSON.stringify({
-              html_url: 'https://github.com/test/react/releases/tag/v19.0.0',
-              body: 'Adds the React 19 compiler and fixes hydration edge cases.',
-              tag_name: 'v19.0.0',
-            }),
-            { headers: { 'Content-Type': 'application/json' } },
-          );
-        }
-
-        if (
-          url ===
-          'https://api.github.com/repos/test/react/compare/v18.2.0...v19.0.0'
-        ) {
-          return new Response(
-            JSON.stringify({
-              html_url:
-                'https://github.com/test/react/compare/v18.2.0...v19.0.0',
-              commits: [
-                {
-                  commit: {
-                    message:
-                      'Ship the compiler by default\n\nAdditional body ignored.',
-                  },
-                },
-              ],
-              files: [{ filename: 'packages/react-compiler/index.ts' }],
-            }),
-            { headers: { 'Content-Type': 'application/json' } },
-          );
-        }
-
-        if (url === 'https://api.openai.com/v1/responses') {
-          return new Response(
-            JSON.stringify({
-              output_text:
-                'Adds the React 19 compiler by default and fixes hydration edge cases.',
-            }),
-            { headers: { 'Content-Type': 'application/json' } },
-          );
-        }
-
-        if (url === 'https://slack.com/api/chat.postMessage') {
-          const body =
-            typeof init?.body === 'string' ? JSON.parse(init.body) : {};
-          return new Response(
-            JSON.stringify({
-              ok: true,
-              ts: body.thread_ts ? '222.333' : '111.222',
-            }),
-            { headers: { 'Content-Type': 'application/json' } },
-          );
-        }
-
-        if (
-          url === 'https://slack.com/api/reactions.add' ||
-          url === 'https://slack.com/api/reactions.remove' ||
-          url === 'https://slack.com/api/chat.update'
-        ) {
-          return new Response(JSON.stringify({ ok: true }), {
-            headers: { 'Content-Type': 'application/json' },
-          });
-        }
-
-        throw new Error(`Unhandled fetch: ${url}`);
-      },
-    );
-
+  it('sends one final notification without queuing delayed enrichment', async () => {
+    const fetchMock = makeNpmFetch({ react: '19.0.0' });
     vi.stubGlobal('fetch', fetchMock);
-    vi.stubEnv('OPENAI_API_KEY', 'test-openai-key');
 
     const t = convexTest(schema, modules);
     const subscriberId = await seedWorkspace(t);
@@ -360,54 +266,21 @@ describe('polling', () => {
     });
 
     await t.action(internal.polling.checkForUpdates, {});
-    await t.finishAllScheduledFunctions(() => {
-      vi.runAllTimers();
-    });
 
-    const threadPostCalls = fetchMock.mock.calls.filter(([input]) => {
+    const postCalls = fetchMock.mock.calls.filter(([input]) => {
       const url =
         typeof input === 'string'
           ? input
           : input instanceof URL
             ? input.toString()
             : (input as Request).url;
-      if (url !== 'https://slack.com/api/chat.postMessage') return false;
-      return true;
+      return url === 'https://slack.com/api/chat.postMessage';
     });
-    expect(threadPostCalls).toHaveLength(2);
+    expect(postCalls).toHaveLength(1);
 
-    const reactionAddBodies = await Promise.all(
-      fetchMock.mock.calls
-        .filter(([input]) => {
-          const url =
-            typeof input === 'string'
-              ? input
-              : input instanceof URL
-                ? input.toString()
-                : (input as Request).url;
-          return url === 'https://slack.com/api/reactions.add';
-        })
-        .map(async ([, init]) =>
-          JSON.parse(typeof init?.body === 'string' ? init.body : '{}'),
-        ),
+    const pendingChecks = await t.run(async (ctx) =>
+      ctx.db.query('pendingReleaseChecks').collect(),
     );
-    expect(reactionAddBodies.map((body) => body.name)).toContain(
-      'hourglass_flowing_sand',
-    );
-    expect(reactionAddBodies.map((body) => body.name)).toContain('memo');
-
-    const openAiCalls = fetchMock.mock.calls.filter(([input]) => {
-      const url =
-        typeof input === 'string'
-          ? input
-          : input instanceof URL
-            ? input.toString()
-            : (input as Request).url;
-      return url === 'https://api.openai.com/v1/responses';
-    });
-    expect(openAiCalls).toHaveLength(1);
-
-    vi.useRealTimers();
-    vi.unstubAllEnvs();
+    expect(pendingChecks).toEqual([]);
   });
 });

@@ -101,7 +101,7 @@ Update notifications use Discord markdown:
   ↳ [`v18.3.2`](<.../releases/tag/v18.3.2>) · [`v18.3.3`](<.../releases/tag/v18.3.3>)
 ```
 
-Release note enrichment (AI summaries, thread replies) is currently Slack-only. Discord receives the base notification only.
+Discord and Slack both receive a single notification when an update is detected.
 
 ## Link Behavior
 
