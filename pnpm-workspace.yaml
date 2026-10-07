@@ -5,6 +5,10 @@ allowBuilds:
   esbuild: true
   sharp: true
 
+overrides:
+  # GHSA-rj75-hqrm-r3gf: transitive via @astrojs/starlight > expressive-code
+  'postcss-selector-parser@<7.1.6': '7.1.6'
+
 minimumReleaseAgeExclude:
   - '@astrojs/starlight@0.41.5'
   - '@oxfmt/binding-android-arm-eabi@0.61.0'
