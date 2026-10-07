@@ -1,5 +1,15 @@
 # patch-pulse
 
+## 4.2.0
+
+### Minor Changes
+
+- d27e244: Honour minimum release age gates. Patch Pulse now mirrors `minimumReleaseAge` (pnpm, bun), `min-release-age` (npm) and `npmMinimalAgeGate` (yarn) so versions too young to install are withheld instead of reported as updates. Configure explicitly with `minimumReleaseAge` / `minimumReleaseAgeExclude` or the `--minimum-release-age` flag.
+
+### Patch Changes
+
+- da5dab3: Lock `package.json` and `pnpm-workspace.yaml` while applying updates so concurrent patch-pulse runs against the same workspace queue instead of overwriting each other's changes.
+
 ## 4.1.1
 
 ### Patch Changes
