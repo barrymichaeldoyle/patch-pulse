@@ -3,6 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { type PackageManager, type UpdateableDependency } from '../types';
 import { ansi } from '../ui/ansi';
+import { withFileLock } from '../utils/fileLock';
 import { preserveWildcardPrefix } from '../utils/parseVersion';
 import { pluralize } from '../utils/pluralize';
 
@@ -161,11 +162,11 @@ export async function updateDependencies({
     const catalogUpdates = collectCatalogUpdates(dependencies);
 
     if (directUpdates.length > 0) {
-      updatePackageJsonFiles(directUpdates);
+      await updatePackageJsonFiles(directUpdates);
     }
 
     if (catalogUpdates.length > 0) {
-      updateCatalogFiles(catalogUpdates);
+      await updateCatalogFiles(catalogUpdates);
     }
 
     await runInstallCommand({
@@ -292,7 +293,9 @@ function collectCatalogUpdates(
   return [...updatesByKey.values()];
 }
 
-function updatePackageJsonFiles(updates: DirectDependencyUpdate[]): void {
+async function updatePackageJsonFiles(
+  updates: DirectDependencyUpdate[],
+): Promise<void> {
   const updatesByFile = updates.reduce(
     (accumulator, update) => {
       if (!accumulator[update.packageJsonPath]) {
@@ -305,30 +308,39 @@ function updatePackageJsonFiles(updates: DirectDependencyUpdate[]): void {
   );
 
   for (const [packageJsonPath, fileUpdates] of Object.entries(updatesByFile)) {
-    let packageJson: Record<string, unknown>;
-    try {
-      packageJson = JSON.parse(
-        readFileSync(packageJsonPath, 'utf-8'),
-      ) as Record<string, unknown>;
-    } catch (error) {
-      throw new Error(
-        `Failed to parse ${packageJsonPath}: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-
-    for (const update of fileUpdates) {
-      const section = packageJson[update.section];
-      if (section && typeof section === 'object' && section !== null) {
-        (section as Record<string, string>)[update.packageName] =
-          update.targetVersion;
+    // Lock around the whole read-modify-write so a concurrent patch-pulse run
+    // against the same manifest cannot silently discard our changes.
+    await withFileLock(packageJsonPath, () => {
+      let packageJson: Record<string, unknown>;
+      try {
+        packageJson = JSON.parse(
+          readFileSync(packageJsonPath, 'utf-8'),
+        ) as Record<string, unknown>;
+      } catch (error) {
+        throw new Error(
+          `Failed to parse ${packageJsonPath}: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
-    }
 
-    writeFileSync(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`);
+      for (const update of fileUpdates) {
+        const section = packageJson[update.section];
+        if (section && typeof section === 'object' && section !== null) {
+          (section as Record<string, string>)[update.packageName] =
+            update.targetVersion;
+        }
+      }
+
+      writeFileSync(
+        packageJsonPath,
+        `${JSON.stringify(packageJson, null, 2)}\n`,
+      );
+    });
   }
 }
 
-function updateCatalogFiles(updates: CatalogDependencyUpdate[]): void {
+async function updateCatalogFiles(
+  updates: CatalogDependencyUpdate[],
+): Promise<void> {
   const updatesByFile = updates.reduce(
     (accumulator, update) => {
       if (!accumulator[update.workspaceManifestPath]) {
@@ -343,29 +355,31 @@ function updateCatalogFiles(updates: CatalogDependencyUpdate[]): void {
   for (const [workspaceManifestPath, fileUpdates] of Object.entries(
     updatesByFile,
   )) {
-    const contents = readFileSync(workspaceManifestPath, 'utf-8');
-    const lines = contents.split('\n');
+    await withFileLock(workspaceManifestPath, () => {
+      const contents = readFileSync(workspaceManifestPath, 'utf-8');
+      const lines = contents.split('\n');
 
-    for (const update of fileUpdates) {
-      const lineIndex = findCatalogEntryLineIndex({
-        catalogName: update.catalogName,
-        lines,
-        packageName: update.packageName,
-      });
+      for (const update of fileUpdates) {
+        const lineIndex = findCatalogEntryLineIndex({
+          catalogName: update.catalogName,
+          lines,
+          packageName: update.packageName,
+        });
 
-      if (lineIndex === -1) {
-        throw new Error(
-          `Catalog entry not found for ${update.packageName} in ${workspaceManifestPath}`,
+        if (lineIndex === -1) {
+          throw new Error(
+            `Catalog entry not found for ${update.packageName} in ${workspaceManifestPath}`,
+          );
+        }
+
+        lines[lineIndex] = replaceYamlValue(
+          lines[lineIndex],
+          update.targetVersion,
         );
       }
 
-      lines[lineIndex] = replaceYamlValue(
-        lines[lineIndex],
-        update.targetVersion,
-      );
-    }
-
-    writeFileSync(workspaceManifestPath, lines.join('\n'));
+      writeFileSync(workspaceManifestPath, lines.join('\n'));
+    });
   }
 }
 
