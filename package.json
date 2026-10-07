@@ -28,7 +28,7 @@
     "build:docs": "pnpm --filter @patch-pulse/docs build",
     "build": "pnpm run build:cli && pnpm run build:vscode-extension",
     "dev:docs": "pnpm --filter @patch-pulse/docs dev",
-    "deploy:notifier": "pnpm --filter @patch-pulse/notifier-bot deploy",
+    "deploy:notifier": "pnpm --filter @patch-pulse/notifier-bot run deploy",
     "dev:notifier": "pnpm --filter @patch-pulse/notifier-bot dev",
     "dev:cli": "pnpm --filter patch-pulse dev",
     "pp": "node --import tsx packages/cli/src/index.ts",
