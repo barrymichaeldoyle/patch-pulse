@@ -17,10 +17,10 @@
   },
   "dependencies": {
     "@patch-pulse/shared": "workspace:*",
-    "convex": "1.42.3"
+    "convex": "1.46.0"
   },
   "devDependencies": {
     "@edge-runtime/vm": "5.0.0",
-    "convex-test": "0.0.54"
+    "convex-test": "0.0.60"
   }
 }

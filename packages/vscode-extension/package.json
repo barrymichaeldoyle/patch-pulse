@@ -72,8 +72,8 @@
     "check-types": "tsc --noEmit"
   },
   "devDependencies": {
-    "@types/node": "26.1.2",
-    "@types/vscode": "1.125.0"
+    "@types/node": "26.6.4",
+    "@types/vscode": "1.140.0"
   },
   "dependencies": {
     "@patch-pulse/shared": "workspace:*"
