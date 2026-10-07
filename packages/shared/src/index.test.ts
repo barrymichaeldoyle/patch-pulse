@@ -5,6 +5,7 @@ import {
   createDependencyCheckResult,
   fetchNpmLatestVersionCached,
   fetchNpmPackageManifest,
+  fetchNpmPackageManifestConditional,
   getAllDependencyNames,
   getDependencySections,
   getDependencyStatus,
@@ -436,6 +437,67 @@ describe('PackageVersionCache', () => {
     });
     cache.set('react', '18.0.0', { tracked: true });
     expect(cache.get('react')?.meta).toEqual({ tracked: true });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// fetchNpmPackageManifestConditional
+// ---------------------------------------------------------------------------
+
+describe('fetchNpmPackageManifestConditional', () => {
+  beforeEach(() => {
+    vi.spyOn(global, 'fetch');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('returns the manifest and response ETag when no etag is provided', async () => {
+    const manifest = { 'dist-tags': { latest: '18.0.0' } };
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify(manifest), {
+        status: 200,
+        headers: { ETag: '"abc"' },
+      }),
+    );
+    const result = await fetchNpmPackageManifestConditional('react');
+    expect(result).toEqual({ status: 'modified', manifest, etag: '"abc"' });
+    const headers = new Headers(vi.mocked(fetch).mock.calls[0][1]?.headers);
+    expect(headers.get('If-None-Match')).toBeNull();
+  });
+
+  it('sends If-None-Match and returns not-modified on 304', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 304 }));
+    const result = await fetchNpmPackageManifestConditional('react', {
+      etag: '"abc"',
+    });
+    expect(result).toEqual({ status: 'not-modified', etag: '"abc"' });
+    const headers = new Headers(vi.mocked(fetch).mock.calls[0][1]?.headers);
+    expect(headers.get('If-None-Match')).toBe('"abc"');
+  });
+
+  it('returns the new manifest and ETag when the stored etag is stale', async () => {
+    const manifest = { 'dist-tags': { latest: '19.0.0' } };
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify(manifest), {
+        status: 200,
+        headers: { ETag: '"def"' },
+      }),
+    );
+    const result = await fetchNpmPackageManifestConditional('react', {
+      etag: '"abc"',
+    });
+    expect(result).toEqual({ status: 'modified', manifest, etag: '"def"' });
+  });
+
+  it('throws on non-ok response', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response('Not Found', { status: 404, statusText: 'Not Found' }),
+    );
+    await expect(
+      fetchNpmPackageManifestConditional('nonexistent', { etag: '"abc"' }),
+    ).rejects.toThrow('HTTP 404');
   });
 });
 

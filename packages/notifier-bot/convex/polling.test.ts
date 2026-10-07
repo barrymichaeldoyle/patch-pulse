@@ -18,7 +18,7 @@ async function seedWorkspace(t: ReturnType<typeof convexTest>) {
 
 function makeNpmFetch(versions: Record<string, string>) {
   // versions: { [packageName]: latestVersion }
-  return vi.fn(async (input: string | URL | Request) => {
+  return vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url =
       typeof input === 'string'
         ? input
@@ -29,13 +29,18 @@ function makeNpmFetch(versions: Record<string, string>) {
     if (url.startsWith('https://registry.npmjs.org/')) {
       const pkg = url.replace('https://registry.npmjs.org/', '').split('/')[0];
       const latest = versions[decodeURIComponent(pkg)] ?? '1.0.0';
+      const etag = `"etag-${pkg}-${latest}"`;
+      const ifNoneMatch = new Headers(init?.headers).get('If-None-Match');
+      if (ifNoneMatch === etag) {
+        return new Response(null, { status: 304, headers: { ETag: etag } });
+      }
       return new Response(
         JSON.stringify({
           'dist-tags': { latest },
           repository: `github:test/${pkg}`,
           versions: { '1.0.0': {}, [latest]: {} },
         }),
-        { headers: { 'Content-Type': 'application/json' } },
+        { headers: { 'Content-Type': 'application/json', ETag: etag } },
       );
     }
 
@@ -98,7 +103,7 @@ describe('polling', () => {
 
     // DM should have been sent (chat.postMessage called)
     const postCalls = fetchMock.mock.calls.filter(
-      ([input]: [string | URL | Request]) => {
+      ([input]: [string | URL | Request, RequestInit?]) => {
         const url =
           typeof input === 'string'
             ? input
@@ -109,6 +114,76 @@ describe('polling', () => {
       },
     );
     expect(postCalls.length).toBeGreaterThan(0);
+  });
+
+  it('stores the registry ETag and sends it as If-None-Match on the next poll', async () => {
+    const fetchMock = makeNpmFetch({ react: '18.2.0' }); // already up to date
+    vi.stubGlobal('fetch', fetchMock);
+
+    const t = convexTest(schema, modules);
+    await t.mutation(internal.packages.upsertVersion, {
+      name: 'react',
+      version: '18.2.0',
+      ecosystem: 'npm',
+    });
+
+    await t.action(internal.polling.checkForUpdates, {});
+
+    const pkg = await t.query(internal.packages.getByName, { name: 'react' });
+    expect(pkg?.etag).toBe('"etag-react-18.2.0"');
+    expect(pkg?.currentVersion).toBe('18.2.0');
+
+    // Second poll must be conditional and get a 304 back.
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.now() + 60_000);
+    try {
+      await t.action(internal.polling.checkForUpdates, {});
+    } finally {
+      vi.useRealTimers();
+    }
+
+    const registryCalls = fetchMock.mock.calls.filter(([input]) =>
+      String(input).startsWith('https://registry.npmjs.org/'),
+    );
+    expect(registryCalls).toHaveLength(2);
+    expect(new Headers(registryCalls[0][1]?.headers).get('If-None-Match')).toBe(
+      null,
+    );
+    expect(new Headers(registryCalls[1][1]?.headers).get('If-None-Match')).toBe(
+      '"etag-react-18.2.0"',
+    );
+
+    const after = await t.query(internal.packages.getByName, { name: 'react' });
+    expect(after?.currentVersion).toBe('18.2.0');
+    expect(after?.etag).toBe('"etag-react-18.2.0"');
+    expect(after?.lastChecked).toBeGreaterThan(pkg?.lastChecked ?? 0);
+  });
+
+  it('still detects a new version when a stale ETag no longer matches', async () => {
+    const fetchMock = makeNpmFetch({ react: '19.0.0' });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const t = convexTest(schema, modules);
+    const subscriberId = await seedWorkspace(t);
+    const packageId = await t.mutation(internal.packages.upsertVersion, {
+      name: 'react',
+      version: '18.2.0',
+      ecosystem: 'npm',
+      etag: '"etag-react-18.2.0"',
+    });
+    await t.mutation(internal.subscriptions.create, {
+      packageId,
+      subscriberId,
+      lastNotifiedVersion: '18.2.0',
+      minUpdateType: 'patch',
+      userId: 'U_ALICE',
+    });
+
+    await t.action(internal.polling.checkForUpdates, {});
+
+    const pkg = await t.query(internal.packages.getByName, { name: 'react' });
+    expect(pkg?.currentVersion).toBe('19.0.0');
+    expect(pkg?.etag).toBe('"etag-react-19.0.0"');
   });
 
   it('does not notify when update type is below the subscription threshold', async () => {
@@ -141,7 +216,7 @@ describe('polling', () => {
     expect(subs[0].lastNotifiedVersion).toBe('18.2.0');
 
     const postCalls = fetchMock.mock.calls.filter(
-      ([input]: [string | URL | Request]) => {
+      ([input]: [string | URL | Request, RequestInit?]) => {
         const url =
           typeof input === 'string'
             ? input
@@ -194,7 +269,7 @@ describe('polling', () => {
 
     // Two separate chat.postMessage calls (one DM, one channel)
     const postCalls = fetchMock.mock.calls.filter(
-      ([input]: [string | URL | Request]) => {
+      ([input]: [string | URL | Request, RequestInit?]) => {
         const url =
           typeof input === 'string'
             ? input
@@ -231,7 +306,7 @@ describe('polling', () => {
     await t.action(internal.polling.checkForUpdates, {});
 
     const postCalls = fetchMock.mock.calls.filter(
-      ([input]: [string | URL | Request]) => {
+      ([input]: [string | URL | Request, RequestInit?]) => {
         const url =
           typeof input === 'string'
             ? input

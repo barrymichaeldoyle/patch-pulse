@@ -33,10 +33,11 @@ export const upsertVersion = internalMutation({
     ecosystem: v.optional(v.string()),
     githubRepoUrl: v.optional(v.string()),
     checkedAt: v.optional(v.number()),
+    etag: v.optional(v.string()),
   },
   handler: async (
     ctx,
-    { name, version, ecosystem, githubRepoUrl, checkedAt },
+    { name, version, ecosystem, githubRepoUrl, checkedAt, etag },
   ) => {
     const timestamp = checkedAt ?? Date.now();
     const existing = await ctx.db
@@ -49,6 +50,7 @@ export const upsertVersion = internalMutation({
         currentVersion: version,
         lastChecked: timestamp,
         githubRepoUrl,
+        ...(etag !== undefined ? { etag } : {}),
       });
       return existing._id;
     }
@@ -59,6 +61,7 @@ export const upsertVersion = internalMutation({
       ecosystem: ecosystem ?? 'npm',
       lastChecked: timestamp,
       githubRepoUrl,
+      etag,
     });
   },
 });
@@ -104,9 +107,13 @@ export const touchLastChecked = internalMutation({
   args: {
     packageId: v.id('packages'),
     checkedAt: v.optional(v.number()),
+    etag: v.optional(v.string()),
   },
-  handler: async (ctx, { packageId, checkedAt }) => {
-    await ctx.db.patch(packageId, { lastChecked: checkedAt ?? Date.now() });
+  handler: async (ctx, { packageId, checkedAt, etag }) => {
+    await ctx.db.patch(packageId, {
+      lastChecked: checkedAt ?? Date.now(),
+      ...(etag !== undefined ? { etag } : {}),
+    });
   },
 });
 

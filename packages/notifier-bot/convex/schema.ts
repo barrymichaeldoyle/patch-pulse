@@ -12,6 +12,9 @@ export default defineSchema({
     ecosystem: v.string(),
     lastChecked: v.optional(v.number()),
     githubRepoUrl: v.optional(v.string()),
+    // ETag of the last registry manifest response, sent as If-None-Match on
+    // the next poll so unchanged packages cost a 304 instead of a full body.
+    etag: v.optional(v.string()),
   })
     .index('by_name', ['name'])
     .index('by_last_checked', ['lastChecked']),

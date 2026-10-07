@@ -2,9 +2,9 @@ import {
   getDependencyStatus,
   getUpdateType,
   getNpmLatestVersion,
-  fetchNpmPackageManifest,
+  fetchNpmPackageManifestConditional,
   type UpdateType,
-  type NpmPackageManifest,
+  type NpmPackageManifestFetchResult,
 } from '@patch-pulse/shared';
 import { internalAction } from './_generated/server';
 import { internal } from './_generated/api';
@@ -62,11 +62,12 @@ export const checkForUpdates = internalAction({
       if (packages.length === 0) break;
 
       for (const pkg of packages) {
-        let manifest: NpmPackageManifest | undefined;
+        let fetched: NpmPackageManifestFetchResult;
 
         try {
-          manifest = await fetchNpmPackageManifest(pkg.name, {
+          fetched = await fetchNpmPackageManifestConditional(pkg.name, {
             userAgent: 'patch-pulse-notifier-bot',
+            etag: pkg.etag,
           });
         } catch {
           console.error(`failed to fetch npm data for ${pkg.name}`);
@@ -77,11 +78,22 @@ export const checkForUpdates = internalAction({
           continue;
         }
 
+        if (fetched.status === 'not-modified') {
+          // Registry confirmed nothing changed since the stored ETag.
+          await ctx.runMutation(internal.packages.touchLastChecked, {
+            packageId: pkg._id,
+            checkedAt: runStartedAt,
+          });
+          continue;
+        }
+
+        const { manifest, etag } = fetched;
         const version = getNpmLatestVersion(manifest);
         if (!version) {
           await ctx.runMutation(internal.packages.touchLastChecked, {
             packageId: pkg._id,
             checkedAt: runStartedAt,
+            etag,
           });
           continue;
         }
@@ -117,6 +129,7 @@ export const checkForUpdates = internalAction({
             version,
             githubRepoUrl: extractGitHubRepoUrl(manifest),
             checkedAt: runStartedAt,
+            etag,
           });
 
           console.log(
@@ -162,6 +175,7 @@ export const checkForUpdates = internalAction({
           await ctx.runMutation(internal.packages.touchLastChecked, {
             packageId: pkg._id,
             checkedAt: runStartedAt,
+            etag,
           });
         }
       }

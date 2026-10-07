@@ -359,17 +359,37 @@ export function getNpmLatestVersion(
   return manifest?.['dist-tags']?.latest;
 }
 
-export async function fetchNpmPackageManifest(
+export interface FetchNpmPackageConditionalOptions extends FetchNpmPackageOptions {
+  /** ETag from a previous response. When provided it is sent as `If-None-Match`. */
+  etag?: string;
+}
+
+export type NpmPackageManifestFetchResult =
+  | { status: 'not-modified'; etag: string }
+  | { status: 'modified'; manifest: NpmPackageManifest; etag?: string };
+
+/**
+ * Fetches a package manifest using a conditional request when a previous ETag
+ * is known. A `304 Not Modified` response is returned as `not-modified` without
+ * downloading or parsing the body, which is what the registry answers for the
+ * vast majority of polling checks.
+ */
+export async function fetchNpmPackageManifestConditional(
   packageName: string,
-  options: FetchNpmPackageOptions = {},
-): Promise<NpmPackageManifest> {
-  const { registryUrl = DEFAULT_NPM_REGISTRY_URL, userAgent } = options;
+  options: FetchNpmPackageConditionalOptions = {},
+): Promise<NpmPackageManifestFetchResult> {
+  const { registryUrl = DEFAULT_NPM_REGISTRY_URL, userAgent, etag } = options;
   const response = await fetch(createRegistryUrl(packageName, registryUrl), {
     headers: {
       Accept: 'application/vnd.npm.install-v1+json',
       ...(userAgent ? { 'User-Agent': userAgent } : {}),
+      ...(etag ? { 'If-None-Match': etag } : {}),
     },
   });
+
+  if (response.status === 304 && etag) {
+    return { status: 'not-modified', etag };
+  }
 
   if (!response.ok) {
     const error = Object.assign(
@@ -379,7 +399,21 @@ export async function fetchNpmPackageManifest(
     throw error;
   }
 
-  return response.json() as Promise<NpmPackageManifest>;
+  const manifest = (await response.json()) as NpmPackageManifest;
+  const responseEtag = response.headers.get('etag') ?? undefined;
+  return { status: 'modified', manifest, etag: responseEtag };
+}
+
+export async function fetchNpmPackageManifest(
+  packageName: string,
+  options: FetchNpmPackageOptions = {},
+): Promise<NpmPackageManifest> {
+  const result = await fetchNpmPackageManifestConditional(packageName, options);
+  // Without an ETag in the request the registry never answers 304.
+  if (result.status === 'not-modified') {
+    throw new Error('Unexpected 304 Not Modified without If-None-Match');
+  }
+  return result.manifest;
 }
 
 export async function fetchNpmLatestVersion(
