@@ -7,6 +7,7 @@ import {
   fetchNpmPackageManifest,
   fetchNpmPackageManifestConditional,
   getAllDependencyNames,
+  resolveLatestVersion,
   getDependencySections,
   getDependencyStatus,
   getDependencyVersion,
@@ -437,6 +438,176 @@ describe('PackageVersionCache', () => {
     });
     cache.set('react', '18.0.0', { tracked: true });
     expect(cache.get('react')?.meta).toEqual({ tracked: true });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveLatestVersion
+// ---------------------------------------------------------------------------
+
+describe('resolveLatestVersion', () => {
+  const NOW = Date.parse('2026-10-07T12:00:00Z');
+  const hoursAgo = (hours: number) =>
+    new Date(NOW - hours * 60 * 60 * 1000).toISOString();
+  const DAY_MS = 24 * 60 * 60 * 1000;
+
+  const manifest = {
+    'dist-tags': { latest: '2.1.0' },
+    versions: {
+      '1.9.0': {},
+      '2.0.0': {},
+      '2.0.1': {},
+      '2.1.0': {},
+      '2.2.0-beta.1': {},
+    },
+    time: {
+      '1.9.0': hoursAgo(24 * 30),
+      '2.0.0': hoursAgo(24 * 5),
+      '2.0.1': hoursAgo(30),
+      '2.1.0': hoursAgo(3),
+      '2.2.0-beta.1': hoursAgo(1),
+    },
+  };
+
+  it('returns the latest dist-tag when no policy is given', () => {
+    expect(resolveLatestVersion('pkg', manifest)).toEqual({
+      latestVersion: '2.1.0',
+    });
+  });
+
+  it('returns the latest dist-tag when it is old enough', () => {
+    expect(
+      resolveLatestVersion('pkg', manifest, {
+        releaseAge: { minimumAgeMs: 60 * 60 * 1000 },
+        now: NOW,
+      }),
+    ).toEqual({ latestVersion: '2.1.0' });
+  });
+
+  it('falls back to the newest stable version that satisfies the age gate', () => {
+    expect(
+      resolveLatestVersion('pkg', manifest, {
+        releaseAge: { minimumAgeMs: DAY_MS },
+        now: NOW,
+      }),
+    ).toEqual({ latestVersion: '2.0.1', withheldVersion: '2.1.0' });
+  });
+
+  it('never falls back to a prerelease', () => {
+    const withYoungStable = {
+      ...manifest,
+      'dist-tags': { latest: '2.1.0' },
+      time: { ...manifest.time, '2.0.1': hoursAgo(2), '2.0.0': hoursAgo(2) },
+    };
+    expect(
+      resolveLatestVersion('pkg', withYoungStable, {
+        releaseAge: { minimumAgeMs: DAY_MS },
+        now: NOW,
+      }),
+    ).toEqual({ latestVersion: '1.9.0', withheldVersion: '2.1.0' });
+  });
+
+  it('reports no eligible version when everything is too new', () => {
+    expect(
+      resolveLatestVersion('pkg', manifest, {
+        releaseAge: { minimumAgeMs: 365 * DAY_MS },
+        now: NOW,
+      }),
+    ).toEqual({ latestVersion: undefined, withheldVersion: '2.1.0' });
+  });
+
+  it('skips the gate for excluded packages', () => {
+    expect(
+      resolveLatestVersion('pkg', manifest, {
+        releaseAge: {
+          minimumAgeMs: DAY_MS,
+          isExcluded: (name) => name === 'pkg',
+        },
+        now: NOW,
+      }),
+    ).toEqual({ latestVersion: '2.1.0' });
+  });
+
+  it('skips the gate for an excluded specific version', () => {
+    expect(
+      resolveLatestVersion('pkg', manifest, {
+        releaseAge: {
+          minimumAgeMs: DAY_MS,
+          isExcluded: (_name, version) => version === '2.1.0',
+        },
+        now: NOW,
+      }),
+    ).toEqual({ latestVersion: '2.1.0' });
+  });
+
+  it('treats versions with unknown publish times as old enough', () => {
+    const noTimes = { ...manifest, time: undefined };
+    expect(
+      resolveLatestVersion('pkg', noTimes, {
+        releaseAge: { minimumAgeMs: DAY_MS },
+        now: NOW,
+      }),
+    ).toEqual({ latestVersion: '2.1.0' });
+  });
+});
+
+describe('getDependencyStatus with a withheld version', () => {
+  it('reports up-to-date and keeps the withheld version when nothing is eligible', () => {
+    const result = getDependencyStatus({
+      packageName: 'pkg',
+      currentVersion: '1.0.0',
+      latestVersion: undefined,
+      withheldVersion: '1.1.0',
+    });
+    expect(result.status).toBe('up-to-date');
+    expect(result.isOutdated).toBe(false);
+    expect(result.withheldVersion).toBe('1.1.0');
+  });
+});
+
+describe('checkNpmDependencyStatuses with a release age policy', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('requests full metadata and withholds versions that are too young', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          'dist-tags': { latest: '18.1.0' },
+          versions: { '18.0.0': {}, '18.1.0': {} },
+          time: {
+            '18.0.0': new Date(Date.now() - 10 * 86_400_000).toISOString(),
+            '18.1.0': new Date(Date.now() - 60_000).toISOString(),
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const results = await checkNpmDependencyStatuses(
+      { react: '18.0.0' },
+      { releaseAge: { minimumAgeMs: 86_400_000 } },
+    );
+
+    expect(results[0]).toMatchObject({
+      status: 'up-to-date',
+      latestVersion: '18.0.0',
+      withheldVersion: '18.1.0',
+    });
+    const headers = new Headers(fetchSpy.mock.calls[0][1]?.headers);
+    expect(headers.get('Accept')).toBe('application/json');
+  });
+
+  it('keeps using the abbreviated manifest without a policy', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ 'dist-tags': { latest: '18.0.0' } }), {
+        status: 200,
+      }),
+    );
+    await checkNpmDependencyStatuses({ react: '17.0.0' });
+    const headers = new Headers(fetchSpy.mock.calls[0][1]?.headers);
+    expect(headers.get('Accept')).toBe('application/vnd.npm.install-v1+json');
   });
 });
 

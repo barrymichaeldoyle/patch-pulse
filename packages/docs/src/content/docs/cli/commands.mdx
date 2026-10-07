@@ -160,3 +160,21 @@ npx patch-pulse --no-peer-deps
 ```
 
 Can also be set persistently via [`ignorePeerDeps`](../configuration#ignorePeerDeps) in your config file.
+
+---
+
+### `--minimum-release-age`
+
+Ignore versions published less than the given number of minutes ago. Withheld versions are shown in a note next to the package but are not counted as updates and are not offered by the interactive updater.
+
+```bash
+npx patch-pulse --minimum-release-age 1440
+```
+
+By default Patch Pulse mirrors the release age gate configured for your package manager (pnpm, bun, npm, or yarn). Use `--no-minimum-release-age` to turn the gate off for one run.
+
+```bash
+npx patch-pulse --no-minimum-release-age
+```
+
+Can also be set persistently via [`minimumReleaseAge`](../configuration#minimumReleaseAge) in your config file.

@@ -20,6 +20,9 @@ export function displaySummary(
     (d) => d.isOutdated && !d.isSkipped,
   ).length;
   const skipped = allDependencies.filter((d) => d.isSkipped).length;
+  const withheld = allDependencies.filter(
+    (d) => d.withheldVersion && !d.isSkipped,
+  ).length;
 
   // Count by update type (only for non-skipped packages)
   const majorUpdates = allDependencies.filter(
@@ -54,6 +57,12 @@ export function displaySummary(
 
   if (unknown > 0) {
     console.log(`  ${ansi.magenta('?  Unknown:')} ${unknown}`);
+  }
+
+  if (withheld > 0) {
+    console.log(
+      `  ${ansi.gray('⏳ Withheld:')} ${withheld} ${ansi.gray('(newer version too recent, run with --expand to see)')}`,
+    );
   }
 
   if (

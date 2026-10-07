@@ -10,6 +10,14 @@ export interface PatchPulseConfig {
   packageManager?: PackageManager;
   interactive?: boolean;
   ignorePeerDeps?: boolean;
+  /**
+   * Minimum age (in minutes) a published version must have before it is
+   * reported as an update. `0` disables the gate. When unset, the package
+   * manager's own setting is mirrored.
+   */
+  minimumReleaseAge?: number;
+  /** Packages exempt from the release age gate. Merged with the package manager's list. */
+  minimumReleaseAgeExclude?: string[];
 }
 
 /**
@@ -101,6 +109,21 @@ export function parseCliConfig(args: string[]): PatchPulseConfig {
     config.ignorePeerDeps = true;
   }
 
+  // Parse minimum release age (minutes)
+  const minimumReleaseAgeIndex = args.indexOf('--minimum-release-age');
+  if (
+    minimumReleaseAgeIndex !== -1 &&
+    minimumReleaseAgeIndex + 1 < args.length
+  ) {
+    const value = Number(args[minimumReleaseAgeIndex + 1]);
+    if (Number.isFinite(value) && value >= 0) {
+      config.minimumReleaseAge = value;
+    }
+  }
+  if (args.includes('--no-minimum-release-age')) {
+    config.minimumReleaseAge = 0;
+  }
+
   return config;
 }
 
@@ -173,6 +196,19 @@ export function mergeConfigs(
     merged.ignorePeerDeps = fileConfig.ignorePeerDeps;
   }
 
+  // Handle minimumReleaseAge (CLI takes precedence)
+  if (cliConfig.minimumReleaseAge !== undefined) {
+    merged.minimumReleaseAge = cliConfig.minimumReleaseAge;
+  } else if (fileConfig?.minimumReleaseAge !== undefined) {
+    merged.minimumReleaseAge = fileConfig.minimumReleaseAge;
+  }
+
+  if (fileConfig?.minimumReleaseAgeExclude) {
+    merged.minimumReleaseAgeExclude = [
+      ...new Set(fileConfig.minimumReleaseAgeExclude),
+    ];
+  }
+
   return merged;
 }
 
@@ -215,6 +251,23 @@ function validateConfig(config: any): PatchPulseConfig {
 
   if (typeof config.ignorePeerDeps === 'boolean') {
     validated.ignorePeerDeps = config.ignorePeerDeps;
+  }
+
+  if (
+    typeof config.minimumReleaseAge === 'number' &&
+    Number.isFinite(config.minimumReleaseAge) &&
+    config.minimumReleaseAge >= 0
+  ) {
+    validated.minimumReleaseAge = config.minimumReleaseAge;
+  }
+
+  if (
+    config.minimumReleaseAgeExclude &&
+    Array.isArray(config.minimumReleaseAgeExclude)
+  ) {
+    validated.minimumReleaseAgeExclude = config.minimumReleaseAgeExclude.filter(
+      (item: any) => typeof item === 'string',
+    );
   }
 
   return validated;
@@ -321,7 +374,7 @@ function hasPatternSyntax(pattern: string): boolean {
   );
 }
 
-function matchesPattern({
+export function matchesPattern({
   value,
   pattern,
 }: {

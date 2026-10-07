@@ -27,6 +27,12 @@ export interface DependencyCheckResult {
   isOutdated: boolean;
   updateType?: UpdateType;
   category?: string;
+  /**
+   * The newest published version that was ignored because it is younger than
+   * the configured minimum release age. Only set when a release age policy is
+   * active and withheld a version.
+   */
+  withheldVersion?: string;
 }
 
 export type DependencyStatusKind =
@@ -44,6 +50,24 @@ export interface PackageVersionCacheEntry<TMeta = undefined> {
   version: string;
   timestamp: number;
   meta: TMeta;
+  withheldVersion?: string;
+}
+
+/**
+ * Mirrors package manager "minimum release age" gates (pnpm
+ * `minimumReleaseAge`, bun `minimumReleaseAge`, npm `min-release-age`, yarn
+ * `npmMinimalAgeGate`). Versions published more recently than `minimumAgeMs`
+ * are not reported as available updates.
+ */
+export interface ReleaseAgePolicy {
+  minimumAgeMs: number;
+  /** Return true to exempt a package (or a specific version of it) from the gate. */
+  isExcluded?: (packageName: string, version: string) => boolean;
+}
+
+export interface ResolvedLatestVersion {
+  latestVersion?: string;
+  withheldVersion?: string;
 }
 
 export interface PackageVersionCacheOptions {
@@ -54,6 +78,7 @@ export interface PackageVersionCacheOptions {
 export interface NpmCheckBaseOptions<TMeta = undefined> {
   cache?: PackageVersionCache<TMeta>;
   userAgent?: string;
+  releaseAge?: ReleaseAgePolicy;
 }
 
 export interface PrefetchNpmPackageVersionsOptions<
@@ -81,13 +106,24 @@ export interface CheckNpmDependencyStatusesOptions<
 export interface NpmPackageManifest {
   'dist-tags'?: NpmDistTags;
   versions?: Record<string, object>;
+  /** Publish timestamps keyed by version. Only present on full metadata. */
+  time?: Record<string, string>;
   [key: string]: unknown;
 }
 
 export interface FetchNpmPackageOptions {
   registryUrl?: string;
   userAgent?: string;
+  /**
+   * Request the full package document instead of the abbreviated install
+   * manifest. Needed for publish times (`time`), at the cost of a larger
+   * response.
+   */
+  fullMetadata?: boolean;
 }
+
+const ABBREVIATED_MANIFEST_ACCEPT = 'application/vnd.npm.install-v1+json';
+const FULL_MANIFEST_ACCEPT = 'application/json';
 
 const DEFAULT_NPM_REGISTRY_URL = 'https://registry.npmjs.org';
 
@@ -234,11 +270,13 @@ export function createDependencyCheckResult({
   currentVersion,
   latestVersion,
   category,
+  withheldVersion,
 }: {
   packageName: string;
   currentVersion: string;
   latestVersion?: string;
   category?: string;
+  withheldVersion?: string;
 }): DependencyCheckResult {
   const isOutdated = latestVersion
     ? isVersionOutdated({ current: currentVersion, latest: latestVersion })
@@ -254,6 +292,7 @@ export function createDependencyCheckResult({
         ? getUpdateType({ current: currentVersion, latest: latestVersion })
         : undefined,
     category,
+    ...(withheldVersion ? { withheldVersion } : {}),
   };
 }
 
@@ -263,18 +302,21 @@ export function getDependencyStatus({
   latestVersion,
   category,
   status,
+  withheldVersion,
 }: {
   packageName: string;
   currentVersion: string;
   latestVersion?: string;
   category?: string;
   status?: DependencyStatusKind;
+  withheldVersion?: string;
 }): DependencyStatusResult {
   const base = createDependencyCheckResult({
     packageName,
     currentVersion,
     latestVersion,
     category,
+    withheldVersion,
   });
 
   if (status === 'lookup-failed') {
@@ -282,6 +324,11 @@ export function getDependencyStatus({
   }
 
   if (!latestVersion) {
+    // Every published version is younger than the release age gate, so the
+    // installed version is the best available one for now.
+    if (withheldVersion) {
+      return { ...base, latestVersion: currentVersion, status: 'up-to-date' };
+    }
     return { ...base, status: 'not-found' };
   }
 
@@ -328,8 +375,18 @@ export class PackageVersionCache<TMeta = undefined> {
     return this.get(packageName)?.version ?? null;
   }
 
-  set(packageName: string, version: string, meta: TMeta): void {
-    this.#cache.set(packageName, { version, timestamp: Date.now(), meta });
+  set(
+    packageName: string,
+    version: string,
+    meta: TMeta,
+    withheldVersion?: string,
+  ): void {
+    this.#cache.set(packageName, {
+      version,
+      timestamp: Date.now(),
+      meta,
+      ...(withheldVersion ? { withheldVersion } : {}),
+    });
   }
 
   clear(packageName?: string): void {
@@ -359,6 +416,69 @@ export function getNpmLatestVersion(
   return manifest?.['dist-tags']?.latest;
 }
 
+function isStableVersion(version: string): boolean {
+  return /^\d+\.\d+\.\d+$/.test(version);
+}
+
+function compareVersions(a: string, b: string): number {
+  const left = parseVersion(a);
+  const right = parseVersion(b);
+  return (
+    left.major - right.major ||
+    left.minor - right.minor ||
+    left.patch - right.patch
+  );
+}
+
+/**
+ * Picks the version to report as "latest" for a package, honouring an optional
+ * release age policy. Without a policy this is simply the `latest` dist-tag.
+ * With one, the dist-tag is used when it is old enough (or exempt); otherwise
+ * the newest stable version that satisfies the policy is reported instead and
+ * the dist-tag is surfaced as `withheldVersion`.
+ */
+export function resolveLatestVersion(
+  packageName: string,
+  manifest: NpmPackageManifest | null | undefined,
+  options: { releaseAge?: ReleaseAgePolicy; now?: number } = {},
+): ResolvedLatestVersion {
+  const taggedLatest = getNpmLatestVersion(manifest);
+  const { releaseAge, now = Date.now() } = options;
+
+  if (!taggedLatest || !releaseAge || releaseAge.minimumAgeMs <= 0) {
+    return { latestVersion: taggedLatest };
+  }
+
+  const times = manifest?.time ?? {};
+  const cutoff = now - releaseAge.minimumAgeMs;
+  const isEligible = (version: string): boolean => {
+    if (releaseAge.isExcluded?.(packageName, version)) return true;
+    const publishedAt = Date.parse(times[version] ?? '');
+    // Unknown publish time: assume old enough rather than hiding it forever.
+    return Number.isNaN(publishedAt) || publishedAt <= cutoff;
+  };
+
+  if (isEligible(taggedLatest)) {
+    return { latestVersion: taggedLatest };
+  }
+
+  let fallback: string | undefined;
+  for (const version of Object.keys(manifest?.versions ?? {})) {
+    if (!isStableVersion(version)) continue;
+    try {
+      if (compareVersions(version, taggedLatest) >= 0) continue;
+      if (!isEligible(version)) continue;
+      if (!fallback || compareVersions(version, fallback) > 0) {
+        fallback = version;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return { latestVersion: fallback, withheldVersion: taggedLatest };
+}
+
 export interface FetchNpmPackageConditionalOptions extends FetchNpmPackageOptions {
   /** ETag from a previous response. When provided it is sent as `If-None-Match`. */
   etag?: string;
@@ -378,10 +498,15 @@ export async function fetchNpmPackageManifestConditional(
   packageName: string,
   options: FetchNpmPackageConditionalOptions = {},
 ): Promise<NpmPackageManifestFetchResult> {
-  const { registryUrl = DEFAULT_NPM_REGISTRY_URL, userAgent, etag } = options;
+  const {
+    registryUrl = DEFAULT_NPM_REGISTRY_URL,
+    userAgent,
+    etag,
+    fullMetadata = false,
+  } = options;
   const response = await fetch(createRegistryUrl(packageName, registryUrl), {
     headers: {
-      Accept: 'application/vnd.npm.install-v1+json',
+      Accept: fullMetadata ? FULL_MANIFEST_ACCEPT : ABBREVIATED_MANIFEST_ACCEPT,
       ...(userAgent ? { 'User-Agent': userAgent } : {}),
       ...(etag ? { 'If-None-Match': etag } : {}),
     },
@@ -424,18 +549,56 @@ export async function fetchNpmLatestVersion(
   return getNpmLatestVersion(manifest);
 }
 
+export async function fetchNpmLatestVersionResolved<TMeta = undefined>(
+  packageName: string,
+  options: NpmCheckBaseOptions<TMeta> = {},
+): Promise<ResolvedLatestVersion> {
+  const { cache, userAgent, releaseAge } = options;
+  const cached = cache?.get(packageName);
+  if (cached) {
+    return {
+      latestVersion: cached.version,
+      withheldVersion: cached.withheldVersion,
+    };
+  }
+
+  const manifest = await fetchNpmPackageManifest(packageName, {
+    userAgent,
+    // Publish times only exist on the full document.
+    fullMetadata: Boolean(releaseAge && releaseAge.minimumAgeMs > 0),
+  });
+  const resolved = resolveLatestVersion(packageName, manifest, { releaseAge });
+
+  if (resolved.latestVersion && cache) {
+    cache.set(
+      packageName,
+      resolved.latestVersion,
+      undefined as TMeta,
+      resolved.withheldVersion,
+    );
+  }
+
+  return resolved;
+}
+
 export async function fetchNpmLatestVersionCached<TMeta = undefined>(
   packageName: string,
   options: NpmCheckBaseOptions<TMeta> = {},
 ): Promise<string | undefined> {
-  const { cache, userAgent } = options;
+  const { cache, userAgent, releaseAge } = options;
   const cachedVersion = cache?.getVersion(packageName);
   if (cachedVersion) return cachedVersion;
 
-  const latestVersion = await fetchNpmLatestVersion(packageName, { userAgent });
+  const existingMeta = cache?.get(packageName)?.meta;
+  const { latestVersion, withheldVersion } =
+    await fetchNpmLatestVersionResolved(packageName, { userAgent, releaseAge });
   if (latestVersion && cache) {
-    const existingMeta = cache.get(packageName)?.meta;
-    cache.set(packageName, latestVersion, existingMeta as TMeta);
+    cache.set(
+      packageName,
+      latestVersion,
+      existingMeta as TMeta,
+      withheldVersion,
+    );
   }
 
   return latestVersion;
@@ -451,6 +614,7 @@ export async function prefetchNpmPackageVersions<TMeta = undefined>(
     createMeta,
     onError,
     onResolved,
+    releaseAge,
     userAgent,
   } = options;
 
@@ -461,6 +625,7 @@ export async function prefetchNpmPackageVersions<TMeta = undefined>(
         try {
           const latestVersion = await fetchNpmLatestVersionCached(packageName, {
             cache,
+            releaseAge,
             userAgent,
           });
 
@@ -487,6 +652,7 @@ export async function checkNpmDependencyStatuses<TMeta = undefined>(
     concurrency = 10,
     onError,
     onResolved,
+    releaseAge,
     userAgent,
   } = options;
   const packageNames = Object.keys(dependencies);
@@ -498,15 +664,18 @@ export async function checkNpmDependencyStatuses<TMeta = undefined>(
     const batchResults = await Promise.all(
       batch.map(async (packageName) => {
         try {
-          const latestVersion = await fetchNpmLatestVersionCached(packageName, {
-            cache,
-            userAgent,
-          });
+          const { latestVersion, withheldVersion } =
+            await fetchNpmLatestVersionResolved(packageName, {
+              cache,
+              releaseAge,
+              userAgent,
+            });
           const result = getDependencyStatus({
             packageName,
             currentVersion: dependencies[packageName],
             latestVersion,
             category,
+            withheldVersion,
           });
           completedCount += 1;
           onResolved?.({

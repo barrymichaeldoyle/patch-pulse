@@ -32,6 +32,22 @@ describe('formatDependencyResult', () => {
   });
 });
 
+describe('formatDependencyResult with a withheld version', () => {
+  it('annotates up-to-date packages whose newer version is too young', () => {
+    const result = formatDependencyResult({
+      packageName: 'react',
+      currentVersion: '18.2.0',
+      latestVersion: '18.2.0',
+      isOutdated: false,
+      status: 'up-to-date',
+      withheldVersion: '19.0.0',
+    });
+
+    expect(result).toContain('UP TO DATE');
+    expect(result).toContain('19.0.0 withheld');
+  });
+});
+
 describe('checkDependencyVersions', () => {
   beforeEach(() => {
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
@@ -39,6 +55,26 @@ describe('checkDependencyVersions', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('forwards the release age policy to the shared checker', async () => {
+    vi.mocked(checkNpmDependencyStatuses).mockResolvedValue([]);
+    const releaseAge = { minimumAgeMs: 1000 };
+
+    await checkDependencyVersions(
+      { react: '18.2.0' },
+      'Dependencies',
+      undefined,
+      {
+        releaseAge,
+        silent: true,
+      },
+    );
+
+    expect(checkNpmDependencyStatuses).toHaveBeenCalledWith(
+      { react: '18.2.0' },
+      expect.objectContaining({ releaseAge }),
+    );
   });
 
   it('stops the progress spinner before returning results', async () => {

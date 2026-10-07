@@ -21,6 +21,34 @@ vi.mock('path', () => ({
   join: vi.fn(),
 }));
 
+describe('release age configuration', () => {
+  it('parses --minimum-release-age from the CLI', () => {
+    expect(parseCliConfig(['--minimum-release-age', '120'])).toEqual({
+      minimumReleaseAge: 120,
+    });
+  });
+
+  it('treats --no-minimum-release-age as zero', () => {
+    expect(parseCliConfig(['--no-minimum-release-age'])).toEqual({
+      minimumReleaseAge: 0,
+    });
+  });
+
+  it('ignores invalid --minimum-release-age values', () => {
+    expect(parseCliConfig(['--minimum-release-age', 'soon'])).toEqual({});
+    expect(parseCliConfig(['--minimum-release-age', '-5'])).toEqual({});
+  });
+
+  it('lets the CLI override the file setting and keeps file excludes', () => {
+    const merged = mergeConfigs(
+      { minimumReleaseAge: 1440, minimumReleaseAgeExclude: ['a', 'a', 'b'] },
+      { minimumReleaseAge: 0 },
+    );
+    expect(merged.minimumReleaseAge).toBe(0);
+    expect(merged.minimumReleaseAgeExclude).toEqual(['a', 'b']);
+  });
+});
+
 describe('Configuration Service', () => {
   beforeEach(() => {
     vi.clearAllMocks();

@@ -13,6 +13,30 @@ describe('displaySummary', () => {
     consoleSpy.mockRestore();
   });
 
+  it('counts packages with a withheld newer version', () => {
+    displaySummary([
+      {
+        packageName: 'knip',
+        currentVersion: '6.39.0',
+        latestVersion: '6.39.0',
+        isOutdated: false,
+        withheldVersion: '6.40.0',
+      },
+      {
+        packageName: 'react',
+        currentVersion: '19.0.0',
+        latestVersion: '19.0.0',
+        isOutdated: false,
+      },
+    ]);
+
+    const output = consoleSpy.mock.calls
+      .map((call: unknown[]) => String(call[0]))
+      .join('\n');
+    expect(output).toContain('Withheld:');
+    expect(output).toContain('1');
+  });
+
   it('should display summary with all dependency types', () => {
     const dependencies: DependencyInfo[] = [
       {

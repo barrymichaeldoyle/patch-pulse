@@ -7,6 +7,12 @@ import {
 import { getConfig } from './services/config';
 import { checkForCliUpdate } from './services/npm';
 import {
+  createReleaseAgePolicy,
+  formatReleaseAge,
+  resolveReleaseAgeSettings,
+  type ReleaseAgeSettings,
+} from './services/releaseAge';
+import {
   detectPackageManager,
   getPackageManagerInfo,
   updateDependencies,
@@ -61,6 +67,8 @@ const VALID_FLAGS = [
   '--expand',
   '--fail',
   '--no-peer-deps',
+  '--minimum-release-age',
+  '--no-minimum-release-age',
 ];
 
 export async function runCli({
@@ -80,7 +88,11 @@ export async function runCli({
   const unknownArgs = getUnknownArgs({
     args: argv,
     validFlags: VALID_FLAGS,
-    singleValueFlags: ['--package-manager', '--project'],
+    singleValueFlags: [
+      '--package-manager',
+      '--project',
+      '--minimum-release-age',
+    ],
   });
   if (unknownArgs.length > 0) {
     displayUnknownArguments(unknownArgs);
@@ -115,6 +127,16 @@ export async function runCli({
   try {
     const allDependencies: DependencyInfo[] = [];
     const config = getConfig({ argv, cwd });
+    const packageManagerName =
+      config.packageManager ?? detectPackageManager(cwd).name;
+    const releaseAgeSettings = resolveReleaseAgeSettings({
+      cwd,
+      config,
+      packageManager: packageManagerName,
+    });
+    const releaseAge = releaseAgeSettings
+      ? createReleaseAgePolicy(releaseAgeSettings)
+      : undefined;
     const workspace = await scanWorkspace(cwd, config);
     const filteredProjects = filterProjects({
       projectFilter,
@@ -151,6 +173,14 @@ export async function runCli({
     if (filteredProjects.length > 0) {
       if (!jsonOutput) {
         console.log();
+        if (releaseAgeSettings) {
+          console.log(
+            ansi.gray(
+              `⏳ Ignoring versions published less than ${formatReleaseAge(releaseAgeSettings.minimumAgeMinutes)} ago (${releaseAgeSettings.source})`,
+            ),
+          );
+          console.log();
+        }
       }
 
       // --hide-clean monorepo: buffer all results then display only outdated projects.
@@ -246,6 +276,7 @@ export async function runCli({
                     `Checking ${sectionLabel.toLowerCase()}... (${completedCount}/${totalCount})`,
                   );
                 },
+                releaseAge,
                 silent: !streamInline,
               },
             );
@@ -335,6 +366,7 @@ export async function runCli({
               isMonorepo: workspace.isMonorepo,
               allProjectReports: projectReports,
               projectFilter,
+              releaseAge: releaseAgeSettings,
               visibleProjectReports,
             }),
             null,
@@ -452,6 +484,7 @@ export async function runCli({
               isMonorepo: workspace.isMonorepo,
               allProjectReports: [],
               projectFilter,
+              releaseAge: releaseAgeSettings,
               visibleProjectReports: [],
             }),
             null,
@@ -565,6 +598,7 @@ function createJsonOutput({
   hasCatalogDependencies,
   isMonorepo,
   projectFilter,
+  releaseAge,
   visibleProjectReports,
 }: {
   allProjectReports: ProjectReport[];
@@ -572,6 +606,7 @@ function createJsonOutput({
   hasCatalogDependencies: boolean;
   isMonorepo: boolean;
   projectFilter?: string;
+  releaseAge: ReleaseAgeSettings | null;
   visibleProjectReports: ProjectReport[];
 }) {
   const allDependencies = allProjectReports.flatMap(
@@ -585,6 +620,13 @@ function createJsonOutput({
     hasCatalogDependencies,
     isMonorepo,
     projectFilter: projectFilter ?? null,
+    releaseAge: releaseAge
+      ? {
+          minimumAgeMinutes: releaseAge.minimumAgeMinutes,
+          exclude: releaseAge.exclude,
+          source: releaseAge.source,
+        }
+      : null,
     visibleProjectCount: visibleProjectReports.length,
     projects: visibleProjectReports.map((project) => ({
       displayName: project.displayName,

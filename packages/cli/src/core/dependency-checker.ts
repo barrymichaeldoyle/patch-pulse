@@ -1,6 +1,7 @@
 import {
   checkNpmDependencyStatuses,
   getDependencyStatus,
+  type ReleaseAgePolicy,
 } from '@patch-pulse/shared';
 
 import { PatchPulseConfig, shouldSkipPackage } from '../services/config';
@@ -16,10 +17,11 @@ export async function checkDependencyVersions(
   config?: PatchPulseConfig,
   options: {
     onProgress?: (args: { completedCount: number; totalCount: number }) => void;
+    releaseAge?: ReleaseAgePolicy;
     silent?: boolean;
   } = {},
 ): Promise<DependencyInfo[]> {
-  const { onProgress, silent = false } = options;
+  const { onProgress, releaseAge, silent = false } = options;
 
   if (!dependencies || Object.keys(dependencies).length === 0) {
     return [];
@@ -88,6 +90,7 @@ export async function checkDependencyVersions(
             onResolved: ({ completedCount }) => {
               reportProgress(completedCount);
             },
+            releaseAge,
             userAgent: 'patch-pulse-cli',
           })) as DependencyInfo[]);
   } finally {
@@ -139,6 +142,7 @@ export function formatDependencyResult(dep: DependencyInfo): string {
         latestVersion: dep.latestVersion,
         category: dep.category,
         status: dep.status,
+        withheldVersion: dep.withheldVersion,
       });
 
   if (dep.isSkipped) {
@@ -164,6 +168,10 @@ export function formatDependencyResult(dep: DependencyInfo): string {
   } else {
     status = ansi.green('UP TO DATE');
     versionInfo = dep.currentVersion;
+  }
+
+  if (dep.withheldVersion && !dep.isSkipped) {
+    versionInfo += ` (${dep.withheldVersion} withheld: newer than minimum release age)`;
   }
 
   return `${status} ${ansi.white(dep.packageName)} ${ansi.gray(versionInfo)}`;

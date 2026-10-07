@@ -36,6 +36,8 @@ ${ansi.cyanBoldUnderline('🔧 Configuration Options:')}
   ${ansi.white('-i, --interactive')}        ${ansi.gray('Show interactive update prompt after summary')}
   ${ansi.white('--no-interactive')}         ${ansi.gray('Skip update prompt after summary (default)')}
   ${ansi.white('--no-peer-deps')}           ${ansi.gray('Exclude peerDependencies from the scan')}
+  ${ansi.white('--minimum-release-age <m>')} ${ansi.gray('Ignore versions published less than <m> minutes ago')}
+  ${ansi.white('--no-minimum-release-age')} ${ansi.gray('Disable the release age gate inherited from your package manager')}
   ${ansi.white('--hide-clean')}             ${ansi.gray('Hide clean projects in monorepos')}
   ${ansi.white('--expand')}                 ${ansi.gray('Show full output for every project in monorepos')}
   ${ansi.white('--fail')}                   ${ansi.gray('Exit with code 1 if any outdated packages are found')}
@@ -48,7 +50,9 @@ ${ansi.cyanBoldUnderline('📁 Configuration File:')}
     ${ansi.gray('"ignorePaths": ["packages/cli/e2e"],')}
     ${ansi.gray('"packageManager": "npm",')}
     ${ansi.gray('"interactive": true,')}
-    ${ansi.gray('"ignorePeerDeps": true')}
+    ${ansi.gray('"ignorePeerDeps": true,')}
+    ${ansi.gray('"minimumReleaseAge": 1440,')}
+    ${ansi.gray('"minimumReleaseAgeExclude": ["@myorg/*"]')}
   ${ansi.gray('}')}
 
 ${ansi.cyanBoldUnderline('📝 Description:')}

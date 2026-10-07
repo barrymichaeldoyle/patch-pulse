@@ -20,7 +20,9 @@ The CLI supports a configuration file for persistent settings. Use `patchpulse.j
   "ignorePaths": ["packages/cli/e2e"],
   "packageManager": "pnpm",
   "interactive": true,
-  "ignorePeerDeps": true
+  "ignorePeerDeps": true,
+  "minimumReleaseAge": 1440,
+  "minimumReleaseAgeExclude": ["@myorg/*"]
 }
 ```
 
@@ -113,6 +115,49 @@ Exclude `peerDependencies` from the scan entirely. Useful for published librarie
 ```
 
 Can also be set via the [`--no-peer-deps`](../commands#--no-peer-deps) CLI flag.
+
+---
+
+### `minimumReleaseAge`
+
+Minimum age, in minutes, a published version must reach before Patch Pulse reports it as an update. Versions younger than this are **withheld**: the package shows as up to date, with a note naming the newer version, and the interactive updater will not offer it.
+
+```json
+{
+  "minimumReleaseAge": 1440
+}
+```
+
+You usually do not need to set this. When it is absent, Patch Pulse mirrors the release age gate your package manager already enforces, so it never suggests a version that `install` would refuse:
+
+| Package manager | Setting mirrored                                                                                                          |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| pnpm            | `minimumReleaseAge` in `pnpm-workspace.yaml` or `minimum-release-age` in `.npmrc` (minutes). pnpm 11 defaults to one day. |
+| bun             | `[install] minimumReleaseAge` in `bunfig.toml` (seconds)                                                                  |
+| npm             | `min-release-age` in `.npmrc` (days)                                                                                      |
+| yarn            | `npmMinimalAgeGate` in `.yarnrc.yml` (minutes or durations such as `7d`)                                                  |
+
+Set it to `0` to turn the gate off even when your package manager has one. Can also be set via the [`--minimum-release-age`](../commands#--minimum-release-age) CLI flag.
+
+<Aside>
+  Enforcing a release age needs publish timestamps, so Patch Pulse fetches the
+  full package document from the registry instead of the smaller abbreviated
+  one. Expect checks to take a little longer when a gate is active.
+</Aside>
+
+---
+
+### `minimumReleaseAgeExclude`
+
+Packages exempt from the release age gate. These are merged with your package manager's own exclusion list (`minimumReleaseAgeExclude`, `minimumReleaseAgeExcludes`, or `npmPreapprovedPackages`).
+
+```json
+{
+  "minimumReleaseAgeExclude": ["@myorg/*", "typescript", "webpack@5.102.1"]
+}
+```
+
+Entries may be exact names, glob patterns, or `name@version` specifiers. Several versions can be listed with `||`, for example `webpack@4.47.0 || 5.102.1`.
 
 ---
 
