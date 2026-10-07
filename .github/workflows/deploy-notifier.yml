@@ -1,0 +1,43 @@
+name: Deploy notifier
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/notifier-bot/**'
+      - 'packages/shared/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/deploy-notifier.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-notifier
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Convex
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test (shared)
+        run: pnpm test:shared
+
+      - name: Test (notifier)
+        run: pnpm test:notifier
+
+      - name: Deploy
+        run: pnpm deploy:notifier
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
