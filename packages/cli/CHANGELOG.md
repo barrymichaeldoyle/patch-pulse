@@ -1,5 +1,11 @@
 # patch-pulse
 
+## 4.2.1
+
+### Patch Changes
+
+- fbf93b2: Remove GitHub Action links from `--help`, `--about` and the README now that the action is no longer maintained.
+
 ## 4.2.0
 
 ### Minor Changes
