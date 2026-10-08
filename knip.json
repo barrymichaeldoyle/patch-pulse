@@ -17,10 +17,6 @@
     },
     "packages/vscode-extension": {
       "project": ["src/**/*.ts"]
-    },
-    "packages/action": {
-      "entry": ["src/main.ts", "scripts/*.cjs"],
-      "project": ["src/**/*.ts", "scripts/*.cjs"]
     }
   }
 }

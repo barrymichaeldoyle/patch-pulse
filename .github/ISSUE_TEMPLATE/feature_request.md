@@ -7,7 +7,6 @@ labels: enhancement
 **Project**
 
 - [ ] CLI
-- [ ] GitHub Action
 - [ ] Slack bot
 - [ ] VS Code extension
 

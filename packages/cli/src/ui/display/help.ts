@@ -3,7 +3,6 @@ import { createCenteredBox } from '../createCenteredBox';
 import {
   DISCORD_BOT_URL,
   DOCS_URL,
-  GITHUB_ACTION_DOCS_URL,
   ISSUES_URL,
   SLACK_BOT_URL,
 } from '../../constant';
@@ -87,8 +86,7 @@ ${ansi.cyanBoldUnderline('🔗 Links:')}
   ${ansi.blue('🐛 Issues:')}    ${ansi.white(ansi.link('Open an issue', ISSUES_URL))}
   ${ansi.blue('👨‍ Author:')}    ${ansi.white(ansi.link('github.com/barrymichaeldoyle', 'https://github.com/barrymichaeldoyle'))}
   ${ansi.blue('🤖 Slack Bot:')} ${ansi.white(ansi.link('Add to Slack', SLACK_BOT_URL))}
-  ${ansi.blue('💬 Discord Bot:')} ${ansi.white(ansi.link('Add to Discord', DISCORD_BOT_URL))}
-  ${ansi.blue('⚙️  GitHub Action:')} ${ansi.white(ansi.link('Read the GitHub Action docs', GITHUB_ACTION_DOCS_URL))}`);
+  ${ansi.blue('💬 Discord Bot:')} ${ansi.white(ansi.link('Add to Discord', DISCORD_BOT_URL))}`);
 
   displayMadeWithLove();
 }

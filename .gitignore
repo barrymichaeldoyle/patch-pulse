@@ -20,3 +20,6 @@ out/
 .DS_Store
 .vscode-test/
 *.vsix
+
+# astro generated types
+.astro/
